@@ -21,14 +21,14 @@ def config_logging(log_fname=None):
         fh.setLevel(logging.DEBUG)
         logger.addHandler(fh)
 
-class NdiayeAPLC(object): # Parent APLC coronagraph class
+class LyotCoronagraph(object): # Lyot coronagraph superclass
     def __init__(self, *args, **kwargs):
         self.logger = logging.getLogger('scda.logger')
         self.file_org = kwargs.get('file_org')
         self.design_params = kwargs.get('design_params')
         self.solver_params = kwargs.get('solver_params')
         self.eval_params = kwargs.get('eval_params')
-        self.ampl_fname = "ndiaye_aplc.mod"
+        self.ampl_fname = "lyot_coronagraph.mod"
     def write_ampl(self):
         logger.info("Writing the AMPL program")
     def read_solution(self):
@@ -38,7 +38,12 @@ class NdiayeAPLC(object): # Parent APLC coronagraph class
     def eval_solution(self):
         logger.info("Evaluating the design throughput, PSF FWHM, etc., and writing summary")
 
-class HalfplaneAPLC(NdiayeAPLC): # Child for the half-plane symmetry case
+class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
+    def __init__(self, *args, **kwargs):
+        super(NdiayeAPLC, self).__init__(self, *args, **kwargs)
+        self.ampl_fname = "ndiaye_aplc.mod"
+
+class HalfplaneAPLC(NdiayeAPLC): # Subclass for the half-plane symmetry case
     def __init__(self, *args, **kwargs):
         super(HalfplaneAPLC, self).__init__(self, *args, **kwargs)
         self.ampl_fname = "halfplane_aplc.mod"
