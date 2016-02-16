@@ -23,31 +23,49 @@ def configure_log(log_fname=None):
         logger.addHandler(fh)
 
 class LyotCoronagraph(object): # Lyot coronagraph base class
-    _key_fields = dict([('fileorg', ['tel ap dir', 'FPM dir', 'LS dir', 'ampl src dir', 'sol dir', 'eval dir']),\
+    _key_fields = dict([('fileorg', ['ampl src dir', 'tel ap dir', 'FPM dir', 'LS dir', 'sol dir', 'eval dir']),\
                         ('solver', ['constr', 'method', 'presolve'])])
+    _solver_menu = dict([('constr',['lin', 'quad']), ('method', ['bar', 'barhom', 'dualsimp']), ('presolve',[True, False])])
 
     def __init__(self, **kwargs):
+        # Only set fileorg and solver attributes in this constructor,
+        # since design and eval parameter checking is design-specific. 
         self.logger = logging.getLogger('scda.logger')
-     
-        # Only set fileorg and solver attributes here, since design and eval parameter checking is design-specific. 
+
         setattr(self, 'fileorg', {})
         if 'fileorg' in kwargs:
-            for field, location in kwargs['fileorg'].items():
-                if field in self._key_fields['fileorg']:
-                    self.fileorg[field] = location
+            for dirkey, location in kwargs['fileorg'].items():
+                if dirkey in self._key_fields['fileorg']:
+                    self.fileorg[dirkey] = location
+                    if location is not None and not os.path.exists(location):
+                        self.logger.warning("Warning: The specified location for \"{0}\", \"{1}\" does not yet exist".format(dirkey, location))
                 else:
-                    self.logger.warning("Unrecognized field {0} in fileorg argument".format(field))
-        else:
-            pass # TODO: default settings
+                    self.logger.warning("Warning: Unrecognized field {0} in fileorg argument".format(dirkey))
+        # Handle missing values
+        if 'ampl src dir' not in self.fileorg: # Set ampl src dir to cwd if unspecified
+            self.fileorg['ampl src dir'] = os.getcwd()
+        elif self.fileorg['ampl src dir'] is None: 
+            self.fileorg['ampl src dir'] = os.getcwd()
+        for dirkey in self._key_fields['fileorg']: # Revert missing locations to ampl src dir
+            if dirkey not in self.fileorg:
+                self.fileorg[dirkey] = self.fileorg['ampl src dir']
+            elif self.fileorg[dirkey] is None:
+                self.fileorg[dirkey] = self.fileorg['ampl src dir']
+                
         setattr(self, 'solver', {})
         if 'solver' in kwargs:
             for field, value in kwargs['solver'].items():
                 if field in self._key_fields['solver']:
-                    self.solver[field] = value
+                    if value in self._solver_menu[field]:
+                        self.solver[field] = value
+                    else:
+                        self.logger.warning("Warning: Unrecognized solver option \"{0}\" in field \"{1}\", reverting to default".format(value, field))
                 else:
-                    self.logger.warning("Unrecognized field {0} in solver argument".format(field))
-        else:
-            pass # TODO: default settings
+                    self.logger.warning("Warning: Unrecognized field {0} in solver argument".format(field))
+        # Handle missing values
+        if 'constr' not in self.solver or self.solver['constr'] is None: self.solver['constr'] = 'lin'
+        if 'method' not in self.solver or self.solver['method'] is None: self.solver['method'] = 'bar'
+        if 'presolve' not in self.solver or self.solver['presolve'] is None: self.solver['presolve'] = True
 
 class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
     _design_fields = dict([('Pupil', ['N', 'pm', 'sm', 'ss', 'tel diam']),\
