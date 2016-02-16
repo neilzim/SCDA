@@ -10,6 +10,8 @@ import sys
 import logging
 import datetime
 import textwrap
+import numpy as np
+import pdb
 
 def configure_log(log_fname=None):
     logger = logging.getLogger("scda.logger")
@@ -28,6 +30,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
     _solver_menu = dict([('constr',['lin', 'quad']), ('method', ['bar', 'barhom', 'dualsimp']), ('presolve',[True, False])])
     _aperture_menu = dict([('pm', ['hex1', 'hex2', 'hex3', 'key24', 'pie12', 'pie8', 'irisao']),\
                            ('ss', ['y60','y60off','x','cross','t','y90']),\
+                           ('sst', ['025','100']),\
                            ('so', [True, False])])
 
     def __init__(self, **kwargs):
@@ -35,6 +38,12 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         # since design and eval parameter checking is design-specific. 
         self.logger = logging.getLogger('scda.logger')
 
+        #////////////////////////////////////////////////////////////////////////////////////////////////////
+        #   The fileorg attribute holds the locations of telescope apertures,
+        #   intermediate masks, and co-eval AMPL programs.
+        #   File names specific to a coronagraph design (AMPL program, apodizer solution, optimizer log, etc)
+        #   are set downstream as object attributes.
+        #////////////////////////////////////////////////////////////////////////////////////////////////////
         setattr(self, 'fileorg', {})
         if 'fileorg' in kwargs:
             for dirkey, location in kwargs['fileorg'].items():
@@ -51,6 +60,10 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
             if dirkey not in self.fileorg or self.fileorg[dirkey] is None:
                 self.fileorg[dirkey] = self.fileorg['ampl src dir']
                 
+        #////////////////////////////////////////////////////////////////////////////////////////////////////
+        #   The solver attribute holds the options handed from AMPL to Gurobi, 
+        #   and determines how the field constraints are mathematically expressed.
+        #////////////////////////////////////////////////////////////////////////////////////////////////////
         setattr(self, 'solver', {})
         if 'solver' in kwargs:
             for field, value in kwargs['solver'].items():
@@ -67,15 +80,14 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         if 'presolve' not in self.solver or self.solver['presolve'] is None: self.solver['presolve'] = True
 
 class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
-    _design_fields = dict([('Pupil', ['N', 'pm', 'so', 'ss', 'tel diam']),\
-                           ('FPM', ['M', 'rad']),\
-                           ('LS', ['id', 'od', 'ovszfac', 'altol']),\
-                           ('Image', ['c', 'c1', 'c2', 'iwa', 'owa', 'owa2', 'bw', 'Nlam'])])
-    _eval_fields =   dict([('Pupil', ['N', 'pm', 'so', 'ss', 'tel diam']),\
-                           ('FPM', ['M', 'rad']),\
-                           ('LS', ['id', 'od', 'ovszfac', 'altol']),\
-                           ('Image', ['c', 'c1', 'c2', 'iwa', 'owa', 'owa2', 'bw', 'Nlam']),\
-                           ('Target', []), ('Aber', []), ('WFSC', [])])
+    _design_fields = { 'Pupil': {'N':(int, 1000), 'pm':(str, 'hex1'), 'so':(bool, True), 'ss':(str, 'x'), 'sst':(str, '100'), 'tel diam':(float, 12.)}, \
+                       'FPM':   {'M':(int, 50), 'rad':(float, 4.)}, \
+                       'LS':    {'id':(float, 0.2), 'od':(float, 0.9), 'ovszfac':(float, None), 'altol':(float, None)}, \
+                       'Image': {'c':(float, 10.), 'c1':(float, None), 'c2':(float, None), 'iwa':(float, 4.), \
+                                 'owa':(float, 10.), 'owa2':(float, None), 'fpres':(int,2), 'bw':(float, 0.1), 'Nlam':(int, 3)} }
+    _eval_fields =   { 'Pupil': _design_fields['Pupil'], 'FPM': _design_fields['FPM'], \
+                       'LS': _design_fields['LS'], 'Image': _design_fields['Image'], \
+                       'Target': {}, 'Aber': {}, 'WFSC': {} }
 
     def __init__(self, **kwargs):
         super(NdiayeAPLC, self).__init__(**kwargs)
@@ -90,16 +102,62 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                 if keycat in self._design_fields:
                     for param, value in param_dict.items():
                         if param in self._design_fields[keycat]:
-                            self.design[keycat][param] = value
+                            if value is not None:
+                                if isinstance(value, self._design_fields[keycat][param][0]):
+                                    self.design[keycat][param] = value
+                                else:
+                                    warnstr = ("Warning: Invalid {0} for parameter \"{1}\" under category \"{2}\" " + \
+                                               "design initialization argument, expecting a {3}").format(type(value), param, keycat, self._design_fields[keycat][param][0]) 
+                                    self.logger.warning(warnstr)
                         else:
                             self.logger.warning("Warning: Unrecognized parameter \"{0}\" under category \"{1}\" in design initialization argument".format(param, keycat))
                 else:
                     self.logger.warning("Warning: Unrecognized key category \"{0}\" in design initialization argument".format(keycat))
                     self.design[keycat] = None
+        for keycat in self._design_fields: # Fill in default values where appropriate
+            for param in self._design_fields[keycat]:
+                if param not in self.design[keycat] or (self.design[keycat][param] is None and \
+                                                        self._design_fields[keycat][param][1] is not None):
+                    self.design[keycat][param] = self._design_fields[keycat][param][1]
+     
+        self.amplname_coron = "APLC" 
+        if self.design['Pupil']['so'] == True:
+            self.amplname_pupil = "{}{}t{}so1D{:04}".format(self.design['Pupil']['pm'], self.design['Pupil']['ss'], self.design['Pupil']['sst'], self.design['Pupil']['N'])
+        else:                                                                                                                                      
+            self.amplname_pupil = "{}{}t{}so0D{:04}".format(self.design['Pupil']['pm'], self.design['Pupil']['ss'], self.design['Pupil']['sst'], self.design['Pupil']['N'])
+
+        self.amplname_fpm = "FPM{:02}M{:03}".format(int(round(100*self.design['FPM']['rad'])), self.design['FPM']['M'])
+        if self.design['LS']['altol'] is None and self.design['LS']['ovszfac'] is None:
+            self.amplname_ls = "LS{:02}D{:02}ovsz{:02}tol{:02}".format(int(round(100*self.design['LS']['id'])), \
+                               int(round(100*self.design['LS']['od'])), 0, 0)
+        elif self.design['LS']['altol'] is None and self.design['LS']['ovszfac'] is not None:
+            self.amplname_ls = "LS{:02}D{:02}ovsz{:02}tol{:02}".format(int(round(100*self.design['LS']['id'])), \
+                               int(round(100*self.design['LS']['od'])), int(round(100*self.design['LS']['ovszfac'])), 0)
+        elif self.design['LS']['altol'] is not None and self.design['LS']['ovszfac'] is None:
+            self.amplname_ls = "LS{:02}D{:02}ovsz{:02}tol{:02}".format(int(round(100*self.design['LS']['id'])), \
+                               int(round(100*self.design['LS']['od'])), 0, int(round(100*self.design['LS']['altol'])))
         else:
-            pass # TODO: default values
-        
-        self.ampl_fname = "ndiaye_aplc.mod"
+            self.amplname_ls = "LS{:02}D{:02}ovsz{:02}tol{:02}".format(int(round(100*self.design['LS']['id'])), \
+                               int(round(100*self.design['LS']['od'])), int(round(100*self.design['LS']['ovszfac'])), \
+                               int(round(100*self.design['LS']['altol'])))
+
+        self.amplname_image = "Img{:03}C{:02}WA{:03}BW{:02}Nlam{:02}fpres{:1}".format(int(round(10*self.design['Image']['c'])), \
+                               int(round(10*self.design['Image']['iwa'])), int(round(10*self.design['Image']['owa'])), \
+                               int(round(100*self.design['Image']['bw'])), self.design['Image']['Nlam'], self.design['Image']['fpres'])
+        if self.design['Image']['c1'] is not None:
+            self.amplname_image += "C1{:03}".format(self.design['Image']['c1'])
+        if self.design['Image']['c2'] is not None:
+            self.amplname_image += "C2{:03}".format(self.design['Image']['c2'])
+        if self.design['Image']['owa2'] is not None:
+            self.amplname_image += "OWA2{:03}".format(self.design['Image']['owa2'])
+
+        if self.solver['presolve']:
+            self.amplname_solver = "{}{}pre1".format(self.solver['constr'], self.solver['method'])
+        else:
+            self.amplname_solver = "{}{}pre0".format(self.solver['constr'], self.solver['method'])
+
+        self.ampl_src_fname = self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
+                              self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".mod" 
 
     def write_ampl(self):
         self.logger.info("Writing the AMPL program")
@@ -113,14 +171,18 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
 class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symmetry case
     def __init__(self, **kwargs):
         super(HalfplaneAPLC, self).__init__(**kwargs)
-        self.ampl_fname = "halfplane_aplc.mod"
+        self.amplname_coron = "hpAPLC" 
+        self.ampl_src_fname = self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
+                              self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".mod" 
 
     def write_ampl(self): 
         self.logger.info("Writing the AMPL program for this APLC with halfplane symmetry")
-        self.abs_ampl_fname = os.path.join(self.fileorg['ampl src dir'], self.ampl_fname)
-        if os.path.exists(self.abs_ampl_fname):
-            self.logger.warning("Warning: Overwriting the existing copy of {0}".format(self.abs_ampl_fname))
-        mod_fobj = open(self.abs_ampl_fname, "w")
+        self.abs_ampl_src_fname = os.path.join(self.fileorg['ampl src dir'], self.ampl_src_fname)
+        if not os.path.exists(self.fileorg['ampl src dir']):
+           os.mkdir(self.fileorg['ampl src dir'])
+        if os.path.exists(self.abs_ampl_src_fname):
+            self.logger.warning("Warning: Overwriting the existing copy of {0}".format(self.abs_ampl_src_fname))
+        mod_fobj = open(self.abs_ampl_src_fname, "w")
 
         header = """\
         # AMPL program to optimize an APLC with half-plane symmetry
@@ -132,4 +194,4 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         mod_fobj.write( textwrap.dedent(header) )
 
         mod_fobj.close()
-        self.logger.info("Wrote %s"%self.abs_ampl_fname)
+        self.logger.info("Wrote %s"%self.abs_ampl_src_fname)
