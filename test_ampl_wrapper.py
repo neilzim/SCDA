@@ -12,7 +12,7 @@ import sys
 
 if __name__ == "__main__":
 
-    scda.config_logging("wrapper_test.log")
+    scda.configure_log("wrapper_test.log")
 
     top_path = os.getcwd() # During a "real" survey preparation, this will be an agreed
                            # location on central store
@@ -24,21 +24,23 @@ if __name__ == "__main__":
     # intermediate masks, and co-eval AMPL programs.
     # File names specific to a coronagraph design (AMPL program, apodizer solution, optimizer log, etc)
     # are set downstream as object attributes.
-    file_org = dict([('aperture dir', ampl_src_dir), ('intermediate mask dir', ampl_src_dir),\
+    file_org = dict([('tel ap dir', ampl_src_dir), ('FPM dir', ampl_src_dir), ('LS dir', ampl_src_dir),\
                      ('ampl src dir', ampl_src_dir)]) # place holders
 
     # Design parameters, encoded in a hierarchical dictionary
-    pupil_params = dict([('array diam', 200),('telescope diam', 12.)])
-    FPM_params = dict([('spot rad',4), ('spot array size', 50)])
-    LS_params = dict([('inner diam', 0.1), ('outer diam', 0.9)])
-    image_params = dict([('logc', -10)])
-    design_params = dict([('pupil_params', pupil_params), ('FPM_params', FPM_params),\
-                          ('LS_params', LS_params), ('image_params', image_params)])
+    pupil_params = dict([('N', 200),('tel diam', 12.)])
+    fpm_params = dict([('rad',4), ('M', 50)])
+    ls_params = dict([('id', 0.1), ('od', 0.9)])
+    image_params = dict([('c', -10)])
+    design_params = dict([('Pupil', pupil_params), ('FPM', fpm_params),\
+                          ('LS', ls_params), ('Image', image_params)])
     # Options for constraints and optimizer
-    solver_params = dict([('type', 'barrier')])
+    solver_params = dict([('method', 'barrier')])
     
-    test_coron = scda.HalfplaneAPLC(file_org=file_org, design_params=design_params, solver_params=solver_params)
+    test_coron = scda.HalfplaneAPLC(fileorg=file_org, design=design_params, solver=solver_params)
 
-    print test_coron.design_params['pupil_params']
+    print("file organization: {0}".format(test_coron.fileorg))
+    print("solver parameters: {0}".format(test_coron.solver))
+    print("design parameters: {0}".format(test_coron.design))
 
     test_coron.write_ampl()
