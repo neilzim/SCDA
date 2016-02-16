@@ -26,6 +26,9 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
     _key_fields = dict([('fileorg', ['ampl src dir', 'tel ap dir', 'FPM dir', 'LS dir', 'sol dir', 'eval dir']),\
                         ('solver', ['constr', 'method', 'presolve'])])
     _solver_menu = dict([('constr',['lin', 'quad']), ('method', ['bar', 'barhom', 'dualsimp']), ('presolve',[True, False])])
+    _aperture_menu = dict([('pm', ['hex1', 'hex2', 'hex3', 'key24', 'pie12', 'pie8', 'irisao']),\
+                           ('ss', ['y60','y60off','x','cross','t','y90']),\
+                           ('so', [True, False])])
 
     def __init__(self, **kwargs):
         # Only set fileorg and solver attributes in this constructor,
@@ -42,14 +45,10 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                 else:
                     self.logger.warning("Warning: Unrecognized field {0} in fileorg argument".format(dirkey))
         # Handle missing values
-        if 'ampl src dir' not in self.fileorg: # Set ampl src dir to cwd if unspecified
-            self.fileorg['ampl src dir'] = os.getcwd()
-        elif self.fileorg['ampl src dir'] is None: 
+        if 'ampl src dir' not in self.fileorg or self.fileorg['ampl src dir'] is None: # Set ampl src dir to cwd if unspecified
             self.fileorg['ampl src dir'] = os.getcwd()
         for dirkey in self._key_fields['fileorg']: # Revert missing locations to ampl src dir
-            if dirkey not in self.fileorg:
-                self.fileorg[dirkey] = self.fileorg['ampl src dir']
-            elif self.fileorg[dirkey] is None:
+            if dirkey not in self.fileorg or self.fileorg[dirkey] is None:
                 self.fileorg[dirkey] = self.fileorg['ampl src dir']
                 
         setattr(self, 'solver', {})
@@ -68,11 +67,11 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         if 'presolve' not in self.solver or self.solver['presolve'] is None: self.solver['presolve'] = True
 
 class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
-    _design_fields = dict([('Pupil', ['N', 'pm', 'sm', 'ss', 'tel diam']),\
+    _design_fields = dict([('Pupil', ['N', 'pm', 'so', 'ss', 'tel diam']),\
                            ('FPM', ['M', 'rad']),\
                            ('LS', ['id', 'od', 'ovszfac', 'altol']),\
                            ('Image', ['c', 'c1', 'c2', 'iwa', 'owa', 'owa2', 'bw', 'Nlam'])])
-    _eval_fields =   dict([('Pupil', ['N', 'pm', 'sm', 'ss', 'tel diam']),\
+    _eval_fields =   dict([('Pupil', ['N', 'pm', 'so', 'ss', 'tel diam']),\
                            ('FPM', ['M', 'rad']),\
                            ('LS', ['id', 'od', 'ovszfac', 'altol']),\
                            ('Image', ['c', 'c1', 'c2', 'iwa', 'owa', 'owa2', 'bw', 'Nlam']),\
@@ -93,9 +92,9 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                         if param in self._design_fields[keycat]:
                             self.design[keycat][param] = value
                         else:
-                            self.logger.warning("Unrecognized parameter \"{0}\" under category \"{1}\" in design initialization argument".format(param, keycat))
+                            self.logger.warning("Warning: Unrecognized parameter \"{0}\" under category \"{1}\" in design initialization argument".format(param, keycat))
                 else:
-                    self.logger.warning("Unrecognized key category \"{0}\" in design initialization argument".format(keycat))
+                    self.logger.warning("Warning: Unrecognized key category \"{0}\" in design initialization argument".format(keycat))
                     self.design[keycat] = None
         else:
             pass # TODO: default values
@@ -120,7 +119,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         self.logger.info("Writing the AMPL program for this APLC with halfplane symmetry")
         self.abs_ampl_fname = os.path.join(self.fileorg['ampl src dir'], self.ampl_fname)
         if os.path.exists(self.abs_ampl_fname):
-            self.logger.warning("Overwriting the existing copy of {0}".format(self.abs_ampl_fname))
+            self.logger.warning("Warning: Overwriting the existing copy of {0}".format(self.abs_ampl_fname))
         mod_fobj = open(self.abs_ampl_fname, "w")
 
         header = """\
