@@ -14,33 +14,26 @@ if __name__ == "__main__":
 
     scda.configure_log("wrapper_test.log")
 
-    top_path = os.getcwd() # During a "real" survey preparation, this will be an agreed
-                           # location on central store
-    assert os.path.exists(top_path)
-    ampl_src_dir = os.path.join(top_path, "test_scda_aplc") # nominal destination for new AMPL programs
-    if not os.path.exists(ampl_src_dir):
-        os.mkdir(ampl_src_dir) # TODO: set context-dependent group ID and permissions
-    # The file_org structure holds general locations of telescope apertures,
-    # intermediate masks, and co-eval AMPL programs.
-    # File names specific to a coronagraph design (AMPL program, apodizer solution, optimizer log, etc)
-    # are set downstream as object attributes.
-    file_org = dict([('tel ap dir', ampl_src_dir), ('FPM dir', ampl_src_dir), ('LS dir', ampl_src_dir),\
-                     ('ampl src dir', ampl_src_dir)]) # place holders
+#    ampl_src_dir = os.path.join(top_path, "test_scda_aplc") # nominal destination for new AMPL programs
+    ampl_src_dir = os.path.join(os.getcwd(), "test_scda_aplc_new") # nominal destination for new AMPL programs
+    fileorg = {'ampl src dir': ampl_src_dir}
 
-    # Design parameters, encoded in a hierarchical dictionary
-    pupil_params = dict([('N', 200),('tel diam', 12.)])
-    fpm_params = dict([('rad',4), ('M', 50)])
-    ls_params = dict([('id', 0.1), ('od', 0.9)])
-    image_params = dict([('c', -10)])
-    design_params = dict([('Pupil', pupil_params), ('FPM', fpm_params),\
-                          ('LS', ls_params), ('Image', image_params)])
+    # Design parameters, encoded in a nested dictionary
+    pupil_params = {'N': 200,'tel diam': 12.}
+    fpm_params = {'rad': 4.}
+    ls_params = {'id': 10, 'od': 0.9}
+    image_params = {'c': 10.1}
+    design_params = {'Pupil': pupil_params, 'FPM': fpm_params, 'LS': ls_params, 'Image': image_params}
     # Options for constraints and optimizer
-    solver_params = dict([('method', 'barrier')])
+    solver_params = {'method': 'bar', 'presolve': False}
     
-    test_coron = scda.HalfplaneAPLC(fileorg=file_org, design=design_params, solver=solver_params)
+    test_coron = scda.HalfplaneAPLC(fileorg=fileorg, design=design_params, solver=solver_params)
 
     print("file organization: {0}".format(test_coron.fileorg))
     print("solver parameters: {0}".format(test_coron.solver))
     print("design parameters: {0}".format(test_coron.design))
+
+    print
+#    print("AMPL source file name: {0}".format(test_coron.ampl_src_fname))
 
     test_coron.write_ampl()
