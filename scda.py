@@ -363,8 +363,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         set Ls := setof {l in 1..Nlam} lam0*(1+((l-1)/(Nlam-1)-0.5)*dl);
         """
 
-        sets_and_arrays = """\
-        
+        sets_and_arrays = """
         #---------------------
         set Pupil := setof {x in Xs, y in Ys: PupilFile[round(x/dx+0.5+N),round(y/dy+0.5)] != 0} (x,y);
         set Mask := setof {mx in MXs, my in MYs: MaskFile[round(mx/dmx+0.5+M),round(my/dmy+0.5)] != 0} (mx,my);
@@ -376,8 +375,6 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
         
         #---------------------
-        #set Xis := setof {i in -Nimg..Nimg by 1} i*dxi;
-        #set Etas := setof {j in 0..Nimg by 1} j*deta;
         
         set Xis := setof {i in -Nimg..Nimg-1 by 1} i*dxi;
         set Etas := setof {j in 0..Nimg-1 by 1} j*deta;
@@ -387,15 +384,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         set InsideArea := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= 0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta); # Only for 360deg masks.
         """
 
-        field_propagation = """\
-        set Xis := setof {i in -Nimg..Nimg-1 by 1} i*dxi;
-        set Etas := setof {j in 0..Nimg-1 by 1} j*deta;
-        
-        set DarkHole := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= rho0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta); # Only for 360deg masks.
-        set PSFCore := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= 0 && sqrt(xi^2+eta^2) < rho0} (xi,eta); # Only for 360deg masks.
-        set InsideArea := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= 0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta); # Only for 360deg masks.
-        
-        
+        field_propagation = """
         #---------------------
         var EBm_cx {x in Xs, my in MYs, lam in Ls} := 0.0;
         var EBm_real {mx in MXs, my in MYs, lam in Ls} := 0.0;
