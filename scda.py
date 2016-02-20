@@ -47,13 +47,13 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                                 'ampl src fname', 'TelAp fname', 'FPM fname', 'LS fname', 'sol fname'], \
                     'solver': ['constr', 'method', 'presolve', 'Nthreads'] }
 
-    _solver_menu = dict([('constr',['lin', 'quad']), ('method', ['bar', 'barhom', 'dualsimp']), \
-                         ('presolve',[True, False]), ('Nthreads', range(1,33))])
+    _solver_menu = { 'constr': ['lin', 'quad'], 'method': ['bar', 'barhom', 'dualsimp'], \
+                     'presolve': [True, False], 'Nthreads': range(1,33) }
 
-    _aperture_menu = dict([('pm', ['hex1', 'hex2', 'hex3', 'key24', 'pie12', 'pie8', 'irisao']),\
-                           ('ss', ['y60','y60off','x','cross','t','y90']),\
-                           ('sst', ['025','100']),\
-                           ('so', [True, False])])
+    _aperture_menu = { 'pm': ['hex1', 'hex2', 'hex3', 'key24', 'pie12', 'pie8', 'irisao'], \
+                       'ss': ['y60','y60off','x','cross','t','y90'], \
+                       'sst': ['025','100'], \
+                       'so': [True, False] }
 
     def __init__(self, **kwargs):
         # Only set fileorg and solver attributes in this constructor,
@@ -90,14 +90,31 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         # look for it in the directory corresponding to its specific category
         if 'TelAp fname' in self.fileorg and self.fileorg['TelAp fname'] is not None and \
         not os.path.exists(self.fileorg['TelAp fname']) and os.path.exists(self.fileorg['TelAp dir']) and \
-        not os.path.isdir(self.fileorg['TelAp fname']):
+        os.path.dirname(self.fileorg['TelAp fname']) == '':
             try_fname = os.path.join(self.fileorg['TelAp dir'], self.fileorg['TelAp fname']) 
             if os.path.exists(try_fname):
                 self.fileorg['TelAp fname'] = try_fname
             else:
                 self.logger.warning("Warning: Could not find the specified telescope aperture file \"{0}\" in {1}".format(self.fileorg['TelAp fname'], \
                                     self.fileorg['TelAp dir']))
-        # TODO: repeat for the FPM and LS
+        if 'FPM fname' in self.fileorg and self.fileorg['FPM fname'] is not None and \
+        not os.path.exists(self.fileorg['FPM fname']) and os.path.exists(self.fileorg['FPM dir']) and \
+        os.path.dirname(self.fileorg['FPM fname']) == '':
+            try_fname = os.path.join(self.fileorg['FPM dir'], self.fileorg['FPM fname']) 
+            if os.path.exists(try_fname):
+                self.fileorg['FPM fname'] = try_fname
+            else:
+                self.logger.warning("Warning: Could not find the specified FPM file \"{0}\" in {1}".format(self.fileorg['FPM fname'], \
+                                    self.fileorg['FPM dir']))
+        if 'LS fname' in self.fileorg and self.fileorg['LS fname'] is not None and \
+        not os.path.exists(self.fileorg['LS fname']) and os.path.exists(self.fileorg['LS dir']) and \
+        os.path.dirname(self.fileorg['LS fname']) == '':
+            try_fname = os.path.join(self.fileorg['LS dir'], self.fileorg['LS fname']) 
+            if os.path.exists(try_fname):
+                self.fileorg['LS fname'] = try_fname
+            else:
+                self.logger.warning("Warning: Could not find the specified LS file \"{0}\" in {1}".format(self.fileorg['LS fname'], \
+                                    self.fileorg['LS dir']))
 
         # If the specified ampl source filename is a simple name with no directory, append it to the ampl source directory.
         if 'ampl src fname' in self.fileorg and self.fileorg['ampl src fname'] is not None and \
@@ -264,7 +281,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
                 self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname)
             else:
                 self.fileorg['ampl src fname'] = os.path.abspath(ampl_src_fname)    
-                self.fileorg['ampl src dir'] = os.path.split(self.fileorg['ampl src fname'])[0]
+                self.fileorg['ampl src dir'] = os.path.dirname(self.fileorg['ampl src fname'])
         if os.path.exists(self.fileorg['ampl src fname']):
             if overwrite == True:
                 self.logger.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
