@@ -9,13 +9,12 @@ import scda
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-import sys
 
 if __name__ == "__main__":
 
     scda.configure_log("wrapper_test.log")
 
-    test_dir = os.path.join(os.getcwd(), "test_scda_aplc") # nominal destination for new AMPL programs
+    test_dir = "test_aplc_wrapper" # nominal destination for new AMPL programs
     fileorg = {'work dir': test_dir}
 
     # IrisAO design parameters
@@ -36,4 +35,4 @@ if __name__ == "__main__":
                                        TelAp_fname=irisao_telap_fname, FPM_fname=occspot_fname, \
                                        LS_fname=irisao_lyotstop_fname )
 
-    irisao_coron.write_ampl()
+    irisao_coron.write_ampl(ampl_src_fname="test_aplc.mod", overwrite=True)
