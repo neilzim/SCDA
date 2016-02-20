@@ -13,6 +13,7 @@ import textwrap
 import numpy as np
 import pdb
 import getpass
+import socket
 
 def configure_log(log_fname=None):
     logger = logging.getLogger("scda.logger")
@@ -267,7 +268,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
 
         header = """\
         # AMPL program to optimize a half-plane symmetric APLC
-        # Created by {0} with {1} at {2}
+        # Created by {0:s} with {1:s} on {2:s} at {3:s}
         load amplgsl.dll;
 
 
@@ -276,28 +277,28 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         param pi:= 4*atan(1);
 
         #---------------------
-        param c := {3:.2f};
+        param c := {4:.2f};
 
         #---------------------
-        param Rmask := {4:0.3f};
-        param rho0 := {5:0.2f};
-        param rho1 := {6:0.2f};
+        param Rmask := {5:0.3f};
+        param rho0 := {6:0.2f};
+        param rho1 := {7:0.2f};
         
         #---------------------
-        param N := {7};				# discretization parameter (pupil)
-        param M := {8};				# discretization parameter (mask)
+        param N := {8:d};				# discretization parameter (pupil)
+        param M := {9:d};				# discretization parameter (mask)
         
-        param Nimg := {9};			# discretization parameter (image)
-        param Fmax := {10:0.2f};    # NTZ: If we paramaterize our image plane resolution by fpres = sampling rate at 
-                                    # the shortest wavelength, then Nimg should be an integer function of fpres, oca,
-        #---------------------      # and bw. This integer is not specified directly by the user, but computed "privately"
-        param bw := {11:0.2f};      # by the APLC class constructor.
+        param Nimg := {10:d};           # discretization parameter (image)
+        param Fmax := {11:0.2f};        # NTZ: We paramaterize our image plane resolution by fpres = sampling rate at 
+                                    #      the shortest wavelength. Then Nimg is an integer function of fpres, oca,
+        #---------------------      #      and bw. This integer is not specified directly by the user, but computed "privately"
+        param bw := {12:0.2f};           #      by the APLC class constructor.
         param lam0 := 1.;
         param dl := bw*lam0;
-        param Nlam := {12};
+        param Nlam := {13:d};
         
         #---------------------
-        param obs := 20;             # NTZ: We could eliminate this section of parameter definitions, 
+        param obs := 20;             # NTZ: We will eliminate this section of parameter definitions, 
         param spiders :=01;          #      since we determine the file names of the aperture and Lyot stop
         param lsobs := 20;           #      outside the program, as well as the file name of the apodizer solution.
         param lsspiders :=02;
@@ -311,7 +312,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         
         #---------------------
         param CoeffOverSizePup :=0.824*OD;
-        """.format(getpass.getuser(), os.path.basename(__file__), datetime.datetime.now(), \
+        """.format(getpass.getuser(), os.path.basename(__file__), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), \
                    self.design['Image']['c'], self.design['FPM']['rad'], self.design['Image']['iwa'], self.design['Image']['owa'], \
                    self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['_Nimg'], \
                    self.design['Image']['oca'], self.design['Image']['bw'], self.design['Image']['Nlam'])
