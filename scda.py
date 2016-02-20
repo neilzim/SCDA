@@ -69,11 +69,11 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
             for namekey, location in kwargs['fileorg'].items():
                 if namekey in self._key_fields['fileorg']:
                     if location is not None:
-                        if 'dir' in namekey:
-                            self.fileorg[namekey] = os.path.abspath(location) # Convert all directory names to absolute paths
+                        if namekey.endswith('dir'):
+                            self.fileorg[namekey] = os.path.abspath(os.path.expanduser(location)) # Convert all directory names to absolute paths
                             if not os.path.exists(self.fileorg[namekey]):
                                 self.logger.warning("Warning: The specified location of '{0}', \"{1}\" does not exist".format(namekey, self.fileorg[namekey]))
-                        elif os.path.isfile(location):
+                        else:
                             self.fileorg[namekey] = location
                     else:
                         self.fileorg[namekey] = None
@@ -140,6 +140,19 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         if 'method' not in self.solver or self.solver['method'] is None: self.solver['method'] = 'bar'
         if 'presolve' not in self.solver or self.solver['presolve'] is None: self.solver['presolve'] = True
         if 'Nthreads' not in self.solver or self.solver['Nthreads'] is None: self.solver['Nthreads'] = None
+
+        setattr(self, 'ampl_infile_status', None)
+        if not issubclass(self.__class__, LyotCoronagraph):
+            self.check_ampl_input_files()
+
+    def check_ampl_input_files(self):
+        status = True
+        checklist = ['TelAp fname', 'FPM fname', 'LS fname']
+        for fname in checklist:
+            if not os.path.exists(self.fileorg[fname]):
+                status = False
+                break
+        self.ampl_infile_status = status
 
 class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
     _design_fields = { 'Pupil': {'N':(int, 1000), 'pm':(str, 'hex1'), 'so':(bool, True), 'ss':(str, 'x'), 'sst':(str, '100'), 'tel diam':(float, 12.)}, \
@@ -243,6 +256,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_full_" + self.amplname_pupil + \
                                                          "_{0:02d}D{1:02d}ovsz{2:02d}.dat".format(self.design['LS']['id'], \
                                                          self.design['LS']['od'], self.design['LS']['ovsz'])) )
+            self.check_ampl_input_files()
                                                               
     def write_ampl(self, overwrite=False):
         self.logger.info("Writing the AMPL program")
@@ -275,7 +289,13 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + self.amplname_pupil + \
                                                      "_{0:02d}D{1:02d}ovsz{2:02d}.dat".format(self.design['LS']['id'], \
                                                      self.design['LS']['od'], self.design['LS']['ovsz'])) )
-    def write_ampl(self, overwrite=False, ampl_src_fname=None): 
+        self.check_ampl_input_files()
+    def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None):
+        if self.ampl_infile_status is False and not override_infile_status:
+            self.logger.error("Error: the most recent input file check for this design configuration failed.")
+            self.logger.error("The override_infile_status switch is off, so write_ampl() will now abort.")
+            self.logger.error("See previous warnings in the log to see what file was missing during the initialization")
+            return
         if ampl_src_fname is not None:
             if os.path.dirname(ampl_src_fname) == '' and self.fileorg['ampl src dir'] is not None:
                 self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname)
@@ -286,7 +306,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             if overwrite == True:
                 self.logger.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
             else:
-                self.logger.warning("Warning: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
+                self.logger.warning("Error: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
                 return
         elif not os.path.exists(self.fileorg['ampl src dir']):
             os.mkdir(self.fileorg['ampl src dir'])
