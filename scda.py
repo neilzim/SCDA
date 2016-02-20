@@ -38,13 +38,14 @@ class WrappedFixedIndentingLog(logging.Formatter):
     def format(self, record):
         return self.wrapper.fill(super().format(record))
 
+class ParamSurvey(object):
+    def __init__(self, **kwargs):
+        self.param_table  = {}
+
 class LyotCoronagraph(object): # Lyot coronagraph base class
     _key_fields = { 'fileorg': ['work dir', 'ampl src dir', 'TelAp dir', 'FPM dir', 'LS dir', 'sol dir', 'eval dir', \
                                 'ampl src fname', 'TelAp fname', 'FPM fname', 'LS fname', 'sol fname'], \
                     'solver': ['constr', 'method', 'presolve', 'Nthreads'] }
-
-#    _key_fields = dict([('fileorg', ['ampl src dir', 'TelAp dir', 'FPM dir', 'LS dir', 'sol dir', 'eval dir']),\
-#                        ('solver', ['constr', 'method', 'presolve', 'Nthreads'])])
 
     _solver_menu = dict([('constr',['lin', 'quad']), ('method', ['bar', 'barhom', 'dualsimp']), \
                          ('presolve',[True, False]), ('Nthreads', range(1,33))])
@@ -67,10 +68,15 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         if 'fileorg' in kwargs:
             for namekey, location in kwargs['fileorg'].items():
                 if namekey in self._key_fields['fileorg']:
-                    self.fileorg[namekey] = location
                     if location is not None:
-                        if not os.path.exists(location):
-                            self.logger.warning("Warning: The specified location of \"{0}\", \"{1}\" does not exist".format(namekey, location))
+                        if 'dir' in namekey:
+                            self.fileorg[namekey] = os.path.abspath(location) # Convert all directory names to absolute paths
+                            if not os.path.exists(self.fileorg[namekey]):
+                                self.logger.warning("Warning: The specified location of '{0}', \"{1}\" does not exist".format(namekey, self.fileorg[namekey]))
+                        elif os.path.isfile(location):
+                            self.fileorg[namekey] = location
+                    else:
+                        self.fileorg[namekey] = None
                 else:
                     self.logger.warning("Warning: Unrecognized field {0} in fileorg argument".format(dirkey))
         # Handle missing directory values
@@ -79,7 +85,9 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         for namekey in self._key_fields['fileorg']: # Set other missing directory locations to 'work dir'
             if namekey.endswith('dir') and ( namekey not in self.fileorg or self.fileorg[namekey] is None ):
                 self.fileorg[namekey] = self.fileorg['work dir']
-
+       
+        # If the location of the optimizer input file is not known, 
+        # look for it in the directory corresponding to its specific category
         if 'TelAp fname' in self.fileorg and self.fileorg['TelAp fname'] is not None and \
         not os.path.exists(self.fileorg['TelAp fname']) and os.path.exists(self.fileorg['TelAp dir']) and \
         not os.path.isdir(self.fileorg['TelAp fname']):
@@ -89,19 +97,12 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
             else:
                 self.logger.warning("Warning: Could not find the specified telescope aperture file \"{0}\" in {1}".format(self.fileorg['TelAp fname'], \
                                     self.fileorg['TelAp dir']))
-#        if 'FPM fname' in kwargs:
-#            self.fpm_fname = os.path.join(self.fileorg['FPM dir'], kwargs['FPM_fname'])
-#            if not os.path.exists(self.fpm_fname):
-#                self.logger.warning("Warning: The specified focal plane mask file \"{0}\" does not exist".format(self.fpm_fname))
-#        if 'LS fname' in kwargs:
-#            self.ls_fname = os.path.join(self.fileorg['LS dir'], kwargs['LS_fname'])
-#            if not os.path.exists(self.ls_fname):
-#                self.logger.warning("Warning: The specified Lyot stop file \"{0}\" does not exist".format(self.ls_fname))
-#        if 'ampl src fname' in kwargs:
-#            if os.path.isabs(kwargs['ampl_src_fname']):
-#                self.ampl_src_fname = kwargs['ampl_src_fname']
-#            else:
-#                self.ampl_src_fname = os.path.join(self.fileorg['ampl src dir'], kwargs['ampl_src_fname']) 
+        # TODO: repeat for the FPM and LS
+
+        # If the specified ampl source filename is a simple name with no directory, append it to the ampl source directory.
+        if 'ampl src fname' in self.fileorg and self.fileorg['ampl src fname'] is not None and \
+        not os.path.exists(self.fileorg['ampl src fname']) and os.path.dirname(self.fileorg['ampl src fname']) == '':
+            self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], self.fileorg['ampl src fname'])
                 
         #////////////////////////////////////////////////////////////////////////////////////////////////////
         #   The solver attribute holds the options handed from AMPL to Gurobi, 
@@ -226,7 +227,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                                                          "_{0:02d}D{1:02d}ovsz{2:02d}.dat".format(self.design['LS']['id'], \
                                                          self.design['LS']['od'], self.design['LS']['ovsz'])) )
                                                               
-    def write_ampl(self):
+    def write_ampl(self, overwrite=False):
         self.logger.info("Writing the AMPL program")
     def read_solution(self):
         self.logger.info("Reading in the apodizer solution and parse the optimizer log")
@@ -257,13 +258,23 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + self.amplname_pupil + \
                                                      "_{0:02d}D{1:02d}ovsz{2:02d}.dat".format(self.design['LS']['id'], \
                                                      self.design['LS']['od'], self.design['LS']['ovsz'])) )
-
-    def write_ampl(self): 
-        self.logger.info("Writing the AMPL program for the specified half-plane APLC")
-        if not os.path.exists(self.fileorg['ampl src dir']):
-           os.mkdir(self.fileorg['ampl src dir'])
+    def write_ampl(self, overwrite=False, ampl_src_fname=None): 
+        if ampl_src_fname is not None:
+            if os.path.dirname(ampl_src_fname) == '' and self.fileorg['ampl src dir'] is not None:
+                self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname)
+            else:
+                self.fileorg['ampl src fname'] = os.path.abspath(ampl_src_fname)    
+                self.fileorg['ampl src dir'] = os.path.split(self.fileorg['ampl src fname'])[0]
         if os.path.exists(self.fileorg['ampl src fname']):
-            self.logger.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
+            if overwrite == True:
+                self.logger.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
+            else:
+                self.logger.warning("Warning: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
+                return
+        elif not os.path.exists(self.fileorg['ampl src dir']):
+            os.mkdir(self.fileorg['ampl src dir'])
+            self.logger.info("Created new AMPL source code directory, {0:s}".format(self.fileorg['ampl src dir']))
+        self.logger.info("Writing the AMPL program for the specified half-plane APLC")
         mod_fobj = open(self.fileorg['ampl src fname'], "w")
 
         header = """\
