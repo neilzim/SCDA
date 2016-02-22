@@ -14,6 +14,9 @@ import numpy as np
 import pdb
 import getpass
 import socket
+from collections import defaultdict, OrderedDict
+import itertools
+import pprint
 
 def configure_log(log_fname=None):
     logger = logging.getLogger("scda.logger")
@@ -38,27 +41,64 @@ class WrappedFixedIndentingLog(logging.Formatter):
     def format(self, record):
         return self.wrapper.fill(super().format(record))
 
-class ParamSurvey(object):
-    def __init__(self, **kwargs):
-        self.param_table  = {}
-
-class LyotCoronagraph(object): # Lyot coronagraph base class
-    _key_fields = { 'fileorg': ['work dir', 'ampl src dir', 'TelAp dir', 'FPM dir', 'LS dir', 'sol dir', 'eval dir', \
-                                'ampl src fname', 'TelAp fname', 'FPM fname', 'LS fname', 'sol fname'], \
-                    'solver': ['constr', 'method', 'presolve', 'Nthreads'] }
-
-    _solver_menu = { 'constr': ['lin', 'quad'], 'method': ['bar', 'barhom', 'dualsimp'], \
-                     'presolve': [True, False], 'Nthreads': range(1,33) }
-
-    _aperture_menu = { 'pm': ['hex1', 'hex2', 'hex3', 'key24', 'pie12', 'pie8', 'irisao'], \
-                       'ss': ['y60','y60off','x','cross','t','y90'], \
-                       'sst': ['025','100'], \
-                       'so': [True, False] }
-
-    def __init__(self, **kwargs):
-        # Only set fileorg and solver attributes in this constructor,
-        # since design and eval parameter checking is design-specific. 
+class DesignParamSurvey(object):
+    def __init__(self, coron_class, survey_config, **kwargs):
         self.logger = logging.getLogger('scda.logger')
+        _param_menu = coron_class._design_fields.copy()
+        _file_fields = coron_class._file_fields.copy()
+        setattr(self, 'survey_config', {})
+        for keycat, param_dict in survey_config.items():
+            self.survey_config[keycat] = {}
+            if keycat in _param_menu:
+                for param, values in param_dict.items():
+                    if param in _param_menu[keycat]:
+                        if values is not None:
+                            if hasattr(values, '__iter__'): #check the type of all items
+                                if all(isinstance(value, _param_menu[keycat][param][0]) for value in values):
+                                    self.survey_config[keycat][param] = values
+                                    #self.survey_config[keycat][param] = tuple(values)
+                                else:
+                                    warnstr = ("Warning: Invalid type found in survey set {0} for parameter {1} under category \"{2}\" " + \
+                                               "design initialization argument, expecting {3}").format(value, param, keycat, _param_menu[keycat][param][0]) 
+                                    self.logger.warning(warnstr)
+                            else:
+                                if isinstance(values, _param_menu[keycat][param][0]):
+                                    self.survey_config[keycat][param] = values
+                                else:
+                                    warnstr = ("Warning: Invalid {0} for parameter \"{1}\" under category \"{2}\" " + \
+                                               "design initialization argument, expecting a {3}").format(type(value), param, keycat, _param_menu[keycat][param][0]) 
+                                    self.logger.warning(warnstr)
+                    else:
+                        self.logger.warning("Warning: Unrecognized parameter \"{0}\" under category \"{1}\" in design initialization argument".format(param, keycat))
+            else:
+                self.logger.warning("Warning: Unrecognized key category \"{0}\" in design initialization argument".format(keycat))
+                self.survey_config[keycat] = None
+        varied_param_flat = []
+        varied_param_index = []
+        fixed_param_flat = []
+        fixed_param_index = []
+        for keycat in _param_menu: # Fill in default values where appropriate
+            if keycat not in self.survey_config:
+                self.survey_config[keycat] = {}
+            for param in _param_menu[keycat]:
+                if param not in self.survey_config[keycat] or (self.survey_config[keycat][param] is None and \
+                                                               _param_menu[keycat][param][1] is not None):
+                    self.survey_config[keycat][param] = _param_menu[keycat][param][1] # default value
+                elif param in self.survey_config[keycat] and self.survey_config[keycat][param] is not None and \
+                not hasattr(self.survey_config[keycat][param], '__iter__'):
+                    fixed_param_flat.append(self.survey_config[keycat][param])
+                    fixed_param_index.append((keycat, param))
+                elif hasattr(self.survey_config[keycat][param], '__iter__'):
+                    varied_param_flat.append(self.survey_config[keycat][param])
+                    varied_param_index.append((keycat, param))
+     
+        varied_param_combos = []
+        for combo in itertools.product(*varied_param_flat):
+            varied_param_combos.append(combo)
+        self.varied_param_combos = tuple(varied_param_combos)
+        self.varied_param_index = tuple(varied_param_index)
+        self.fixed_param_vals = tuple(fixed_param_flat)
+        self.fixed_param_index = tuple(fixed_param_index)
 
         #////////////////////////////////////////////////////////////////////////////////////////////////////
         #   The fileorg attribute holds the locations of telescope apertures,
@@ -67,7 +107,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         setattr(self, 'fileorg', {})
         if 'fileorg' in kwargs:
             for namekey, location in kwargs['fileorg'].items():
-                if namekey in self._key_fields['fileorg']:
+                if namekey in _file_fields['fileorg']:
                     if location is not None:
                         if namekey.endswith('dir'):
                             self.fileorg[namekey] = os.path.abspath(os.path.expanduser(location)) # Convert all directory names to absolute paths
@@ -82,7 +122,115 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         # Handle missing directory values
         if 'work dir' not in self.fileorg or self.fileorg['work dir'] is None:
             self.fileorg['work dir'] = os.getcwd()
-        for namekey in self._key_fields['fileorg']: # Set other missing directory locations to 'work dir'
+        for namekey in _file_fields['fileorg']: # Set other missing directory locations to 'work dir'
+            if namekey.endswith('dir') and ( namekey not in self.fileorg or self.fileorg[namekey] is None ):
+                self.fileorg[namekey] = self.fileorg['work dir']
+      
+        # In most cases we don't expect to directly specify file names for apertures, FPM, or LS files
+        # for the SCDA parameter survey. However, it easy enough to make this option available.
+        # If the location of the optimizer input file is not known, 
+        # look for it in the directory corresponding to its specific category
+        if 'TelAp fname' in self.fileorg and self.fileorg['TelAp fname'] is not None and \
+        not os.path.exists(self.fileorg['TelAp fname']) and os.path.exists(self.fileorg['TelAp dir']) and \
+        os.path.dirname(self.fileorg['TelAp fname']) == '':
+            try_fname = os.path.join(self.fileorg['TelAp dir'], self.fileorg['TelAp fname']) 
+            if os.path.exists(try_fname):
+                self.fileorg['TelAp fname'] = try_fname
+            else:
+                self.logger.warning("Warning: Could not find the specified telescope aperture file \"{0}\" in {1}".format(self.fileorg['TelAp fname'],
+                                    self.fileorg['TelAp dir']))
+        if 'FPM fname' in self.fileorg and self.fileorg['FPM fname'] is not None and \
+        not os.path.exists(self.fileorg['FPM fname']) and os.path.exists(self.fileorg['FPM dir']) and \
+        os.path.dirname(self.fileorg['FPM fname']) == '':
+            try_fname = os.path.join(self.fileorg['FPM dir'], self.fileorg['FPM fname']) 
+            if os.path.exists(try_fname):
+                self.fileorg['FPM fname'] = try_fname
+            else:
+                self.logger.warning("Warning: Could not find the specified FPM file \"{0}\" in {1}".format(self.fileorg['FPM fname'],
+                                    self.fileorg['FPM dir']))
+        if 'LS fname' in self.fileorg and self.fileorg['LS fname'] is not None and \
+        not os.path.exists(self.fileorg['LS fname']) and os.path.exists(self.fileorg['LS dir']) and \
+        os.path.dirname(self.fileorg['LS fname']) == '':
+            try_fname = os.path.join(self.fileorg['LS dir'], self.fileorg['LS fname']) 
+            if os.path.exists(try_fname):
+                self.fileorg['LS fname'] = try_fname
+            else:
+                self.logger.warning("Warning: Could not find the specified LS file \"{0}\" in {1}".format(self.fileorg['LS fname'],
+                                    self.fileorg['LS dir']))
+        #////////////////////////////////////////////////////////////////////////////////////////////////////
+        #   The solver attribute holds the options handed from AMPL to Gurobi, 
+        #   and determines how the field constraints are mathematically expressed.
+        #////////////////////////////////////////////////////////////////////////////////////////////////////
+        setattr(self, 'solver', {})
+        if 'solver' in kwargs:
+            for field, value in kwargs['solver'].items():
+                if field in self._file_fields['solver']:
+                    if value in self._solver_menu[field]:
+                        self.solver[field] = value
+                    else:
+                        self.logger.warning("Warning: Unrecognized solver option \"{0}\" in field \"{1}\", reverting to default".format(value, field))
+                else:
+                    self.logger.warning("Warning: Unrecognized field {0} in solver argument".format(field))
+        # Handle missing values
+        if 'constr' not in self.solver or self.solver['constr'] is None: self.solver['constr'] = 'lin'
+        if 'method' not in self.solver or self.solver['method'] is None: self.solver['method'] = 'bar'
+        if 'presolve' not in self.solver or self.solver['presolve'] is None: self.solver['presolve'] = True
+        if 'Nthreads' not in self.solver or self.solver['Nthreads'] is None: self.solver['Nthreads'] = None
+         
+        setattr(self, 'coron_list', [])
+        design = {}
+        for keycat in _param_menu:
+            design[keycat] = {}
+        for (fixed_keycat, fixed_parname), fixed_val in zip(self.fixed_param_index, self.fixed_param_vals):
+            design[fixed_keycat][fixed_parname] = fixed_val
+        self.coron_list = []
+        for param_combo in self.varied_param_combos:
+            for (varied_keycat, varied_parname), current_val in zip(self.varied_param_index, param_combo):
+                design[varied_keycat][varied_parname] = current_val
+            self.coron_list.append( coron_class(design=design, fileorg=self.fileorg, solver=self.solver) )
+
+class LyotCoronagraph(object): # Lyot coronagraph base class
+    _file_fields = { 'fileorg': ['work dir', 'ampl src dir', 'TelAp dir', 'FPM dir', 'LS dir', 'sol dir', 'eval dir',
+                                 'ampl src fname', 'TelAp fname', 'FPM fname', 'LS fname', 'sol fname'],
+                     'solver': ['constr', 'method', 'presolve', 'Nthreads'] }
+
+    _solver_menu = { 'constr': ['lin', 'quad'], 'solver': ['LOQO', 'gurobi', 'gurobix'], 
+                     'method': ['bar', 'barhom', 'dualsimp'],
+                     'presolve': [True, False], 'Nthreads': [None]+range(1,33) }
+
+    _aperture_menu = { 'pm': ['hex1', 'hex2', 'hex3', 'key24', 'pie12', 'pie8', 'irisao'],
+                       'ss': ['y60','y60off','x','cross','t','y90'],
+                       'sst': ['025','100'],
+                       'so': [True, False] }
+
+    def __init__(self, verbose=False, **kwargs):
+        # Only set fileorg and solver attributes in this constructor,
+        # since design and eval parameter checking is design-specific. 
+        self.logger = logging.getLogger('scda.logger')
+
+        #////////////////////////////////////////////////////////////////////////////////////////////////////
+        #   The fileorg attribute holds the locations of telescope apertures,
+        #   intermediate masks, co-eval AMPL programs, solutilons, logs, etc.
+        #////////////////////////////////////////////////////////////////////////////////////////////////////
+        setattr(self, 'fileorg', {})
+        if 'fileorg' in kwargs:
+            for namekey, location in kwargs['fileorg'].items():
+                if namekey in self._file_fields['fileorg']:
+                    if location is not None:
+                        if namekey.endswith('dir'):
+                            self.fileorg[namekey] = os.path.abspath(os.path.expanduser(location)) # Convert all directory names to absolute paths
+                            if not os.path.exists(self.fileorg[namekey]):
+                                self.logger.warning("Warning: The specified location of '{0}', \"{1}\" does not exist".format(namekey, self.fileorg[namekey]))
+                        else:
+                            self.fileorg[namekey] = location
+                    else:
+                        self.fileorg[namekey] = None
+                else:
+                    self.logger.warning("Warning: Unrecognized field {0} in fileorg argument".format(dirkey))
+        # Handle missing directory values
+        if 'work dir' not in self.fileorg or self.fileorg['work dir'] is None:
+            self.fileorg['work dir'] = os.getcwd()
+        for namekey in self._file_fields['fileorg']: # Set other missing directory locations to 'work dir'
             if namekey.endswith('dir') and ( namekey not in self.fileorg or self.fileorg[namekey] is None ):
                 self.fileorg[namekey] = self.fileorg['work dir']
        
@@ -128,7 +276,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         setattr(self, 'solver', {})
         if 'solver' in kwargs:
             for field, value in kwargs['solver'].items():
-                if field in self._key_fields['solver']:
+                if field in self._file_fields['solver']:
                     if value in self._solver_menu[field]:
                         self.solver[field] = value
                     else:
@@ -137,6 +285,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                     self.logger.warning("Warning: Unrecognized field {0} in solver argument".format(field))
         # Handle missing values
         if 'constr' not in self.solver or self.solver['constr'] is None: self.solver['constr'] = 'lin'
+        if 'solver' not in self.solver or self.solver['solver'] is None: self.solver['solver'] = 'gurobi'
         if 'method' not in self.solver or self.solver['method'] is None: self.solver['method'] = 'bar'
         if 'presolve' not in self.solver or self.solver['presolve'] is None: self.solver['presolve'] = True
         if 'Nthreads' not in self.solver or self.solver['Nthreads'] is None: self.solver['Nthreads'] = None
@@ -155,16 +304,18 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         self.ampl_infile_status = status
 
 class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
-    _design_fields = { 'Pupil': {'N':(int, 1000), 'pm':(str, 'hex1'), 'so':(bool, True), 'ss':(str, 'x'), 'sst':(str, '100'), 'tel diam':(float, 12.)}, \
-                       'FPM':   {'M':(int, 50), 'rad':(float, 4.)}, \
-                       'LS':    {'id':(int, 20), 'od':(int, 90), 'ovsz':(int, 0), 'altol':(int, None)}, \
-                       'Image': {'c':(float, 10.), 'ci':(float, None), 'co':(float, None), 'iwa':(float, 4.), \
-                                 'owa':(float, 10.), 'oca':(float, 10.), 'fpres':(int,2), 'bw':(float, 0.1), 'Nlam':(int, 3)} }
+    _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 1000)), ('pm',(str, 'hex1')), ('ss',(str, 'x')), 
+                                                          ('sst',(str, '100')), ('so',(bool, True))]) ),
+                                   ( 'FPM', OrderedDict([('rad',(float, 4.)), ('M',(int, 50))]) ),
+                                   ( 'LS', OrderedDict([('id',(int, 20)), ('od',(int, 90)), ('ovsz',(int, 0)), ('altol',(int, None))]) ),
+                                   ( 'Image', OrderedDict([('c',(float, 10.)), ('iwa',(float, 4.)), ('owa',(float, 10.)),
+                                                         ('bw',(float, 0.1)), ('Nlam',(int, 3)), ('fpres',(int,2)),
+                                                         ('oca',(float, 10.)), ('ci',(float, None)), ('co',(float, None))]) ) ])
     _eval_fields =   { 'Pupil': _design_fields['Pupil'], 'FPM': _design_fields['FPM'], \
                        'LS': _design_fields['LS'], 'Image': _design_fields['Image'], \
-                       'Target': {}, 'Aber': {}, 'WFSC': {} }
+                       'Tel': {'TelAp diam':(float, 12.)}, 'Target': {}, 'Aber': {}, 'WFSC': {} }
 
-    def __init__(self, **kwargs):
+    def __init__(self, verbose=False, **kwargs):
         super(NdiayeAPLC, self).__init__(**kwargs)
 
         setattr(self, 'design', {})
@@ -190,16 +341,18 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                     self.logger.warning("Warning: Unrecognized key category \"{0}\" in design initialization argument".format(keycat))
                     self.design[keycat] = None
         for keycat in self._design_fields: # Fill in default values where appropriate
+            if keycat not in self.design:
+                self.design[keycat] = {}
             for param in self._design_fields[keycat]:
                 if param not in self.design[keycat] or (self.design[keycat][param] is None and \
                                                         self._design_fields[keycat][param][1] is not None):
                     self.design[keycat][param] = self._design_fields[keycat][param][1]
         # Finally, set a private attribute for the number of image plane samples between the center and the OCA
         self.design['Image']['_Nimg'] = int( np.ceil( self.design['Image']['fpres']*self.design['Image']['oca']/(1. - self.design['Image']['bw']/2) ) )
-        # Print summary of the set parameters
-        self.logger.info("Design parameters: {}".format(self.design))
-        self.logger.info("Optimization and solver parameters: {}".format(self.solver))
-        self.logger.info("File organization parameters: {}".format(self.fileorg))
+        if verbose: # Print summary of the set parameters
+            self.logger.info("Design parameters: {}".format(self.design))
+            self.logger.info("Optimization and solver parameters: {}".format(self.solver))
+            self.logger.info("File organization parameters: {}".format(self.fileorg))
      
         self.amplname_coron = "APLC_full"
         if self.design['Pupil']['so'] == True:
