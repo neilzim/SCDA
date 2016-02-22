@@ -189,6 +189,10 @@ class DesignParamSurvey(object):
                 design[varied_keycat][varied_parname] = current_val
             self.coron_list.append( coron_class(design=design, fileorg=self.fileorg, solver=self.solver) )
 
+    def write_ampl(self, overwrite=False, override_infile_status=False):
+        for coron in self.coron_list:
+            coron.write_ampl(overwrite, override_infile_status)
+
 class LyotCoronagraph(object): # Lyot coronagraph base class
     _file_fields = { 'fileorg': ['work dir', 'ampl src dir', 'TelAp dir', 'FPM dir', 'LS dir', 'sol dir', 'eval dir',
                                  'ampl src fname', 'TelAp fname', 'FPM fname', 'LS fname', 'sol fname'],
@@ -464,7 +468,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         elif not os.path.exists(self.fileorg['ampl src dir']):
             os.mkdir(self.fileorg['ampl src dir'])
             self.logger.info("Created new AMPL source code directory, {0:s}".format(self.fileorg['ampl src dir']))
-        self.logger.info("Writing the AMPL program for the specified half-plane APLC")
+#        self.logger.info("Writing the AMPL program for the specified half-plane APLC")
         mod_fobj = open(self.fileorg['ampl src fname'], "w")
 
         header = """\

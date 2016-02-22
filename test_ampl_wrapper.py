@@ -47,5 +47,5 @@ if __name__ == "__main__":
 
     telap_survey = scda.DesignParamSurvey(scda.HalfplaneAPLC, jpl_telap_all, 
                                           fileorg={'ampl src dir':survey_ampl_dir})
-
-#    print telap_survey.survey_config
+    #telap_survey.write_ampl()
+    telap_survey.write_ampl(override_infile_status=True)
