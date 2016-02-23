@@ -16,13 +16,13 @@ if __name__ == "__main__":
     scda.configure_log("wrapper_test.log")
 
     local_test_dir = os.path.join(os.getcwd(), "test_scda_aplc") # nominal destination for new AMPL programs
-    aux_dir = "../2d AMPL script - half pupil"
+    aux_dir = "/home/ntz/SCDA/2d AMPL script - half pupil"
     irisao_telap_fname = os.path.join(aux_dir, "IRISAO_N=0200_center_half_spiders3=01_gapID=10_BW.dat")
     occspot_fname = os.path.join(aux_dir, "CircPupil_N=0050_obs=00_center_half.dat")
     irisao_lyotstop_fname = os.path.join(aux_dir, "IRISAO-0_N=0200_center_half_spiders3=02_ID=20_OD=098.dat")
 
     fileorg = { 'work dir': local_test_dir, 'TelAp fname': irisao_telap_fname, \
-                'FPM dir': occspot_fname, 'LS fname': irisao_lyotstop_fname }
+                'FPM fname': occspot_fname, 'LS fname': irisao_lyotstop_fname }
 
     # half-plane IRISAO example design parameters
     pupil_params = {'N': 200,'tel diam': 12.}
