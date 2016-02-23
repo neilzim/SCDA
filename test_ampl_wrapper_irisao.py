@@ -15,16 +15,14 @@ if __name__ == "__main__":
 
     scda.configure_log("wrapper_test.log")
 
-    local_test_dir = os.path.join(os.getcwd(), "test_scda_aplc") # nominal destination for new AMPL programs
-    aux_dir = "/home/ntz/SCDA/2d AMPL script - half pupil"
-    irisao_telap_fname = os.path.join(aux_dir, "IRISAO_N=0150_center_half_spiders3=01_gapID=10_BW.dat")
-    occspot_fname = os.path.join(aux_dir, "CircPupil_N=0050_obs=00_center_half.dat")
-    irisao_lyotstop_fname = os.path.join(aux_dir, "IRISAO-0_N=0150_center_half_spiders3=02_ID=20_OD=098.dat")
+    test_dir = "test_scda_aplc" # nominal destination for new AMPL programs
+    aux_dir = "~/SCDA/2d AMPL script - half pupil"
 
-    fileorg = { 'work dir': local_test_dir, 'TelAp fname': irisao_telap_fname, \
-                'FPM fname': occspot_fname, 'LS fname': irisao_lyotstop_fname }
+    fileorg = {'work dir': test_dir, 'TelAp dir': aux_dir, 'FPM dir': aux_dir, 'LS dir': aux_dir,
+               'TelAp fname': "IRISAO_N=0150_center_half_spiders3=01_gapID=10_BW.dat",
+               'FPM fname': "CircPupil_N=0050_obs=00_center_half.dat",
+               'LS fname': "IRISAO-0_N=0150_center_half_spiders3=02_ID=20_OD=098.dat"}
 
-    # half-plane IRISAO example design parameters
     pupil_params = {'N': 150}
 #    fpm_params = {'rad': 9.898/2, 'M':50}
     fpm_params = {'rad': 6.466/2, 'M':50}
@@ -33,10 +31,9 @@ if __name__ == "__main__":
     image_params = {'c': 8., 'iwa':3., 'owa':10.}
     design_params = {'Pupil': pupil_params, 'FPM': fpm_params, 'LS': ls_params, 'Image': image_params}
 
-    # Options for constraints and optimizer
 #    solver_params = {'method': 'bar', 'presolve': False, 'Nthreads': 8}
     solver_params = {}
     
-    irisao_coron = scda.HalfplaneAPLC( fileorg=fileorg, design=design_params, solver=solver_params )
+    irisao_coron = scda.HalfplaneAPLC(fileorg=fileorg, design=design_params, solver=solver_params, verbose=True)
 
-    irisao_coron.write_ampl()
+    irisao_coron.write_ampl(ampl_src_fname="irisao_hpaplc_C08.mod", overwrite=True)

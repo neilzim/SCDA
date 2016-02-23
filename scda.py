@@ -202,7 +202,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                      'method': ['bar', 'barhom', 'dualsimp'],
                      'presolve': [True, False], 'Nthreads': [None]+range(1,33) }
 
-    _aperture_menu = { 'pm': ['hex1', 'hex2', 'hex3', 'key24', 'pie12', 'pie8', 'irisao'],
+    _aperture_menu = { 'pm': ['hex1', 'hex2', 'hex3', 'hex4', 'key24', 'pie12', 'pie8', 'irisao'],
                        'ss': ['y60','y60off','x','cross','t','y90'],
                        'sst': ['025','100'],
                        'so': [True, False] }
@@ -475,32 +475,33 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         # AMPL program to optimize a half-plane symmetric APLC
         # Created by {0:s} with {1:s} on {2:s} at {3:s}
         load amplgsl.dll;
+        """.format(getpass.getuser(), os.path.basename(__file__), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
 
-
+        params = """
         #---------------------
 
         param pi:= 4*atan(1);
 
         #---------------------
-        param c := {4:.2f};
+        param c := {0:.2f};
 
         #---------------------
-        param Rmask := {5:0.3f};
-        param rho0 := {6:0.2f};
-        param rho1 := {7:0.2f};
+        param Rmask := {1:0.3f};
+        param rho0 := {2:0.2f};
+        param rho1 := {3:0.2f};
         
         #---------------------
-        param N := {8:d};				# discretization parameter (pupil)
-        param M := {9:d};				# discretization parameter (mask)
+        param N := {4:d};				# discretization parameter (pupil)
+        param M := {5:d};				# discretization parameter (mask)
         
-        param Nimg := {10:d};           # discretization parameter (image)
-        param Fmax := {11:0.2f};        # NTZ: We paramaterize our image plane resolution by fpres = sampling rate at 
+        param Nimg := {6:d};           # discretization parameter (image)
+        param Fmax := {7:0.2f};        # NTZ: We paramaterize our image plane resolution by fpres = sampling rate at 
                                     #      the shortest wavelength. Then Nimg is an integer function of fpres, oca,
         #---------------------      #      and bw. This integer is not specified directly by the user, but computed "privately"
-        param bw := {12:0.2f};           #      by the APLC class constructor.
+        param bw := {8:0.2f};           #      by the APLC class constructor.
         param lam0 := 1.;
         param dl := bw*lam0;
-        param Nlam := {13:d};
+        param Nlam := {9:d};
         
         #---------------------
         param obs := 20;             # NTZ: We will eliminate this section of parameter definitions, 
@@ -517,8 +518,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         
         #---------------------
         param CoeffOverSizePup :=0.824*OD;
-        """.format(getpass.getuser(), os.path.basename(__file__), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), \
-                   self.design['Image']['c'], self.design['FPM']['rad'], self.design['Image']['iwa'], self.design['Image']['owa'], \
+        """.format(self.design['Image']['c'], self.design['FPM']['rad'], self.design['Image']['iwa'], self.design['Image']['owa'], \
                    self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['_Nimg'], \
                    self.design['Image']['oca'], self.design['Image']['bw'], self.design['Image']['Nlam'])
         
@@ -586,8 +586,8 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         set Etas := setof {j in 0..Nimg-1 by 1} j*deta;
         
         set DarkHole := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= rho0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta); # Only for 360deg masks.
-        set PSFCore := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= 0 && sqrt(xi^2+eta^2) < rho0} (xi,eta); # Only for 360deg masks.
-        set InsideArea := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= 0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta); # Only for 360deg masks.
+        #set PSFCore := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= 0 && sqrt(xi^2+eta^2) < rho0} (xi,eta); # Only for 360deg masks.
+        #set InsideArea := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= 0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta); # Only for 360deg masks.
         """
 
         field_propagation = """
@@ -630,12 +630,8 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         var ED1_imag {xi in Xis, eta in Etas, lam in Ls} := 0.0;
         
         subject to st_ED1_ECmreal_cx {x in Xs, eta in Etas, lam in Ls}: ED1_ECmreal_cx[x,eta,lam] = 2.*sum {y in Ys: (x,y) in Lyot} (A[x,y]*PupilFile[round(x/dx+0.5+N),round(y/dy+0.5)]-ECm_real[x,y,lam])*cos(2*pi*y*eta*(lam0/lam))*dy;
-        
-        #subject to st_ED1_real {xi in Xis, eta in Etas, lam in Ls}: ED1_real[xi,eta,lam] = (lam0/lam)*sum {x in Xs} ED1_ECmreal_cx[x,eta,lam]*cos(2*pi*x*xi*(lam0/lam))*dx;
-        #subject to st_ED1_imag {xi in Xis, eta in Etas, lam in Ls}: ED1_imag[xi,eta,lam] = (lam0/lam)*sum {x in Xs} -ED1_ECmreal_cx[x,eta,lam]*sin(2*pi*x*xi*(lam0/lam))*dx;
-        
-        subject to st_ED1_real {(xi, eta) in InsideArea, lam in Ls}: ED1_real[xi,eta,lam] = (lam0/lam)*sum {x in Xs} ED1_ECmreal_cx[x,eta,lam]*cos(2*pi*x*xi*(lam0/lam))*dx;
-        subject to st_ED1_imag {(xi, eta) in InsideArea, lam in Ls}: ED1_imag[xi,eta,lam] = (lam0/lam)*sum {x in Xs} -ED1_ECmreal_cx[x,eta,lam]*sin(2*pi*x*xi*(lam0/lam))*dx;
+        subject to st_ED1_real {xi in Xis, eta in Etas, lam in Ls}: ED1_real[xi,eta,lam] = (lam0/lam)*sum {x in Xs} ED1_ECmreal_cx[x,eta,lam]*cos(2*pi*x*xi*(lam0/lam))*dx;
+        subject to st_ED1_imag {xi in Xis, eta in Etas, lam in Ls}: ED1_imag[xi,eta,lam] = (lam0/lam)*sum {x in Xs} -ED1_ECmreal_cx[x,eta,lam]*sin(2*pi*x*xi*(lam0/lam))*dx;
         
         
         var ED2_ECmimag_cx {x in Xs, eta in Etas, lam in Ls} := 0.0;
@@ -643,21 +639,14 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         var ED2_imag {xi in Xis, eta in Etas, lam in Ls} := 0.0;
         
         subject to st_ED2_ECmimag_cx {x in Xs, eta in Etas, lam in Ls}: ED2_ECmimag_cx[x,eta,lam] = 2.*sum {y in Ys: (x,y) in Lyot} (-ECm_imag[x,y,lam])*cos(2*pi*y*eta*(lam0/lam))*dy;
-        
-        #subject to st_ED2_real {xi in Xis, eta in Etas, lam in Ls}: ED2_real[xi,eta,lam] = (lam0/lam)*sum {x in Xs} ED2_ECmimag_cx[x,eta,lam]*cos(2*pi*x*xi*(lam0/lam))*dx;
-        #subject to st_ED2_imag {xi in Xis, eta in Etas, lam in Ls}: ED2_imag[xi,eta,lam] = (lam0/lam)*sum {x in Xs} -ED2_ECmimag_cx[x,eta,lam]*sin(2*pi*x*xi*(lam0/lam))*dx;
-        
-        subject to st_ED2_real {(xi, eta) in InsideArea, lam in Ls}: ED2_real[xi,eta,lam] = (lam0/lam)*sum {x in Xs} ED2_ECmimag_cx[x,eta,lam]*cos(2*pi*x*xi*(lam0/lam))*dx;
-        subject to st_ED2_imag {(xi, eta) in InsideArea, lam in Ls}: ED2_imag[xi,eta,lam] = (lam0/lam)*sum {x in Xs} -ED2_ECmimag_cx[x,eta,lam]*sin(2*pi*x*xi*(lam0/lam))*dx;
+        subject to st_ED2_real {xi in Xis, eta in Etas, lam in Ls}: ED2_real[xi,eta,lam] = (lam0/lam)*sum {x in Xs} ED2_ECmimag_cx[x,eta,lam]*cos(2*pi*x*xi*(lam0/lam))*dx;
+        subject to st_ED2_imag {xi in Xis, eta in Etas, lam in Ls}: ED2_imag[xi,eta,lam] = (lam0/lam)*sum {x in Xs} -ED2_ECmimag_cx[x,eta,lam]*sin(2*pi*x*xi*(lam0/lam))*dx;
         
         
         var ED_real {xi in Xis, eta in Etas, lam in Ls} := 0.0;
         var ED_imag {xi in Xis, eta in Etas, lam in Ls} := 0.0;
-        #subject to st_ED_real {xi in Xis, eta in Etas, lam in Ls}: ED_real[xi,eta,lam] = ED1_real[xi,eta,lam]-ED2_imag[xi,eta,lam];
-        #subject to st_ED_imag {xi in Xis, eta in Etas, lam in Ls}: ED_imag[xi,eta,lam] = ED1_imag[xi,eta,lam]+ED2_real[xi,eta,lam];
-        
-        subject to st_ED_real {(xi, eta) in InsideArea, lam in Ls}: ED_real[xi,eta,lam] = ED1_real[xi,eta,lam]-ED2_imag[xi,eta,lam];
-        subject to st_ED_imag {(xi, eta) in InsideArea, lam in Ls}: ED_imag[xi,eta,lam] = ED1_imag[xi,eta,lam]+ED2_real[xi,eta,lam];
+        subject to st_ED_real {xi in Xis, eta in Etas, lam in Ls}: ED_real[xi,eta,lam] = ED1_real[xi,eta,lam]-ED2_imag[xi,eta,lam];
+        subject to st_ED_imag {xi in Xis, eta in Etas, lam in Ls}: ED_imag[xi,eta,lam] = ED1_imag[xi,eta,lam]+ED2_real[xi,eta,lam];
         
         
         #---------------------
@@ -676,11 +665,12 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/sqrt(2.);
         subject to sidelobe_zero_imag_pos {(xi,eta) in DarkHole, lam in Ls}: ED_imag[xi,eta,lam] <= 10^(-c/2)*ED00_real/sqrt(2.);
         subject to sidelobe_zero_imag_neg {(xi,eta) in DarkHole, lam in Ls}: ED_imag[xi,eta,lam] >= -10^(-c/2)*ED00_real/sqrt(2.);
-        
-        subject to sidelobe_zero_real_pos_core {(xi,eta) in PSFCore, lam in Ls}: ED_real[xi,eta,lam] <= 10^((-c+2)/2)*ED00_real/sqrt(2.);
-        subject to sidelobe_zero_real_neg_core {(xi,eta) in PSFCore, lam in Ls}: ED_real[xi,eta,lam] >= -10^((-c+2)/2)*ED00_real/sqrt(2.);
-        subject to sidelobe_zero_imag_pos_core {(xi,eta) in PSFCore, lam in Ls}: ED_imag[xi,eta,lam] <= 10^((-c+2)/2)*ED00_real/sqrt(2.);
-        subject to sidelobe_zero_imag_neg_core {(xi,eta) in PSFCore, lam in Ls}: ED_imag[xi,eta,lam] >= -10^((-c+2)/2)*ED00_real/sqrt(2.);
+        """
+
+        misc_options = """
+        option times 1;
+        option gentimes 1;
+        option show_stats 1;
         """
         
         solver = """
@@ -689,12 +679,6 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
 
         solver_options = """
         option gurobi_options "outlev=1 lpmethod=2 crossover=0";
-        """
-
-        misc_options = """
-        option times 1;
-        option gentimes 1;
-        option show_stats 1;
         """
  
         execute = """
@@ -711,14 +695,15 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         """.format(self.fileorg['sol fname'])
 
         mod_fobj.write( textwrap.dedent(header) )
+        mod_fobj.write( textwrap.dedent(params) )
         mod_fobj.write( textwrap.dedent(load_masks) )
         mod_fobj.write( textwrap.dedent(define_coords) )
         mod_fobj.write( textwrap.dedent(sets_and_arrays) )
         mod_fobj.write( textwrap.dedent(field_propagation) )
         mod_fobj.write( textwrap.dedent(constraints) )
+        mod_fobj.write( textwrap.dedent(misc_options) )
         mod_fobj.write( textwrap.dedent(solver) )
         mod_fobj.write( textwrap.dedent(solver_options) )
-        mod_fobj.write( textwrap.dedent(misc_options) )
         mod_fobj.write( textwrap.dedent(execute) )
         mod_fobj.write( textwrap.dedent(store_results) )
 
