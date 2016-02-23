@@ -35,6 +35,6 @@ if __name__ == "__main__":
 #    solver_params = {'method': 'bar', 'presolve': False, 'Nthreads': 8}
     solver_params = {}
     
-    irisao_coron = scda.HalfplaneAPLC(fileorg=fileorg, design=design_params, solver=solver_params, verbose=True)
+    atlast_coron = scda.QuarterplaneAPLC(fileorg=fileorg, design=design_params, solver=solver_params, verbose=True)
 
-    irisao_coron.write_ampl(ampl_src_fname="atlast_qpaplc.mod", overwrite=True)
+    atlast_coron.write_ampl(ampl_src_fname="atlast_qpaplc.mod", overwrite=True)
