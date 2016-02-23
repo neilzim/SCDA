@@ -857,9 +857,9 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
 
         sets_and_arrays = """
         #---------------------
-        set Pupil := setof {x in Xs, y in Ys: PupilFile[round(x/dx+0.5+N),round(y/dy+0.5)] != 0} (x,y);
-        set Mask := setof {mx in MXs, my in MYs: MaskFile[round(mx/dmx+0.5+M),round(my/dmy+0.5)] != 0} (mx,my);
-        set Lyot := setof {x in Xs, y in Ys: LyotFile[round(x/dx+0.5+N),round(y/dy+0.5)] != 0} (x,y);
+        set Pupil := setof {x in Xs, y in Ys: PupilFile[round(x/dx+0.5),round(y/dy+0.5)] != 0.} (x,y);
+        set Mask := setof {mx in MXs, my in MYs: MaskFile[round(mx/dmx+0.5),round(my/dmy+0.5)] != 0.} (mx,my);
+        set Lyot := setof {x in Xs, y in Ys: LyotFile[round(x/dx+0.5),round(y/dy+0.5)] != 0.} (x,y);
         
         param TR := sum {i in 1..N, j in 1..N} PupilFile[i,j]*dx*dy; # Transmission of the Pupil. Used for calibration.
         param I00 := (sum {i in 1..N, j in 1..N} PupilFile[i,j]*LyotFile[i,j]*dx*dy)^2; # Peak intensity in the absence of coronagraph (Pupil and Lyot terms are squared but square exponiential is unnecessary because of the binary values).
