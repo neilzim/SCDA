@@ -58,15 +58,13 @@ For now, only an annular stop is supported, with and without secondary support s
 
 - Symmetry (defined by coronagraph subclass): ``'full'``, ``'half'``, ``'quart'``
 
-- Inner diameter of annular aperture, percentage of telescope aperture diameter (key ``'id'``, integer)
+- Inner diameter of annular aperture, percentage of telescope aperture diameter (key ``'id'``, integer, default ``90``)
 
-- Outer diameter of annular aperture, percentage of telescope aperture diameter (key ``'od'``, integer)
+- Outer diameter of annular aperture, percentage of telescope aperture diameter (key ``'od'``, integer, default ``20``)
 
-- Secondary support strut configuration, if telescope features are mimicked by the stop (key ``'ss'``, string, defaults to the telescope aperture secondary support strut configuration). If the stop is a simple annulus with no struts, the string is '0'.
+- Obscuration switch (key 'obscure', Boolean, default ```False```). If ```True```, the stop mimics the secondary obscuration configuration of the telescope aperture. Otherwise, the stop is a clear annulus. 
 
-- Secondary support strut thickness, if telescope features are mimicked by the stop (key ``'sst'``, string, defaults to the telescope aperture strut thickness). If the stop is a clear annulus with no struts, the string is '0'.
-
-- Padding of obscuration features, if present (key ``'pad'``, integer, default ``0``). The padding parameter is specified in units of telescope aperture diameter percentage. Padding is applied in an omindirectial sense by a shift-and-combine-and-mask routine, so it increases thickness on all sides of a given obscuration feature, and the thickness of all features increases by the same absolute propportion of the telescope aperture. This parameter remains zero if obscuration features are not mimicked by the Lyot stop, or if they are mimicked but not padded.
+- Padding of obscuration features, if present (key ``'pad'``, integer, default ``0``). The padding parameter is specified as a percentage of telescope pupil diameter. Padding is applied in an omindirectial sense by a shift-and-combine-and-mask routine, so it increases thickness on all sides of a given obscuration feature, and the thickness of all features increases by the same absolute propportion of the pupil diameter. This parameter remains zero if obscuration features are not mimicked by the Lyot stop, or if they are mimicked but not padded.
 
 - Alignment tolerance, percentage of telescope aperture diameter (key ``'altol'``, integer). Does not affect the Lyot stop file name, but  modifies the AMPL optimization program. Not yet supported.
 
@@ -85,20 +83,19 @@ Format spec: ``'LS_{0:s}_ann{1:02d}D{2:02d}_clear_N{3:04d}.dat'``
 
 Example: ``'LS_quart_ann15D80_clear_N0300.dat'``
 
-B. When telescope obscurations are mimicked by the stop:
+B. When telescope obscurations are mimicked by the stop, the relevant design parameters from the telescope aperture are included:
 
-Format spec: ``'LS_{0:s}_ann{1:02d}D{2:02d}_{3:s}{4:s}p{5:02d}_N{6:04d}.dat'``
+Format spec: ``'LS_{0:s}_ann{1:02d}D{2:02d}_{3:s}{4:s}sm{5:d}p{6:02d}_N{7:04d}.dat'``
 
 0. Symmetry, string
 1. Inner diameter, zero-padded 2-digit integer
 2. Outer diameter, zero-padded 2-digit integer
-3. Secondary support stut config, string
-4. Secondary support stut thickness in telescope aperture, string
-5. Obscuration padding, zero-padded 2-digit integer
-6. Pupil array quadrant width, zero-padded 4-digit integer
+3. Support stut config, string
+4. Support stut thickness in telescope aperture, string
+5. Secondary mirror obscuration, single-digit Boolean integer
+6. Obscuration padding, zero-padded 2-digit integer
+7. Pupil array quadrant width, zero-padded 4-digit integer
 
-Examples:
-
-- ``'LS_quart_ann20D85_X100p08_N0300.dat'``
+Examples: ``'LS_quart_ann20D85_X100sm1p08_N0300.dat'``
 
 
