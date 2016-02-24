@@ -26,7 +26,7 @@ Format spec: ``'TelAp_{0:s}_{1:s}{2:s}{3:s}sm{4:d}_N{5:04d}.dat'``
 4. Secondary mirror obscuration flag: either ``0`` or ``1``
 5. Pupil array quadrant width: zero-padded 4-digit integer from 50 to 1000
 
-Example: ``'TelAp_half_pie12Y60dCross025sm1_N0500.dat'``
+Example: ``'TelAp_half_pie12Y60d025sm1_N0500.dat'``
 
 ===================
 2. Focal plane mask
