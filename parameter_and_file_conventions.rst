@@ -56,13 +56,13 @@ Design parameter input menu
 ---------------------
 The basic Lyot stop is a clear annulus. For future flexibility, the interface nominally supports stops several options: a hexagonal outer edge, switching on and off both secondary obscurations and primary mirror gaps, as well as adjusting the padding level applied to each layer.
 
-- Shape (key ``shape''; string; accepts ```ann'`` or ``'hex'``; default ``'ann'``). The default Lyot stop is an annular aperture. When the ``'hex'`` option is set, the outer edge is a hexagon.
+- Shape (key ``shape''; string; choice of ``'ann'`` or ``'hex'``; default ``'ann'``). The default Lyot stop is an annular aperture. When the ``'hex'`` option is set, the outer edge is a hexagon.
 
 - Inner diameter of the aperture, as a percentage of the re-imaged telescope pupil diameter (key ``'id'``; integer from 0 to 99; default ``20``)
 
 - Outer diameter of the aperture, as a percentage of the re-imaged telescope pupil diameter (key ``'od'``; integer from 0 to 99; default ``90``)
 
-- Obscuration switch (key 'obscure'; integer; default ``0``): ``0``, ``1``, ``2``. If ``0``, the stop is a clear annulus. If ``1``, the stop mimics the secondary obscuration (secondary mirror plus support struts) defined for the telescope. If ``2``, the stop mimics the complete re-imaged telescope pupil, including the secondary obscuration as well as the gaps and edges of the primary mirror.
+- Obscuration switch (key 'obscure'; integer from ``0`` to ``2``; default ``0``). If ``0``, the stop is a clear annulus. If ``1``, the stop mimics the secondary obscuration (secondary mirror plus support struts) defined for the telescope. If ``2``, the stop mimics the complete re-imaged telescope pupil, including the secondary obscuration as well as the gaps and edges of the primary mirror.
 
 - Padding of secondary obscuration features, if present (key ``'spad'``; integer from 0 to 99; default ``0``). The padding parameter is specified as a percentage of telescope pupil diameter [1].
 
@@ -83,7 +83,7 @@ Format spec: ``'LS_{0:s}_{1:s}{2:02d}D{3:02d}_clear_N{4:04d}.dat'``
 3. Outer diameter: zero-padded 2-digit integer from 0 to 99
 4. Pupil array quadrant width: zero-padded 4-digit integer from 50 to 1000
 
-Example: ``'LS_quart_ann15D80_clear_N0300.dat'``
+Example: ``'LS_quart_ann15D80_clear_N0250.dat'``
 
 **B.** When secondary obscuration is mimicked by the stop (``'obscure' = 1``), the relevant design parameters from the telescope aperture and the padding value are included:
 
@@ -99,7 +99,7 @@ Format spec: ``'LS_{0:s}_{1:s}{2:02d}D{3:02d}_{4:s}{5:s}sm{6:d}Pad{7:02d}_N{8:04
 7. Secondary obscuration padding: zero-padded 2-digit integer from 0 to 99
 8. Pupil array quadrant width: zero-padded 4-digit integer from 50 to 1000
 
-Examples: ``'LS_quart_ann20D85_X100sm1sp08_N0300.dat'``
+Examples: ``'LS_quart_ann20D85_X100sm1sp08_N0250.dat'``
 
 **C.** When primary mirror gaps and secondary obscuration are mimicked by the stop (``'obscure' = 2``), the relevant design parameters from the telescope aperture and the padding values are included:
 
@@ -117,7 +117,7 @@ Format spec: ``'LS_{0:s}_{1:s}{2:02d}D{3:02d}_{4:s}Pad{5:02d}{6:s}{7:s}sm{8:d}Pa
 9. Secondary obscuration padding: zero-padded 2-digit integer from 0 to 99
 10. Pupil array quadrant width: zero-padded 4-digit integer from 50 to 1000
 
-Example: ``'LS_quart_hex20D80_hex2X100sm1sp05gp05_N0300.dat'``
+Example: ``'LS_quart_hex20D80_hex2X100sm1sp05gp05_N0250.dat'``
 
 
 ..  [1] Padding is applied in an omindirectial sense by a shift-and-combine-and-mask routine, so it increases thickness on all sides of a given obscuration feature, and the thickness of all features increases by the same absolute propportion of the pupil diameter. This parameter remains zero if pupil features are not mimicked by the Lyot stop, or if they are mimicked but not padded.
