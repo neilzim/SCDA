@@ -64,7 +64,7 @@ For now, only an annular stop is supported, with and without secondary support s
 
 - Secondary support strut configuration, if telescope features are mimicked by the stop (key ``'ss'``, string, defaults to the telescope aperture secondary support strut configuration). If the stop is a simple annulus with no struts, the string is '0'.
 
-- Secondary support strut thickness, if telescope features are mimicked by the stop (key ``'st'``, string, defaults to the telescope aperture strut thickness). If the stop is a simple annulus with no struts, the string is '0'.
+- Secondary support strut thickness, if telescope features are mimicked by the stop (key ``'sst'``, string, defaults to the telescope aperture strut thickness). If the stop is a simple annulus with no struts, the string is '0'.
 
 - Padding of obscuration features, if present (key ``'pad'``, integer, default ``0``). The padding parameter is specified in units of telescope aperture diameter percentage. Padding is applied in an omindirectial sense by a shift-and-combine-and-mask routine, so it increases thickness on all sides of a given obscuration feature, and the thickness of all features increases by the same absolute propportion of the telescope aperture. This parameter is zero if obscuration features are not mimicked by the Lyot stop, or if they are mimicked but not padded.
 
@@ -87,7 +87,7 @@ Example: ``'LS_quart_ann15D90_obs0_N0300.dat'``
 
 B. When telescope obscurations are mimicked by the stop:
 
-Format spec: ``'LS_{0:s}_ann{1:02d}D{2:02d}_{3:s}t{4:s}p{5:02d}_N{6:04d}.dat'``
+Format spec: ``'LS_{0:s}_ann{1:02d}D{2:02d}_{3:s}{4:s}p{5:02d}_N{6:04d}.dat'``
 
 0. Symmetry, string
 1. Inner diameter, zero-padded 2-digit integer
@@ -99,6 +99,6 @@ Format spec: ``'LS_{0:s}_ann{1:02d}D{2:02d}_{3:s}t{4:s}p{5:02d}_N{6:04d}.dat'``
 
 Examples:
 
-- ``'LS_quart_ann20D85_cross025p08_N0300.dat'``
+- ``'LS_quart_ann20D85_X025p08_N0300.dat'``
 
 
