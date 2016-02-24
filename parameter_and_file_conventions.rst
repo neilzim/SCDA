@@ -57,7 +57,7 @@ Design parameter input menu
 ---------------------
 The basic Lyot stop is a clear annulus. For future flexibility, the interface nominally supports stops several options: a hexagonal outer edge, switching on and off both secondary obscurations and primary mirror gaps, as well as adjusting the padding level applied to each layer.
 
-- Shape (key ``shape''; string; choice of ``'ann'`` or ``'hex'``; default ``'ann'``). The default Lyot stop is an annular aperture. When the ``'hex'`` option is set, the outer edge is a hexagon.
+- Shape (key ``'shape'``; string; choice of ``'ann'`` or ``'hex'``; default ``'ann'``). The default Lyot stop is an annular aperture. When the ``'hex'`` option is set, the outer edge is a hexagon.
 
 - Inner diameter of the aperture, as a percentage of the re-imaged telescope pupil diameter (key ``'id'``; integer from 0 to 99; default ``20``)
 
