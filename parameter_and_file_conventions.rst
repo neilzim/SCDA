@@ -54,21 +54,21 @@ Example: ``'FPM_occspot_M050.dat'``
 =============
 Design parameter input menu
 ---------------------
-For now, only an annular stop is supported, with and without secondary support struts.
+The basic Lyot stop is a clear annulus. For future flexibility, the interface nominally supports switching on and off both secondary obscurations and primary mirror features, as well as adjusting the padding level applied to each layer.
 
 - Symmetry (defined by coronagraph subclass): ``'full'``, ``'half'``, ``'quart'``
 
-- Inner diameter of annular aperture, percentage of telescope aperture diameter (key ``'id'``, integer, default ``90``)
+- Inner diameter of annular aperture, percentage of re-imaged telescope pupil diameter (key ``'id'``, integer, default ``90``)
 
-- Outer diameter of annular aperture, percentage of telescope aperture diameter (key ``'od'``, integer, default ``20``)
+- Outer diameter of annular aperture, percentage of re-imaged telescope pupil diameter (key ``'od'``, integer, default ``20``)
 
-- Obscuration switch (key 'obscure', integer, default ``0``): ``0``, ``1``, ``2``. If ``0``, the stop is a clear annulus. If ``1``, the stop mimics the secondary obscuration configuration (secondary mirror plus support struts) of the telescope aperture. Otherwise, the stop is a clear annulus. If ``2``, the stop mimics the complete re-imaged telescope pupil, including secondary obscuration and mirror gaps.
+- Obscuration switch (key 'obscure', integer, default ``0``): ``0``, ``1``, ``2``. If ``0``, the stop is a clear annulus. If ``1``, the stop mimics the secondary obscuration configuration (secondary mirror plus support struts) of the telescope. If ``2``, the stop mimics the complete re-imaged telescope pupil, including the secondary obscurations as well as the gaps and edges of the primary mirror.
 
-- Padding of secondary obscuration features, if present (key ``'spad'``, integer in the range 0 to 100, default ``0``). The padding parameter is specified as a percentage of telescope pupil diameter [1]_.
+- Padding of secondary obscuration features, if present (key ``'spad'``, integer from 0 to 99, default ``0``). The padding parameter is specified as a percentage of telescope pupil diameter [1]_.
 
-- Padding of primary mirror gap features, if present (key ``'ppad'``, integer, default ``0``). The padding parameter is specified as a percentage of telescope pupil diameter. Padding is applied in an omindirectial sense by a shift-and-combine-and-mask routine, so it increases thickness on all sides of a given obscuration feature, and the thickness of all features increases by the same absolute propportion of the pupil diameter. This parameter remains zero if gaps are not mimicked by the Lyot stop, or if they are mimicked but not padded.
+- Padding of primary mirror features, if present (key ``'ppad'``, integer from 0 to 99, default ``0``). The padding parameter is specified as a percentage of telescope pupil diameter [1]_.
 
-- Alignment tolerance, percentage of telescope aperture diameter (key ``'altol'``, integer). Does not affect the Lyot stop file name, but  modifies the AMPL optimization program. Not yet supported.
+- Alignment tolerance, in units of 1/1000th of re-imaged telescope pupil diameter (key ``'altol'``, integer from 0 to 99). Does not affect the Lyot stop file name, but modifies the AMPL optimization program. Not yet supported; for future implementation.
 
 File name format
 ----------------
@@ -87,7 +87,7 @@ Example: ``'LS_quart_ann15D80_clear_N0300.dat'``
 
 B. When telescope obscurations are mimicked by the stop, the relevant design parameters from the telescope aperture are included:
 
-Format spec: ``'LS_{0:s}_ann{1:02d}D{2:02d}_{3:s}{4:s}sm{5:d}p{6:02d}_N{7:04d}.dat'``
+Format spec: ``'LS_{0:s}_ann{1:02d}D{2:02d}_{3:s}{4:s}sm{5:d}spad{6:02d}ppad{7:02d}_N{8:04d}.dat'``
 
 0. Symmetry, string
 1. Inner diameter, zero-padded 2-digit integer
@@ -101,4 +101,4 @@ Format spec: ``'LS_{0:s}_ann{1:02d}D{2:02d}_{3:s}{4:s}sm{5:d}p{6:02d}_N{7:04d}.d
 Examples: ``'LS_quart_ann20D85_X100sm1p08_N0300.dat'``
 
 
-..  [1] Padding is applied in an omindirectial sense by a shift-and-combine-and-mask routine, so it increases thickness on all sides of a given obscuration feature, and the thickness of all features increases by the same absolute propportion of the pupil diameter. This parameter remains zero if obscuration features are not mimicked by the Lyot stop, or if they are mimicked but not padded.
+..  [1] Padding is applied in an omindirectial sense by a shift-and-combine-and-mask routine, so it increases thickness on all sides of a given obscuration feature, and the thickness of all features increases by the same absolute propportion of the pupil diameter. This parameter remains zero if pupil features are not mimicked by the Lyot stop, or if they are mimicked but not padded.
