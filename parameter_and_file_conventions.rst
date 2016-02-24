@@ -64,7 +64,7 @@ For now, only an annular stop is supported, with and without secondary support s
 
 - Obscuration switch (key 'obscure', integer, default ``0``): ``0``, ``1``, ``2``. If ``0``, the stop is a clear annulus. If ``1``, the stop mimics the secondary obscuration configuration (secondary mirror plus support struts) of the telescope aperture. Otherwise, the stop is a clear annulus. If ``2``, the stop mimics the complete re-imaged telescope pupil, including secondary obscuration and mirror gaps.
 
-- Padding of secondary obscuration features, if present (key ``'spad'``, integer in the range 0 to 100, default ``0``). The padding parameter is specified as a percentage of telescope pupil diameter._[1]
+- Padding of secondary obscuration features, if present (key ``'spad'``, integer in the range 0 to 100, default ``0``). The padding parameter is specified as a percentage of telescope pupil diameter.[1]_
 
 - Padding of primary mirror gap features, if present (key ``'ppad'``, integer, default ``0``). The padding parameter is specified as a percentage of telescope pupil diameter. Padding is applied in an omindirectial sense by a shift-and-combine-and-mask routine, so it increases thickness on all sides of a given obscuration feature, and the thickness of all features increases by the same absolute propportion of the pupil diameter. This parameter remains zero if gaps are not mimicked by the Lyot stop, or if they are mimicked but not padded.
 
