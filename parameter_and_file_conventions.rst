@@ -9,21 +9,21 @@ With the exception of symmetry, all parameter keys are nested under the ``'Pupil
 
 - Primary mirror configuration (key ``'pm'``): ``'hex1'``, ``'hex2'``, ``'hex3'``, ``'hex4'``, ``'key24'``, ``'pie12'``, ``'pie08'``
 
-- Support strut configuration (key ``'ss'``): ``'y60'``, ``'y60off'``, ``'x'``, ``'cross'``, ``'t'``, ``'y90'``
+- Secondary support strut configuration (key ``'ss'``): ``'y60'``, ``'y60off'``, ``'x'``, ``'cross'``, ``'t'``, ``'y90'``
 
-- Support strut thickness, either 2.5 or 10 cm (key ``'sst'``): ``'025'``, ``'100'``
+- Secondary support strut thickness, either 2.5 or 10 cm (key ``'sst'``): ``'025'``, ``'100'``
 
-- Secondary obscuration present? (key ``'so'``): ``True``, ``False``
+- Secondary mirror obscuration present? (key ``'sm'``): ``True``, ``False``
 
 File name format
 ----------------
-Format spec: ``'TelAp_{0:s}_{1:s}{2:s}t{3:s}so{4:d}_N{5:04d}.dat'``
+Format spec: ``'TelAp_{0:s}_{1:s}{2:s}t{3:s}sm{4:d}_N{5:04d}.dat'``
 
 0. Symmetry, string
 1. Primary mirror, string
 2. Support strut config, string
 3. Support stut thickness, string
-4. Secondary obscuration, single digit integer (Boolean)
+4. Secondary mirror obscuration, single-digit Boolean integer
 5. Pupil array quadrant width, zero-padded 4-digit integer
 
 Example: ``'TelAp_half_hex3crosst025so1_N0125.dat'``
@@ -33,19 +33,19 @@ Example: ``'TelAp_half_hex3crosst025so1_N0125.dat'``
 ===================
 Design parameter menu
 ---------------------
-For now, only the occulting spot is supported. All keys are nested in the 'FPM' category.
+For now, only the occulting spot is supported. All keys are nested under the 'FPM' category.
 
 - Spot radius (key ``rad''): float
 
-- Array quadrant width (key ``M``): integer
+- Mask array quadrant width (key ``M``): integer
 
 File name format
 ----------------
-FPM file names are agnostic to physical radius.
+FPM files are agnostic to physical radius.
 
 Format spec: ``'FPM_occspot_M{0:03d}.dat'``
 
-0. Array quadrant width, zero-padded 3-digit integer
+0. Mask array quadrant width, zero-padded 3-digit integer
 
 Example: ``'FPM_occspot_M050.dat'``
 
@@ -62,7 +62,7 @@ For now, only an annular stop is supported, with and without secondary support s
 
 - Outer diameter of annular aperture, percentage of telescope aperture diameter (key ``'od'``, integer)
 
-- Secondary support strut configuration, if telescope features are mimicked by the stop (key ``'ss'``, string). If the stop is a simple annulus with no struts, the string is '0'.
+- Secondary support strut configuration, if telescope features are mimicked by the stop (key ``'ss'``, string, defaults to the telescope aperture secondary support strut configuration). If the stop is a simple annulus with no struts, the string is '0'.
 
 - Padding of obscuration features, if present (key ``'pad'``, integer). The padding parameter is specified in units of telescope aperture diameter percentage. Padding is applied in an omindirectial sense by a shift-and-combine-and-mask routine, so it increases thickness on all sides of a given obscuration feature, and the thickness of all features increases by the same absolute propportion of the telescope aperture.  This parameter is zero if obscuration features are not mimicked by the Lyot stop, or if they are mimicked but not padded.
 
