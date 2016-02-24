@@ -43,12 +43,12 @@ File name format
 ----------------
 FPM files are agnostic to physical/optical design dimensions.
 
-Format spec: ``'FPM_occspot_{0:s}_M{1:03d}.dat'``
+Format spec: ``'FPM_{0:s}_occspot_M{1:03d}.dat'``
 
 0. Symmetry string (from coronagraph subclass): one of ``'full'``, ``'half'``, ``'quart'``
 1. Mask array quadrant width; zero-padded 3-digit integer
 
-Example: ``'FPM_occspot_half_M050.dat'``
+Example: ``'FPM_half_occspot_M050.dat'``
 
 =============
 3. Lyot stop
