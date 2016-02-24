@@ -126,10 +126,12 @@ class DesignParamSurvey(object):
             if namekey.endswith('dir') and ( namekey not in self.fileorg or self.fileorg[namekey] is None ):
                 self.fileorg[namekey] = self.fileorg['work dir']
       
+        #////////////////////////////////////////////////////////////////////////////////////////////////////
         # In most cases we don't expect to directly specify file names for apertures, FPM, or LS files
         # for the SCDA parameter survey. However, it easy enough to make this option available.
         # If the location of the optimizer input file is not known, 
         # look for it in the directory corresponding to its specific category
+        #////////////////////////////////////////////////////////////////////////////////////////////////////
         if 'TelAp fname' in self.fileorg and self.fileorg['TelAp fname'] is not None and \
         not os.path.exists(self.fileorg['TelAp fname']) and os.path.exists(self.fileorg['TelAp dir']) and \
         os.path.dirname(self.fileorg['TelAp fname']) == '':
@@ -184,7 +186,7 @@ class DesignParamSurvey(object):
         for (fixed_keycat, fixed_parname), fixed_val in zip(self.fixed_param_index, self.fixed_param_vals):
             design[fixed_keycat][fixed_parname] = fixed_val
         self.coron_list = []
-        for param_combo in self.varied_param_combos:
+        for param_combo in self.varied_param_combos: # TODO: Switch the coronagraph type depending on the symmetry of the telescope aperture and support struts 
             for (varied_keycat, varied_parname), current_val in zip(self.varied_param_index, param_combo):
                 design[varied_keycat][varied_parname] = current_val
             self.coron_list.append( coron_class(design=design, fileorg=self.fileorg, solver=self.solver) )
@@ -202,10 +204,10 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                      'method': ['bar', 'barhom', 'dualsimp'],
                      'presolve': [True, False], 'Nthreads': [None]+range(1,33) }
 
-    _aperture_menu = { 'pm': ['hex1', 'hex2', 'hex3', 'hex4', 'key24', 'pie12', 'pie8', 'irisao'],
-                       'ss': ['y60','y60off','x','cross','t','y90'],
+    _aperture_menu = { 'pm': ['hex1', 'hex2', 'hex3', 'key24', 'pie12', 'pie08', 'irisao', 'atlast'],
+                       'ss': ['Y60d','Yoff60d','X','Cross','T','Y90d'],
                        'sst': ['025','100'],
-                       'so': [True, False] }
+                       'sm': [True, False] }
 
     def __init__(self, verbose=False, **kwargs):
         # Only set fileorg and solver attributes in this constructor,
@@ -309,7 +311,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
 
 class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 1000)), ('pm',(str, 'hex1')), ('ss',(str, 'x')), 
-                                                          ('sst',(str, '100')), ('so',(bool, True))]) ),
+                                                          ('sst',(str, '100')), ('sm',(bool, True))]) ),
                                    ( 'FPM', OrderedDict([('rad',(float, 4.)), ('M',(int, 50))]) ),
                                    ( 'LS', OrderedDict([('id',(int, 20)), ('od',(int, 90)), ('ovsz',(int, 0)), ('altol',(int, None))]) ),
                                    ( 'Image', OrderedDict([('c',(float, 10.)), ('iwa',(float, 4.)), ('owa',(float, 10.)),
@@ -359,10 +361,8 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             self.logger.info("File organization parameters: {}".format(self.fileorg))
      
         self.amplname_coron = "APLC_full"
-        if self.design['Pupil']['so'] == True:
-            self.amplname_pupil = "{0:s}{1:s}t{2:s}so1_N{3:04d}".format(self.design['Pupil']['pm'], self.design['Pupil']['ss'], self.design['Pupil']['sst'], self.design['Pupil']['N'])
-        else:                                                                                                                                      
-            self.amplname_pupil = "{0:s}{1:s}t{2:s}so0_N{3:04d}".format(self.design['Pupil']['pm'], self.design['Pupil']['ss'], self.design['Pupil']['sst'], self.design['Pupil']['N'])
+        self.amplname_pupil = "{0:s}{1:s}t{2:s}so{3:d}_N{4:04d}".format(self.design['Pupil']['pm'], self.design['Pupil']['ss'], self.design['Pupil']['sst'], \
+                                                                        int(self.design['Pupil']['sm']), self.design['Pupil']['N'])
 
         self.amplname_fpm = "FPM{:02}M{:03}".format(int(round(100*self.design['FPM']['rad'])), self.design['FPM']['M'])
         if self.design['LS']['altol'] is None and self.design['LS']['ovsz'] is None:
@@ -407,7 +407,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                 self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_full_" + self.amplname_pupil + ".dat") )
 
             if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
-                self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_occspot_M{:03}.dat".format(self.design['FPM']['M']) )
+                self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_occspot_full_M{:03}.dat".format(self.design['FPM']['M']) )
 
             if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_full_" + self.amplname_pupil + \
@@ -440,7 +440,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_half_" + self.amplname_pupil + ".dat") )
 
         if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
-            self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_occspot_M{:03}.dat".format(self.design['FPM']['M']) )
+            self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_occspot_half_M{:03}.dat".format(self.design['FPM']['M']) )
 
         if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
             self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + self.amplname_pupil + \
@@ -475,33 +475,32 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         # AMPL program to optimize a half-plane symmetric APLC
         # Created by {0:s} with {1:s} on {2:s} at {3:s}
         load amplgsl.dll;
-        """.format(getpass.getuser(), os.path.basename(__file__), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
 
-        params = """
+
         #---------------------
 
         param pi:= 4*atan(1);
 
         #---------------------
-        param c := {0:.2f};
+        param c := {4:.2f};
 
         #---------------------
-        param Rmask := {1:0.3f};
-        param rho0 := {2:0.2f};
-        param rho1 := {3:0.2f};
+        param Rmask := {5:0.3f};
+        param rho0 := {6:0.2f};
+        param rho1 := {7:0.2f};
         
         #---------------------
-        param N := {4:d};				# discretization parameter (pupil)
-        param M := {5:d};				# discretization parameter (mask)
+        param N := {8:d};				# discretization parameter (pupil)
+        param M := {9:d};				# discretization parameter (mask)
         
-        param Nimg := {6:d};           # discretization parameter (image)
-        param Fmax := {7:0.2f};        # NTZ: We paramaterize our image plane resolution by fpres = sampling rate at 
+        param Nimg := {10:d};           # discretization parameter (image)
+        param Fmax := {11:0.2f};        # NTZ: We paramaterize our image plane resolution by fpres = sampling rate at 
                                     #      the shortest wavelength. Then Nimg is an integer function of fpres, oca,
         #---------------------      #      and bw. This integer is not specified directly by the user, but computed "privately"
-        param bw := {8:0.2f};           #      by the APLC class constructor.
+        param bw := {12:0.2f};           #      by the APLC class constructor.
         param lam0 := 1.;
         param dl := bw*lam0;
-        param Nlam := {9:d};
+        param Nlam := {13:d};
         
         #---------------------
         param obs := 20;             # NTZ: We will eliminate this section of parameter definitions, 
@@ -518,7 +517,8 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         
         #---------------------
         param CoeffOverSizePup :=0.824*OD;
-        """.format(self.design['Image']['c'], self.design['FPM']['rad'], self.design['Image']['iwa'], self.design['Image']['owa'], \
+        """.format(getpass.getuser(), os.path.basename(__file__), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), \
+                   self.design['Image']['c'], self.design['FPM']['rad'], self.design['Image']['iwa'], self.design['Image']['owa'], \
                    self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['_Nimg'], \
                    self.design['Image']['oca'], self.design['Image']['bw'], self.design['Image']['Nlam'])
         
@@ -586,8 +586,8 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         set Etas := setof {j in 0..Nimg-1 by 1} j*deta;
         
         set DarkHole := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= rho0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta); # Only for 360deg masks.
-        #set PSFCore := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= 0 && sqrt(xi^2+eta^2) < rho0} (xi,eta); # Only for 360deg masks.
-        #set InsideArea := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= 0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta); # Only for 360deg masks.
+        set PSFCore := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= 0 && sqrt(xi^2+eta^2) < rho0} (xi,eta); # Only for 360deg masks.
+        set InsideArea := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= 0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta); # Only for 360deg masks.
         """
 
         field_propagation = """
@@ -630,8 +630,12 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         var ED1_imag {xi in Xis, eta in Etas, lam in Ls} := 0.0;
         
         subject to st_ED1_ECmreal_cx {x in Xs, eta in Etas, lam in Ls}: ED1_ECmreal_cx[x,eta,lam] = 2.*sum {y in Ys: (x,y) in Lyot} (A[x,y]*PupilFile[round(x/dx+0.5+N),round(y/dy+0.5)]-ECm_real[x,y,lam])*cos(2*pi*y*eta*(lam0/lam))*dy;
-        subject to st_ED1_real {xi in Xis, eta in Etas, lam in Ls}: ED1_real[xi,eta,lam] = (lam0/lam)*sum {x in Xs} ED1_ECmreal_cx[x,eta,lam]*cos(2*pi*x*xi*(lam0/lam))*dx;
-        subject to st_ED1_imag {xi in Xis, eta in Etas, lam in Ls}: ED1_imag[xi,eta,lam] = (lam0/lam)*sum {x in Xs} -ED1_ECmreal_cx[x,eta,lam]*sin(2*pi*x*xi*(lam0/lam))*dx;
+        
+        #subject to st_ED1_real {xi in Xis, eta in Etas, lam in Ls}: ED1_real[xi,eta,lam] = (lam0/lam)*sum {x in Xs} ED1_ECmreal_cx[x,eta,lam]*cos(2*pi*x*xi*(lam0/lam))*dx;
+        #subject to st_ED1_imag {xi in Xis, eta in Etas, lam in Ls}: ED1_imag[xi,eta,lam] = (lam0/lam)*sum {x in Xs} -ED1_ECmreal_cx[x,eta,lam]*sin(2*pi*x*xi*(lam0/lam))*dx;
+        
+        subject to st_ED1_real {(xi, eta) in InsideArea, lam in Ls}: ED1_real[xi,eta,lam] = (lam0/lam)*sum {x in Xs} ED1_ECmreal_cx[x,eta,lam]*cos(2*pi*x*xi*(lam0/lam))*dx;
+        subject to st_ED1_imag {(xi, eta) in InsideArea, lam in Ls}: ED1_imag[xi,eta,lam] = (lam0/lam)*sum {x in Xs} -ED1_ECmreal_cx[x,eta,lam]*sin(2*pi*x*xi*(lam0/lam))*dx;
         
         
         var ED2_ECmimag_cx {x in Xs, eta in Etas, lam in Ls} := 0.0;
@@ -639,14 +643,21 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         var ED2_imag {xi in Xis, eta in Etas, lam in Ls} := 0.0;
         
         subject to st_ED2_ECmimag_cx {x in Xs, eta in Etas, lam in Ls}: ED2_ECmimag_cx[x,eta,lam] = 2.*sum {y in Ys: (x,y) in Lyot} (-ECm_imag[x,y,lam])*cos(2*pi*y*eta*(lam0/lam))*dy;
-        subject to st_ED2_real {xi in Xis, eta in Etas, lam in Ls}: ED2_real[xi,eta,lam] = (lam0/lam)*sum {x in Xs} ED2_ECmimag_cx[x,eta,lam]*cos(2*pi*x*xi*(lam0/lam))*dx;
-        subject to st_ED2_imag {xi in Xis, eta in Etas, lam in Ls}: ED2_imag[xi,eta,lam] = (lam0/lam)*sum {x in Xs} -ED2_ECmimag_cx[x,eta,lam]*sin(2*pi*x*xi*(lam0/lam))*dx;
+        
+        #subject to st_ED2_real {xi in Xis, eta in Etas, lam in Ls}: ED2_real[xi,eta,lam] = (lam0/lam)*sum {x in Xs} ED2_ECmimag_cx[x,eta,lam]*cos(2*pi*x*xi*(lam0/lam))*dx;
+        #subject to st_ED2_imag {xi in Xis, eta in Etas, lam in Ls}: ED2_imag[xi,eta,lam] = (lam0/lam)*sum {x in Xs} -ED2_ECmimag_cx[x,eta,lam]*sin(2*pi*x*xi*(lam0/lam))*dx;
+        
+        subject to st_ED2_real {(xi, eta) in InsideArea, lam in Ls}: ED2_real[xi,eta,lam] = (lam0/lam)*sum {x in Xs} ED2_ECmimag_cx[x,eta,lam]*cos(2*pi*x*xi*(lam0/lam))*dx;
+        subject to st_ED2_imag {(xi, eta) in InsideArea, lam in Ls}: ED2_imag[xi,eta,lam] = (lam0/lam)*sum {x in Xs} -ED2_ECmimag_cx[x,eta,lam]*sin(2*pi*x*xi*(lam0/lam))*dx;
         
         
         var ED_real {xi in Xis, eta in Etas, lam in Ls} := 0.0;
         var ED_imag {xi in Xis, eta in Etas, lam in Ls} := 0.0;
-        subject to st_ED_real {xi in Xis, eta in Etas, lam in Ls}: ED_real[xi,eta,lam] = ED1_real[xi,eta,lam]-ED2_imag[xi,eta,lam];
-        subject to st_ED_imag {xi in Xis, eta in Etas, lam in Ls}: ED_imag[xi,eta,lam] = ED1_imag[xi,eta,lam]+ED2_real[xi,eta,lam];
+        #subject to st_ED_real {xi in Xis, eta in Etas, lam in Ls}: ED_real[xi,eta,lam] = ED1_real[xi,eta,lam]-ED2_imag[xi,eta,lam];
+        #subject to st_ED_imag {xi in Xis, eta in Etas, lam in Ls}: ED_imag[xi,eta,lam] = ED1_imag[xi,eta,lam]+ED2_real[xi,eta,lam];
+        
+        subject to st_ED_real {(xi, eta) in InsideArea, lam in Ls}: ED_real[xi,eta,lam] = ED1_real[xi,eta,lam]-ED2_imag[xi,eta,lam];
+        subject to st_ED_imag {(xi, eta) in InsideArea, lam in Ls}: ED_imag[xi,eta,lam] = ED1_imag[xi,eta,lam]+ED2_real[xi,eta,lam];
         
         
         #---------------------
@@ -665,12 +676,11 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/sqrt(2.);
         subject to sidelobe_zero_imag_pos {(xi,eta) in DarkHole, lam in Ls}: ED_imag[xi,eta,lam] <= 10^(-c/2)*ED00_real/sqrt(2.);
         subject to sidelobe_zero_imag_neg {(xi,eta) in DarkHole, lam in Ls}: ED_imag[xi,eta,lam] >= -10^(-c/2)*ED00_real/sqrt(2.);
-        """
-
-        misc_options = """
-        option times 1;
-        option gentimes 1;
-        option show_stats 1;
+        
+        subject to sidelobe_zero_real_pos_core {(xi,eta) in PSFCore, lam in Ls}: ED_real[xi,eta,lam] <= 10^((-c+2)/2)*ED00_real/sqrt(2.);
+        subject to sidelobe_zero_real_neg_core {(xi,eta) in PSFCore, lam in Ls}: ED_real[xi,eta,lam] >= -10^((-c+2)/2)*ED00_real/sqrt(2.);
+        subject to sidelobe_zero_imag_pos_core {(xi,eta) in PSFCore, lam in Ls}: ED_imag[xi,eta,lam] <= 10^((-c+2)/2)*ED00_real/sqrt(2.);
+        subject to sidelobe_zero_imag_neg_core {(xi,eta) in PSFCore, lam in Ls}: ED_imag[xi,eta,lam] >= -10^((-c+2)/2)*ED00_real/sqrt(2.);
         """
         
         solver = """
@@ -679,6 +689,12 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
 
         solver_options = """
         option gurobi_options "outlev=1 lpmethod=2 crossover=0";
+        """
+
+        misc_options = """
+        option times 1;
+        option gentimes 1;
+        option show_stats 1;
         """
  
         execute = """
@@ -691,264 +707,18 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         store_results = """
         #---------------------
 
-        printf {{x in Xs, y in Ys}}: "%15g %15g %15g \\n", x, y, A[x,y] > "{0:s}";
+        printf {{x in Xs, y in Ys}}: "%15g %15g %15g \\n", x, y, A[x,y] > "{0:s}"
         """.format(self.fileorg['sol fname'])
 
         mod_fobj.write( textwrap.dedent(header) )
-        mod_fobj.write( textwrap.dedent(params) )
         mod_fobj.write( textwrap.dedent(load_masks) )
         mod_fobj.write( textwrap.dedent(define_coords) )
         mod_fobj.write( textwrap.dedent(sets_and_arrays) )
         mod_fobj.write( textwrap.dedent(field_propagation) )
         mod_fobj.write( textwrap.dedent(constraints) )
-        mod_fobj.write( textwrap.dedent(misc_options) )
         mod_fobj.write( textwrap.dedent(solver) )
         mod_fobj.write( textwrap.dedent(solver_options) )
-        mod_fobj.write( textwrap.dedent(execute) )
-        mod_fobj.write( textwrap.dedent(store_results) )
-
-        mod_fobj.close()
-        self.logger.info("Wrote %s"%self.fileorg['ampl src fname'])
-
-class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plane symmetry case
-    def __init__(self, **kwargs):
-        super(QuarterplaneAPLC, self).__init__(**kwargs)
-        self.amplname_coron = "APLC_quart"
-        if 'ampl src fname' not in self.fileorg or self.fileorg['ampl src fname'] is None:
-            ampl_src_fname_tail = self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
-                                  self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".mod"
-            self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname_tail)
-
-        if 'sol fname' not in self.fileorg or self.fileorg['sol fname'] is None:
-            self.fileorg['sol fname'] = self.fileorg['ampl src fname'][:-4] + "solAp.dat"
-
-        if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
-            self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_quart_" + self.amplname_pupil + ".dat") )
-
-        if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
-            self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_occspot_M{:03}.dat".format(self.design['FPM']['M']) )
-
-        if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
-            self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + self.amplname_pupil + \
-                                                     "_{0:02d}D{1:02d}ovsz{2:02d}.dat".format(self.design['LS']['id'], \
-                                                     self.design['LS']['od'], self.design['LS']['ovsz'])) )
-        self.check_ampl_input_files()
-    def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None):
-        if self.ampl_infile_status is False and not override_infile_status:
-            self.logger.error("Error: the most recent input file check for this design configuration failed.")
-            self.logger.error("The override_infile_status switch is off, so write_ampl() will now abort.")
-            self.logger.error("See previous warnings in the log to see what file was missing during the initialization")
-            return
-        if ampl_src_fname is not None:
-            if os.path.dirname(ampl_src_fname) == '' and self.fileorg['ampl src dir'] is not None:
-                self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname)
-            else:
-                self.fileorg['ampl src fname'] = os.path.abspath(ampl_src_fname)    
-                self.fileorg['ampl src dir'] = os.path.dirname(self.fileorg['ampl src fname'])
-        if os.path.exists(self.fileorg['ampl src fname']):
-            if overwrite == True:
-                self.logger.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
-            else:
-                self.logger.warning("Error: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
-                return
-        elif not os.path.exists(self.fileorg['ampl src dir']):
-            os.mkdir(self.fileorg['ampl src dir'])
-            self.logger.info("Created new AMPL source code directory, {0:s}".format(self.fileorg['ampl src dir']))
-#        self.logger.info("Writing the AMPL program for the specified quarter-plane APLC")
-        mod_fobj = open(self.fileorg['ampl src fname'], "w")
-
-        header = """\
-        # AMPL program to optimize a quarter-plane symmetric APLC
-        # Created by {0:s} with {1:s} on {2:s} at {3:s}
-        load amplgsl.dll;
-        """.format(getpass.getuser(), os.path.basename(__file__), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
-
-        params = """
-        #---------------------
-
-        param pi:= 4*atan(1);
-
-        #---------------------
-        param c := {0:.2f};
-
-        #---------------------
-        param Rmask := {1:0.3f};
-        param rho0 := {2:0.2f};
-        param rho1 := {3:0.2f};
-        
-        #---------------------
-        param N := {4:d};				# discretization parameter (pupil)
-        param M := {5:d};				# discretization parameter (mask)
-        
-        param Nimg := {6:d};           # discretization parameter (image)
-        param Fmax := {7:0.2f};        # NTZ: We paramaterize our image plane resolution by fpres = sampling rate at 
-                                    #      the shortest wavelength. Then Nimg is an integer function of fpres, oca,
-        #---------------------      #      and bw. This integer is not specified directly by the user, but computed "privately"
-        param bw := {8:0.2f};           #      by the APLC class constructor.
-        param lam0 := 1.;
-        param dl := bw*lam0;
-        param Nlam := {9:d};
-        
-        #---------------------
-        param obs := 20;             # NTZ: We will eliminate this section of parameter definitions, 
-        param spiders :=01;          #      since we determine the file names of the aperture and Lyot stop
-        param lsobs := 20;           #      outside the program, as well as the file name of the apodizer solution.
-        param lsspiders :=02;
-        param gap :=01;
-        param lsgap :=00;
-        
-        param OD :=0.98;
-        
-        #---------------------
-        param Normterm := 1.00; 	# 0.380
-        
-        #---------------------
-        param CoeffOverSizePup :=1.0*OD;
-        """.format(self.design['Image']['c'], self.design['FPM']['rad'], self.design['Image']['iwa'], self.design['Image']['owa'], \
-                   self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['_Nimg'], \
-                   self.design['Image']['oca'], self.design['Image']['bw'], self.design['Image']['Nlam'])
-        
-        load_masks = """\
-        #---------------------
-        # Loading Pupil
-        param PupilFile {{1..N,1..N}};
-        
-        read {{i in 1..N,j in 1..N}} PupilFile[i,j] < "{0:s}";
-        close "{1:s}";
-        
-        # Loading FPM
-        param MaskFile {{1..M,1..M}};
-        
-        read {{i in 1..M,j in 1..M}} MaskFile[i,j] < "{2:s}"; 
-        close "{3:s}";
-        
-        # Loading Lyot stop
-        param LyotFile {{1..N,1..N}};
-        
-        read {{i in 1..N,j in 1..N}} LyotFile[i,j] < "{4:s}";
-        close "{5:s}";
-        """.format(self.fileorg['TelAp fname'], self.fileorg['TelAp fname'], self.fileorg['FPM fname'], self.fileorg['FPM fname'], \
-                   self.fileorg['LS fname'], self.fileorg['LS fname'])
-
-        define_coords = """\
-         
-        #---------------------
-        # steps in each plane
-        param dx := 1/(2*N);
-        
-        param dy := dx;
-        
-        param dmx := 2*Rmask/(2*M);
-        param dmy := dmx;
-        
-        param dxi := (Fmax/Nimg)*(1/CoeffOverSizePup);
-        param deta := dxi;
-
-        #---------------------
-        # coordinate vectors in each plane
-        set Xs := setof {i in 0.5..N-0.5 by 1} i*dx;
-        set Ys := setof {j in 0.5..N-0.5 by 1} j*dy;
-        
-        set MXs := setof {i in 0.5..M-0.5 by 1} i*dmx;
-        set MYs := setof {j in 0.5..M-0.5 by 1} j*dmy;
-        
-        set Ls := setof {l in 1..Nlam} lam0*(1+((l-1)/(Nlam-1)-0.5)*dl);
-        """
-
-        sets_and_arrays = """
-        #---------------------
-        set Pupil := setof {x in Xs, y in Ys: PupilFile[round(x/dx+0.5),round(y/dy+0.5)] != 0.} (x,y);
-        set Mask := setof {mx in MXs, my in MYs: MaskFile[round(mx/dmx+0.5),round(my/dmy+0.5)] != 0.} (mx,my);
-        set Lyot := setof {x in Xs, y in Ys: LyotFile[round(x/dx+0.5),round(y/dy+0.5)] != 0.} (x,y);
-        
-        param TR := sum {i in 1..N, j in 1..N} PupilFile[i,j]*dx*dy; # Transmission of the Pupil. Used for calibration.
-        param I00 := (sum {i in 1..N, j in 1..N} PupilFile[i,j]*LyotFile[i,j]*dx*dy)^2; # Peak intensity in the absence of coronagraph (Pupil and Lyot terms are squared but square exponiential is unnecessary because of the binary values).
-        
-        var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
-        
-        #---------------------
-        
-        set Xis := setof {i in 0..Nimg-1 by 1} i*dxi;
-        set Etas := setof {j in 0..Nimg-1 by 1} j*deta;
-        
-        set DarkHole := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= rho0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta); # Only for 360deg masks.
-        """
-
-        field_propagation = """
-        #---------------------
-        var EBm_real_X {mx in MXs, y in Ys, lam in Ls} := 0.0;
-        var EBm_real {mx in MXs, my in MYs, lam in Ls} := 0.0;
-        
-        subject to st_EBm_real_X {mx in MXs, y in Ys, lam in Ls}: EBm_real_X[mx,y,lam] = 2.*sum {x in Xs: (x,y) in Pupil} A[x,y]*PupilFile[round(x/dx+0.5),round(y/dy+0.5)]*cos(2.*pi*x*mx*(lam0/lam))*dx;
-        subject to st_EBm_real {(mx, my) in Mask, lam in Ls}: EBm_real[mx,my,lam] = 2.*(lam0/lam)*sum {y in Ys} EBm_real_X[mx,y,lam]*cos(2.*pi*y*my*(lam0/lam))*dy;
-        
-        
-        #---------------------
-        var ECm_real_X {x in Xs, my in MYs, lam in Ls} := 0.0;
-        var ECm_real {x in Xs, y in Ys, lam in Ls} := 0.0;
-        
-        subject to st_ECm_real_X {x in Xs, my in MYs, lam in Ls}: ECm_real_X[x,my,lam] = 2.*sum {mx in MXs: (mx,my) in Mask} EBm_real[mx,my,lam]*cos(2.*pi*x*mx*(lam0/lam))*dmx;
-        subject to st_ECm_real {(x,y) in Lyot, lam in Ls}: ECm_real[x,y,lam] = 2.*(lam0/lam)*sum {my in MYs} ECm_real_X[x,my,lam]*cos(2.*pi*y*my*(lam0/lam))*dmy;
-        
-        
-        #---------------------
-        var ED_real_X {xi in Xis, y in Ys, lam in Ls} := 0.0;
-        var ED_real {xi in Xis, eta in Etas, lam in Ls} := 0.0;
-        
-        subject to st_ED_real_X {xi in Xis, y in Ys, lam in Ls}: ED_real_X[xi,y,lam] = 2.*sum {x in Xs: (x,y) in Lyot} (A[x,y]*PupilFile[round(x/dx+0.5),round(y/dy+0.5)]-ECm_real[x,y,lam])*cos(2.*pi*x*xi*(lam0/lam))*dx;
-        subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] = 2.*(lam0/lam)*sum {y in Ys} ED_real_X[xi,y,lam]*cos(2.*pi*y*eta*(lam0/lam))*dy;
-        
-        #---------------------
-        
-        var ED00_real := 0.0;
-        subject to st_ED00_real: ED00_real = 4.*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*PupilFile[round(x/dx+0.5),round(y/dy+0.5)])*dx*dy;
-        """
-
-        constraints = """
-        #---------------------
-        maximize throughput: sum{(x,y) in Pupil} A[x,y]*dx*dy/TR;
-        
-        subject to sidelobe_zero_real_pos {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real/sqrt(2.); 
-        subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/sqrt(2.);
-        """
-
-        misc_options = """
-        option times 1;
-        option gentimes 1;
-        option show_stats 1;
-        """
-        
-        solver = """
-        option solver gurobi;
-        """
-
-        solver_options = """
-        option gurobi_options "outlev=1 lpmethod=2 crossover=0";
-        """
- 
-        execute = """
-        solve;
-
-        display solve_result_num, solve_result;
-        display ED00_real; 
-        """
-
-        store_results = """
-        #---------------------
-
-        printf {{x in Xs, y in Ys}}: "%15g %15g %15g \\n", x, y, A[x,y] > "{0:s}";
-        """.format(self.fileorg['sol fname'])
-
-        mod_fobj.write( textwrap.dedent(header) )
-        mod_fobj.write( textwrap.dedent(params) )
-        mod_fobj.write( textwrap.dedent(load_masks) )
-        mod_fobj.write( textwrap.dedent(define_coords) )
-        mod_fobj.write( textwrap.dedent(sets_and_arrays) )
-        mod_fobj.write( textwrap.dedent(field_propagation) )
-        mod_fobj.write( textwrap.dedent(constraints) )
         mod_fobj.write( textwrap.dedent(misc_options) )
-        mod_fobj.write( textwrap.dedent(solver) )
-        mod_fobj.write( textwrap.dedent(solver_options) )
         mod_fobj.write( textwrap.dedent(execute) )
         mod_fobj.write( textwrap.dedent(store_results) )
 
