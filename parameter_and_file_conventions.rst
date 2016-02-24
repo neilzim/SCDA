@@ -9,7 +9,7 @@ With the exception of symmetry, all parameter keys are nested under the ``'Pupil
 
 - Primary mirror configuration (key ``'pm'``): ``'hex1'``, ``'hex2'``, ``'hex3'``, ``'hex4'``, ``'key24'``, ``'pie12'``, ``'pie08'``
 
-- Secondary support strut configuration (key ``'ss'``): ``'y60'``, ``'y60off'``, ``'x'``, ``'cross'``, ``'t'``, ``'y90'``
+- Secondary support strut configuration (key ``'ss'``): ``'y60'``, ``'offy60'``, ``'x'``, ``'cross'``, ``'t'``, ``'y90'``
 
 - Secondary support strut thickness, either 2.5 or 10 cm (key ``'sst'``): ``'025'``, ``'100'``
 
@@ -81,3 +81,9 @@ Format spec: ``'LS_{0:s}_ann{1:02d}D{2:02d}_{3:s}t{4:s}p{5:02d}_N{6:04d}.dat'``
 4. Secondary support stut thickness in telescope aperture, string
 5. Obscuration padding, zero-padded 2-digit integer
 6. Pupil array quadrant width, zero-padded 4-digit integer
+
+Examples:
+
+- ``'LS_quart_ann20D85_cross025p08_N0300.dat'``
+
+- ``'LS_quart_ann15D90_N0300.dat'`` - no telescope features mimicked
