@@ -35,9 +35,9 @@ Design parameter input menu
 ---------------------
 For now, only the occulting spot is supported. All keys are nested under the 'FPM' category.
 
-- Spot radius (key ``rad''; float)
+- Spot radius (key ``'rad'``; float)
 
-- Mask array quadrant width (key ``M``; integer)
+- Mask array quadrant width (key ``'M'``; integer)
 
 File name format
 ----------------
@@ -64,9 +64,9 @@ The basic Lyot stop is a clear annulus. For future flexibility, the interface no
 
 - Obscuration switch (key 'obscure'; integer from ``0`` to ``2``; default ``0``). If ``0``, the stop is a clear annulus. If ``1``, the stop mimics the secondary obscuration (secondary mirror plus support struts) defined for the telescope. If ``2``, the stop mimics the complete re-imaged telescope pupil, including the secondary obscuration as well as the gaps and edges of the primary mirror.
 
-- Padding of secondary obscuration features, if present (key ``'spad'``; integer from 0 to 99; default ``0``). The padding parameter is specified as a percentage of telescope pupil diameter [1].
+- Padding of secondary obscuration features, if present (key ``'spad'``; integer from 0 to 99; default ``0``). The padding parameter is specified as a percentage of telescope pupil diameter [1]_.
 
-- Padding of primary mirror features, if present (key ``'ppad'``; integer from 0 to 99; default ``0``). The padding parameter is specified as a percentage of telescope pupil diameter [1].
+- Padding of primary mirror features, if present (key ``'ppad'``; integer from 0 to 99; default ``0``). The padding parameter is specified as a percentage of telescope pupil diameter [1]_.
 
 - Alignment tolerance, in units of 1/1000th of re-imaged telescope pupil diameter (key ``'altol'``; integer from 0 to 99). Does not affect the Lyot stop file name, but modifies the AMPL optimization program. Not yet supported; for future implementation.
 
