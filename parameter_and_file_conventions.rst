@@ -5,9 +5,9 @@ Design parameter input menu
 ---------------------
 With the exception of symmetry, all parameter keys are nested under the ``'Pupil'`` key category. See https://github.com/neilzim/SCDA/blob/master/scda_demo.ipynb for usage when initializing a design survey.
 
-- Symmetry (defined by coronagraph subclass; string; ``'full'``, ``'half'``, ``'quart'``)
+- Symmetry (defined by coronagraph subclass): ``'full'``, ``'half'``, ``'quart'``
 
-- Primary mirror configuration (key ``'pm'``;): ``'hex1'``, ``'hex2'``, ``'hex3'``, ``'hex4'``, ``'key24'``, ``'pie12'``, ``'pie08'``
+- Primary mirror configuration (key ``'pm'``): ``'hex1'``, ``'hex2'``, ``'hex3'``, ``'hex4'``, ``'key24'``, ``'pie12'``, ``'pie08'``
 
 - Secondary mirror support strut configuration (key ``'ss'``): ``'Y60d'``, ``'Yoff60d'``, ``'X'``, ``'Cross'``, ``'T'``, ``'Y90d'``
 
