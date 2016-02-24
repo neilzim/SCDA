@@ -1,7 +1,7 @@
 =====================
 1. Telescope aperture
 =====================
-Design parameter menu
+Design parameter input menu
 ---------------------
 With the exception of symmetry, all parameter keys are nested under the ``'Pupil'`` key category. See https://github.com/neilzim/SCDA/blob/master/scda_demo.ipynb for usage when initializing a design survey.
 
@@ -9,7 +9,7 @@ With the exception of symmetry, all parameter keys are nested under the ``'Pupil
 
 - Primary mirror configuration (key ``'pm'``): ``'hex1'``, ``'hex2'``, ``'hex3'``, ``'hex4'``, ``'key24'``, ``'pie12'``, ``'pie08'``
 
-- Secondary support strut configuration (key ``'ss'``): ``'y60'``, ``'offy60'``, ``'x'``, ``'cross'``, ``'t'``, ``'y90'``
+- Secondary support strut configuration (key ``'ss'``): ``'Y60d'``, ``'Yoff60d'``, ``'X'``, ``'Cross'``, ``'T'``, ``'Y90d'``
 
 - Secondary support strut thickness, either 2.5 or 10 cm (key ``'sst'``): ``'025'``, ``'100'``
 
@@ -31,7 +31,7 @@ Example: ``'TelAp_half_hex3crosst025so1_N0125.dat'``
 ===================
 2. Focal plane mask
 ===================
-Design parameter menu
+Design parameter input menu
 ---------------------
 For now, only the occulting spot is supported. All keys are nested under the 'FPM' category.
 
@@ -52,7 +52,7 @@ Example: ``'FPM_occspot_M050.dat'``
 =============
 3. Lyot stop
 =============
-Design parameter menu
+Design parameter input menu
 ---------------------
 For now, only an annular stop is supported, with and without secondary support struts.
 
@@ -64,14 +64,29 @@ For now, only an annular stop is supported, with and without secondary support s
 
 - Secondary support strut configuration, if telescope features are mimicked by the stop (key ``'ss'``, string, defaults to the telescope aperture secondary support strut configuration). If the stop is a simple annulus with no struts, the string is '0'.
 
-- Secondary support strut thickness, if telescope features are mimicked by the stop (key ``'st'``, string, defaults to the telescope aperture secondary support strut thickness). If the stop is a simple annulus with no struts, the string is '0'.
+- Secondary support strut thickness, if telescope features are mimicked by the stop (key ``'st'``, string, defaults to the telescope aperture strut thickness). If the stop is a simple annulus with no struts, the string is '0'.
 
-- Padding of obscuration features, if present (key ``'pad'``, integer). The padding parameter is specified in units of telescope aperture diameter percentage. Padding is applied in an omindirectial sense by a shift-and-combine-and-mask routine, so it increases thickness on all sides of a given obscuration feature, and the thickness of all features increases by the same absolute propportion of the telescope aperture. This parameter is zero if obscuration features are not mimicked by the Lyot stop, or if they are mimicked but not padded.
+- Padding of obscuration features, if present (key ``'pad'``, integer, default ``0``). The padding parameter is specified in units of telescope aperture diameter percentage. Padding is applied in an omindirectial sense by a shift-and-combine-and-mask routine, so it increases thickness on all sides of a given obscuration feature, and the thickness of all features increases by the same absolute propportion of the telescope aperture. This parameter is zero if obscuration features are not mimicked by the Lyot stop, or if they are mimicked but not padded.
 
 - Alignment tolerance, percentage of telescope aperture diameter (key ``'altol'``, integer). Does not affect the Lyot stop file name, but  modifies the AMPL optimization program. Not yet supported.
 
 File name format
 ----------------
+Format spec
+
+A. When telescope obscurations are ommitted and the stop is a simple annulus:
+
+Format spec: ``'LS_{0:s}_ann{1:02d}D{2:02d}_clear_N{3:04d}.dat'``
+
+0. Symmetry, string
+1. Inner diameter, zero-padded 2-digit integer
+2. Outer diameter, zero-padded 2-digit integer
+3. Pupil array quadrant width, zero-padded 4-digit integer
+
+Example: ``'LS_quart_ann15D90_obs0_N0300.dat'``
+
+B. When telescope obscurations are mimicked by the stop:
+
 Format spec: ``'LS_{0:s}_ann{1:02d}D{2:02d}_{3:s}t{4:s}p{5:02d}_N{6:04d}.dat'``
 
 0. Symmetry, string
@@ -86,4 +101,4 @@ Examples:
 
 - ``'LS_quart_ann20D85_cross025p08_N0300.dat'``
 
-- ``'LS_quart_ann15D90_N0300.dat'`` - no telescope features mimicked
+
