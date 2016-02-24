@@ -19,12 +19,12 @@ File name format
 ----------------
 Format spec: ``'TelAp_{0:s}_{1:s}{2:s}{3:s}sm{4:d}_N{5:04d}.dat'``
 
-0. Symmetry, string
-1. Primary mirror, string
-2. Support strut config, string
-3. Support stut thickness, string
-4. Secondary mirror obscuration, single-digit Boolean integer
-5. Pupil array quadrant width, zero-padded 4-digit integer
+0. Symmetry string: one of ``'full'``, ``'half'``, ``'quart'``
+1. Primary mirror string: one of ``'hex1'``, ``'hex2'``, ``'hex3'``, ``'hex4'``, ``'key24'``, ``'pie12'``, ``'pie08'``
+2. Support strut config string: one of ``'Y60d'``, ``'Yoff60d'``, ``'X'``, ``'Cross'``, ``'T'``, ``'Y90d'``
+3. Support strut thickness string: either ``'025'`` or ``'100'``
+4. Secondary mirror obscuration flag: either ``0`` or ``1``
+5. Pupil array quadrant width: zero-padded 4-digit integer from 50 to 1000
 
 Example: ``'TelAp_half_hex3Cross025sm1_N0125.dat'``
 
@@ -73,7 +73,7 @@ The basic Lyot stop is a clear annulus. For future flexibility, the interface no
 File name format
 -----------------
 
-*A.* When telescope obscurations are ommitted and the stop is a clear annulus (``'obscure' = 0``):
+**A.** When telescope obscurations are ommitted and the stop is a clear annulus (``'obscure' = 0``):
 
 Format spec: ``'LS_{0:s}_{1:s}{2:02d}D{3:02d}_clear_N{4:04d}.dat'``
 
@@ -85,9 +85,9 @@ Format spec: ``'LS_{0:s}_{1:s}{2:02d}D{3:02d}_clear_N{4:04d}.dat'``
 
 Example: ``'LS_quart_ann15D80_clear_N0300.dat'``
 
-*B.* When secondary obscuration is mimicked by the stop (``'obscure' = 1``), the relevant design parameters from the telescope aperture and the padding value are included:
+**B.** When secondary obscuration is mimicked by the stop (``'obscure' = 1``), the relevant design parameters from the telescope aperture and the padding value are included:
 
-Format spec: ``'LS_{0:s}_{1:s}{2:02d}D{3:02d}_{4:s}{5:s}sm{6:d}spad{7:02d}_N{8:04d}.dat'``
+Format spec: ``'LS_{0:s}_{1:s}{2:02d}D{3:02d}_{4:s}{5:s}sm{6:d}Pad{7:02d}_N{8:04d}.dat'``
 
 0. Symmetry string: one of ``'full'``, ``'half'``, ``'quart'``
 1. Shape string: either ``'ann'`` or ``'hex'``
@@ -101,7 +101,7 @@ Format spec: ``'LS_{0:s}_{1:s}{2:02d}D{3:02d}_{4:s}{5:s}sm{6:d}spad{7:02d}_N{8:0
 
 Examples: ``'LS_quart_ann20D85_X100sm1sp08_N0300.dat'``
 
-*C.* When primary mirror gaps and secondary obscuration are mimicked by the stop (``'obscure' = 2``), the relevant design parameters from the telescope aperture and the padding values are included:
+**C.** When primary mirror gaps and secondary obscuration are mimicked by the stop (``'obscure' = 2``), the relevant design parameters from the telescope aperture and the padding values are included:
 
 Format spec: ``'LS_{0:s}_{1:s}{2:02d}D{3:02d}_{4:s}Pad{5:02d}{6:s}{7:s}sm{8:d}Pad{9:02d}_N{10:04d}.dat'``
 
