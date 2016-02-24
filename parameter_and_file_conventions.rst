@@ -71,10 +71,9 @@ The basic Lyot stop is a clear annulus. For future flexibility, the interface no
 - Alignment tolerance, in units of 1/1000th of re-imaged telescope pupil diameter (key ``'altol'``; integer from 0 to 99). Does not affect the Lyot stop file name, but modifies the AMPL optimization program. Not yet supported; for future implementation.
 
 File name format
-----------------
-Format spec
+-----------------
 
-A. When telescope obscurations are ommitted and the stop is a clear annulus:
+*A.* When telescope obscurations are ommitted and the stop is a clear annulus (``'obscure' = 0``):
 
 Format spec: ``'LS_{0:s}_{1:s}{2:02d}D{3:02d}_clear_N{4:04d}.dat'``
 
@@ -86,7 +85,7 @@ Format spec: ``'LS_{0:s}_{1:s}{2:02d}D{3:02d}_clear_N{4:04d}.dat'``
 
 Example: ``'LS_quart_ann15D80_clear_N0300.dat'``
 
-B. When secondary obscuration is mimicked by the stop (``'obscure' = 1``), the relevant design parameters from the telescope aperture and the padding value are included:
+*B.* When secondary obscuration is mimicked by the stop (``'obscure' = 1``), the relevant design parameters from the telescope aperture and the padding value are included:
 
 Format spec: ``'LS_{0:s}_{1:s}{2:02d}D{3:02d}_{4:s}{5:s}sm{6:d}spad{7:02d}_N{8:04d}.dat'``
 
@@ -102,7 +101,7 @@ Format spec: ``'LS_{0:s}_{1:s}{2:02d}D{3:02d}_{4:s}{5:s}sm{6:d}spad{7:02d}_N{8:0
 
 Examples: ``'LS_quart_ann20D85_X100sm1sp08_N0300.dat'``
 
-C. When primary mirror gaps and secondary obscuration are mimicked by the stop (``'obscure' = 2``), the relevant design parameters from the telescope aperture and the padding values are included:
+*C.* When primary mirror gaps and secondary obscuration are mimicked by the stop (``'obscure' = 2``), the relevant design parameters from the telescope aperture and the padding values are included:
 
 Format spec: ``'LS_{0:s}_{1:s}{2:02d}D{3:02d}_{4:s}{5:s}{6:s}sm{7:d}spad{8:02d}gpad{9:02d}_N{10:04d}.dat'``
 
