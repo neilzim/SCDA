@@ -177,7 +177,7 @@ class DesignParamSurvey(object):
         if 'constr' not in self.solver or self.solver['constr'] is None: self.solver['constr'] = 'lin'
         if 'method' not in self.solver or self.solver['method'] is None: self.solver['method'] = 'bar'
         if 'presolve' not in self.solver or self.solver['presolve'] is None: self.solver['presolve'] = True
-        if 'Nthreads' not in self.solver or self.solver['Nthreads'] is None: self.solver['Nthreads'] = None
+        if 'threads' not in self.solver or self.solver['threads'] is None: self.solver['threads'] = None
          
         setattr(self, 'coron_list', [])
         design = {}
@@ -198,11 +198,11 @@ class DesignParamSurvey(object):
 class LyotCoronagraph(object): # Lyot coronagraph base class
     _file_fields = { 'fileorg': ['work dir', 'ampl src dir', 'TelAp dir', 'FPM dir', 'LS dir', 'sol dir', 'eval dir',
                                  'ampl src fname', 'TelAp fname', 'FPM fname', 'LS fname', 'sol fname'],
-                     'solver': ['constr', 'method', 'presolve', 'Nthreads'] }
+                     'solver': ['constr', 'method', 'presolve', 'threads'] }
 
     _solver_menu = { 'constr': ['lin', 'quad'], 'solver': ['LOQO', 'gurobi', 'gurobix'], 
                      'method': ['bar', 'barhom', 'dualsimp'],
-                     'presolve': [True, False], 'Nthreads': [None]+range(1,33) }
+                     'presolve': [True, False], 'threads': [None]+range(1,33) }
 
     _aperture_menu = { 'pm': ['hex1', 'hex2', 'hex3', 'key24', 'pie12', 'pie08', 'irisao', 'atlast'],
                        'ss': ['Y60d','Yoff60d','X','Cross','T','Y90d'],
@@ -294,7 +294,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         if 'solver' not in self.solver or self.solver['solver'] is None: self.solver['solver'] = 'gurobi'
         if 'method' not in self.solver or self.solver['method'] is None: self.solver['method'] = 'bar'
         if 'presolve' not in self.solver or self.solver['presolve'] is None: self.solver['presolve'] = True
-        if 'Nthreads' not in self.solver or self.solver['Nthreads'] is None: self.solver['Nthreads'] = None
+        if 'threads' not in self.solver or self.solver['threads'] is None: self.solver['threads'] = None
 
         setattr(self, 'ampl_infile_status', None)
         if not issubclass(self.__class__, LyotCoronagraph):
@@ -313,7 +313,8 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 1000)), ('pm',(str, 'hex1')), ('ss',(str, 'x')), 
                                                           ('sst',(str, '100')), ('sm',(bool, True))]) ),
                                    ( 'FPM', OrderedDict([('rad',(float, 4.)), ('M',(int, 50))]) ),
-                                   ( 'LS', OrderedDict([('id',(int, 20)), ('od',(int, 90)), ('ovsz',(int, 0)), ('altol',(int, None))]) ),
+                                   ( 'LS', OrderedDict([('shape',(str, 'ann')), ('id',(int, 20)), ('od',(int, 90)), ('obscure',(int, 0)),
+                                                        ('spad',(int, 0)), ('ppad',(int, 0)), ('altol',(int, None))]) ),
                                    ( 'Image', OrderedDict([('c',(float, 10.)), ('iwa',(float, 4.)), ('owa',(float, 10.)),
                                                          ('bw',(float, 0.1)), ('Nlam',(int, 3)), ('fpres',(int,2)),
                                                          ('oca',(float, 10.)), ('ci',(float, None)), ('co',(float, None))]) ) ])
@@ -361,22 +362,21 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             self.logger.info("File organization parameters: {}".format(self.fileorg))
      
         self.amplname_coron = "APLC_full"
-        self.amplname_pupil = "{0:s}{1:s}t{2:s}so{3:d}_N{4:04d}".format(self.design['Pupil']['pm'], self.design['Pupil']['ss'], self.design['Pupil']['sst'], \
-                                                                        int(self.design['Pupil']['sm']), self.design['Pupil']['N'])
+        self.amplname_pupil = "{0:s}{1:s}{2:s}sm{3:d}_N{4:04d}".format(self.design['Pupil']['pm'], self.design['Pupil']['ss'], self.design['Pupil']['sst'], \
+                                                                       int(self.design['Pupil']['sm']), self.design['Pupil']['N'])
 
         self.amplname_fpm = "FPM{:02}M{:03}".format(int(round(100*self.design['FPM']['rad'])), self.design['FPM']['M'])
-        if self.design['LS']['altol'] is None and self.design['LS']['ovsz'] is None:
-            self.amplname_ls = "LS{:02}D{:02}ovsz{:02}tol{:02}".format(self.design['LS']['id'], \
-                               self.design['LS']['od'], 0, 0)
-        elif self.design['LS']['altol'] is None and self.design['LS']['ovsz'] is not None:
-            self.amplname_ls = "LS{:02}D{:02}ovsz{:02}tol{:02}".format(self.design['LS']['id'], \
-                               self.design['LS']['od'], self.design['LS']['ovsz'], 0)
-        elif self.design['LS']['altol'] is not None and self.design['LS']['ovsz'] is None:
-            self.amplname_ls = "LS{:02}D{:02}ovsz{:02}tol{:02}".format(self.design['LS']['id'], \
-                               self.design['LS']['od'], 0, self.design['LS']['altol'])
-        else:
-            self.amplname_ls = "LS{:02}D{:02}ovsz{:02}tol{:02}".format(self.design['LS']['id'], \
-                               self.design['LS']['od'], self.design['LS']['ovsz'], self.design['LS']['altol'])
+        if self.design['LS']['obscure'] == 2: # LS includes primary and secondary aperture features
+            self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}Pad{4:02d}{5:s}{6:s}sm{7:d}Pad{8:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], \
+                               self.design['LS']['od'], self.design['Pupil']['pm'], self.design['LS']['ppad'], self.design['Pupil']['ss'], self.design['Pupil']['st'], \
+                               int(self.design['Pupil']['sm']), self.design['LS']['spad'])
+        elif self.design['LS']['obscure'] == 1: # LS includes secondary aperture features
+            self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}{4:s}sm{5:d}Pad{6:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'], \
+                               self.design['Pupil']['ss'], self.design['Pupil']['st'], int(self.design['Pupil']['sm']), self.design['LS']['spad'])
+        else: # LS aperture is unobscured
+            self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}clear".format(self.design['LS']['id'], self.design['LS']['od'])
+        if self.design['LS']['altol'] is not None:
+            self.amplname_ls += "tol{0:02d}".format(self.design['LS']['altol'])
 
         self.amplname_image = "Img{:03}C_{:02}WA{:03}CA{:03}_BW{:02}Nlam{:02}fpres{:1}".format(int(round(10*self.design['Image']['c'])), \
                                int(round(10*self.design['Image']['iwa'])), int(round(10*self.design['Image']['owa'])), \
@@ -391,8 +391,8 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             self.amplname_solver = "{}{}pre1".format(self.solver['constr'], self.solver['method'])
         else:
             self.amplname_solver = "{}{}pre0".format(self.solver['constr'], self.solver['method'])
-        if self.solver['Nthreads'] is not None:
-            self.amplname_solver += "thr{:02d}".format(self.solver['Nthreads'])
+        if self.solver['threads'] is not None:
+            self.amplname_solver += "thr{:02d}".format(self.solver['threads'])
 
         if not issubclass(self.__class__, NdiayeAPLC): # Only set these file names if this is a full-plane APLC.
             if 'ampl src fname' not in self.fileorg or self.fileorg['ampl src fname'] is None:
@@ -443,9 +443,24 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_half_occspot_M{:03}.dat".format(self.design['FPM']['M']) )
 
         if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
-            self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + self.amplname_pupil + \
-                                                     "_{0:02d}D{1:02d}ovsz{2:02d}.dat".format(self.design['LS']['id'], \
-                                                     self.design['LS']['od'], self.design['LS']['ovsz'])) )
+            if self.design['LS']['obscure'] == 2:
+                self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + \
+                                                         "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}sm{7:d}Pad{8:02d}_N{9:04d}.dat".format(
+                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                         self.design['Pupil']['pm'], self.design['LS']['ppad'], self.design['Pupil']['ss'],
+                                                         self.design['Pupil']['sst'], int(self.design['Pupil']['sm']), self.design['LS']['spad'],
+                                                         self.design['Pupil']['N'])) )
+            elif self.design['LS']['obscure'] == 1:
+                self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + \
+                                                         "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}sm{5:d}Pad{6:02d}_N{7:04d}.dat".format(
+                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                         self.design['Pupil']['ss'], self.design['Pupil']['sst'], int(self.design['Pupil']['sm']),
+                                                         self.design['LS']['spad'], self.design['Pupil']['N'])) )
+            else:
+                self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + \
+                                                         "{0:s}{1:02d}D{2:02d}_clear_N{7:04d}.dat".format(
+                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                         self.design['LS']['spad'], self.design['Pupil']['N'])) )
         self.check_ampl_input_files()
     def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None):
         if self.ampl_infile_status is False and not override_infile_status:
@@ -872,6 +887,11 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
 
          sets_and_arrays = """
          #---------------------
+
+         set Pupil := setof {x in Xs, y in Ys: PupilFile[round(x/dx+0.5),round(y/dy+0.5)] != 0.} (x,y);
+         set Mask := setof {mx in MXs, my in MYs: MaskFile[round(mx/dmx+0.5),round(my/dmy+0.5)] != 0.} (mx,my);
+         set Lyot := setof {x in Xs, y in Ys: LyotFile[round(x/dx+0.5),round(y/dy+0.5)] != 0.} (x,y);
+
          param TR := sum {i in 1..N, j in 1..N} PupilFile[i,j]*dx*dy; # Transmission of the Pupil. Used for calibration.
          param I00 := (sum {i in 1..N, j in 1..N} PupilFile[i,j]*LyotFile[i,j]*dx*dy)^2; # Peak intensity in the absence of coronagraph (Pupil and Lyot terms are squared but square exponiential is unnecessary because of the binary values).
          
