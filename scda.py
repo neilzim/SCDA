@@ -191,7 +191,7 @@ class DesignParamSurvey(object):
                 design[varied_keycat][varied_parname] = current_val
             self.coron_list.append( coron_class(design=design, fileorg=self.fileorg, solver=self.solver) )
 
-    def write_ampl(self, overwrite=False, override_infile_status=False):
+    def write_ampl_batch(self, overwrite=False, override_infile_status=False):
         for coron in self.coron_list:
             coron.write_ampl(overwrite, override_infile_status)
 
@@ -368,13 +368,13 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         self.amplname_fpm = "FPM{:02}M{:03}".format(int(round(100*self.design['FPM']['rad'])), self.design['FPM']['M'])
         if self.design['LS']['obscure'] == 2: # LS includes primary and secondary aperture features
             self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}Pad{4:02d}{5:s}{6:s}sm{7:d}Pad{8:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], \
-                               self.design['LS']['od'], self.design['Pupil']['pm'], self.design['LS']['ppad'], self.design['Pupil']['ss'], self.design['Pupil']['st'], \
+                               self.design['LS']['od'], self.design['Pupil']['pm'], self.design['LS']['ppad'], self.design['Pupil']['ss'], self.design['Pupil']['sst'], \
                                int(self.design['Pupil']['sm']), self.design['LS']['spad'])
         elif self.design['LS']['obscure'] == 1: # LS includes secondary aperture features
             self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}{4:s}sm{5:d}Pad{6:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'], \
-                               self.design['Pupil']['ss'], self.design['Pupil']['st'], int(self.design['Pupil']['sm']), self.design['LS']['spad'])
+                               self.design['Pupil']['ss'], self.design['Pupil']['sst'], int(self.design['Pupil']['sm']), self.design['LS']['spad'])
         else: # LS aperture is unobscured
-            self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}clear".format(self.design['LS']['id'], self.design['LS']['od'])
+            self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}clear".format(self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'])
         if self.design['LS']['altol'] is not None:
             self.amplname_ls += "tol{0:02d}".format(self.design['LS']['altol'])
 
@@ -458,9 +458,8 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
                                                          self.design['LS']['spad'], self.design['Pupil']['N'])) )
             else:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + \
-                                                         "{0:s}{1:02d}D{2:02d}_clear_N{7:04d}.dat".format(
-                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                         self.design['LS']['spad'], self.design['Pupil']['N'])) )
+                                                         "{0:s}{1:02d}D{2:02d}_clear_N{3:04d}.dat".format(self.design['LS']['shape'],
+                                                         self.design['LS']['id'], self.design['LS']['od'], self.design['Pupil']['N'])) )
         self.check_ampl_input_files()
     def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None):
         if self.ampl_infile_status is False and not override_infile_status:
