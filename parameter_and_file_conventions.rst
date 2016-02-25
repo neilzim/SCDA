@@ -3,7 +3,7 @@
 =====================
 Design parameter input menu
 ---------------------
-With the exception of symmetry, all parameter keys are nested under the ``'Pupil'`` key category. See https://github.com/neilzim/SCDA/blob/master/scda_demo.ipynb for usage when initializing a design survey.
+With the exception of symmetry, all these parameter keys are nested under the ``'Pupil'`` key category. See https://github.com/neilzim/SCDA/blob/master/scda_demo.ipynb for usage when initializing a design survey.
 
 - Symmetry (defined by coronagraph subclass): ``'full'``, ``'half'``, ``'quart'``
 
@@ -33,7 +33,7 @@ Example: ``'TelAp_half_pie12Y60d025sm1_N0500.dat'``
 ===================
 Design parameter input menu
 ---------------------
-For now, only the occulting spot is supported. All keys are nested under the 'FPM' category.
+For now, only the occulting spot is supported. All these keys are nested under the 'FPM' category.
 
 - Spot radius (key ``'rad'``; float)
 
@@ -55,7 +55,7 @@ Example: ``'FPM_half_occspot_M050.dat'``
 =============
 Design parameter input menu
 ---------------------
-The basic Lyot stop is a clear annulus. On top of this, the interface supports a wide range of options: a hexagonal outer edge, switching on and off both secondary obscurations and primary mirror gaps, as well as adjusting the padding level applied to each layer.
+The basic Lyot stop is a clear annulus. On top of this, the interface supports a wide range of options: a hexagonal outer edge, switching on and off both secondary obscurations and primary mirror gaps, as well as adjusting the padding level applied to each layer. These keys are nested under the 'LS' category.
 
 - Shape (key ``'shape'``; string; choice of ``'ann'`` or ``'hex'``; default ``'ann'``). The default Lyot stop is an annular aperture. When the ``'hex'`` option is set, the outer edge is a hexagon.
 
