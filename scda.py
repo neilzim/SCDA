@@ -756,11 +756,25 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
  
          if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
              self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_quart_occspot_M{:03}.dat".format(self.design['FPM']['M']) )
- 
+
          if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
-             self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + self.amplname_pupil + \
-                                                      "_{0:02d}D{1:02d}ovsz{2:02d}.dat".format(self.design['LS']['id'], \
-                                                      self.design['LS']['od'], self.design['LS']['ovsz'])) )
+             if self.design['LS']['obscure'] == 2:
+                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
+                                                          "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}sm{7:d}Pad{8:02d}_N{9:04d}.dat".format(
+                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                          self.design['Pupil']['pm'], self.design['LS']['ppad'], self.design['Pupil']['ss'],
+                                                          self.design['Pupil']['sst'], int(self.design['Pupil']['sm']), self.design['LS']['spad'],
+                                                          self.design['Pupil']['N'])) )
+             elif self.design['LS']['obscure'] == 1:
+                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
+                                                          "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}sm{5:d}Pad{6:02d}_N{7:04d}.dat".format(
+                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                          self.design['Pupil']['ss'], self.design['Pupil']['sst'], int(self.design['Pupil']['sm']),
+                                                          self.design['LS']['spad'], self.design['Pupil']['N'])) )
+             else:
+                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
+                                                          "{0:s}{1:02d}D{2:02d}_clear_N{3:04d}.dat".format(self.design['LS']['shape'],
+                                                          self.design['LS']['id'], self.design['LS']['od'], self.design['Pupil']['N'])) )
          self.check_ampl_input_files()
      def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None):
          if self.ampl_infile_status is False and not override_infile_status:
