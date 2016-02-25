@@ -55,7 +55,7 @@ Example: ``'FPM_half_occspot_M050.dat'``
 =============
 Design parameter input menu
 ---------------------
-The basic Lyot stop is a clear annulus. For future flexibility, the interface nominally supports stops several options: a hexagonal outer edge, switching on and off both secondary obscurations and primary mirror gaps, as well as adjusting the padding level applied to each layer.
+The basic Lyot stop is a clear annulus. On top of this, the interface supports a wide range of options: a hexagonal outer edge, switching on and off both secondary obscurations and primary mirror gaps, as well as adjusting the padding level applied to each layer.
 
 - Shape (key ``'shape'``; string; choice of ``'ann'`` or ``'hex'``; default ``'ann'``). The default Lyot stop is an annular aperture. When the ``'hex'`` option is set, the outer edge is a hexagon.
 
@@ -74,7 +74,7 @@ The basic Lyot stop is a clear annulus. For future flexibility, the interface no
 File name format
 -----------------
 
-**A.** When telescope obscurations are ommitted and the stop is a clear annulus (``'obscure' = 0``):
+**A.** When telescope obscurations are omitted and the stop is a clear annulus (``'obscure' = 0``):
 
 Format spec: ``'LS_{0:s}_{1:s}{2:02d}D{3:02d}_clear_N{4:04d}.dat'``
 
