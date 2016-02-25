@@ -121,4 +121,4 @@ Format spec: ``'LS_{0:s}_{1:s}{2:02d}D{3:02d}_{4:s}Pad{5:02d}{6:s}{7:s}sm{8:d}Pa
 Example: ``'LS_quart_ann20D85_hex2Pad05X100sm1Pad08_N0250.dat'``
 
 
-..  [1] Padding is applied in an omindirectial sense by a shift-and-combine-and-mask routine, so it increases thickness on all sides of a given obscuration feature, and the thickness of all features in a given layer increases by the same number of pixels (in other words, this is not a scale factor). This parameter remains zero if pupil features are not mimicked by the Lyot stop, or if they are mimicked but not padded.
+..  [1] Padding is applied in an omindirectional sense by a shift-and-combine-and-mask routine, so it increases thickness on all sides of a given obscuration feature, and the thickness of all features in a given layer increases by the same number of pixels (in other words, this is not a scale factor). This parameter remains zero if pupil features are not mimicked by the Lyot stop, or if they are mimicked but not padded.
