@@ -510,7 +510,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         param M := {9:d};				# discretization parameter (mask)
         
         param Nimg := {10:d};           # discretization parameter (image)
-        param Fmax := {11:0.2f};        # NTZ: We paramaterize our image plane resolution by fpres = sampling rate at 
+        param rho2 := {11:0.2f};        # NTZ: We paramaterize our image plane resolution by fpres = sampling rate at 
                                     #      the shortest wavelength. Then Nimg is an integer function of fpres, oca,
         #---------------------      #      and bw. This integer is not specified directly by the user, but computed "privately"
         param bw := {12:0.2f};           #      by the APLC class constructor.
@@ -571,7 +571,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         param dmx := 2*Rmask/(2*M);
         param dmy := dmx;
         
-        param dxi := (Fmax/Nimg)*(1/CoeffOverSizePup);
+        param dxi := (rho2/Nimg)*(1/CoeffOverSizePup);
         param deta := dxi;
 
         #---------------------
@@ -751,7 +751,9 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
              self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname_tail)
  
          if 'sol fname' not in self.fileorg or self.fileorg['sol fname'] is None:
-             self.fileorg['sol fname'] = self.fileorg['ampl src fname'][:-4] + "_ApodSol.dat"
+             sol_fname_tail = "ApodSol_" + self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
+                              self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".dat"
+             self.fileorg['sol fname'] = os.path.join(self.fileorg['ampl src dir'], sol_fname_tail)
  
          if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
              self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_quart_" + self.amplname_pupil + ".dat") )
@@ -826,7 +828,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          param M := {5:d};				# discretization parameter (mask)
          
          param Nimg := {6:d};           # discretization parameter (image)
-         param Fmax := {7:0.2f};        # NTZ: We paramaterize our image plane resolution by fpres = sampling rate at 
+         param rho2 := {7:0.2f};        # NTZ: We paramaterize our image plane resolution by fpres = sampling rate at 
                                      #      the shortest wavelength. Then Nimg is an integer function of fpres, oca,
          #---------------------      #      and bw. This integer is not specified directly by the user, but computed "privately"
          param bw := {8:0.2f};           #      by the APLC class constructor.
@@ -835,20 +837,6 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          param Nlam := {9:d};
          
          #---------------------
-         param obs := 20;             # NTZ: We will eliminate this section of parameter definitions, 
-         param spiders :=01;          #      since we determine the file names of the aperture and Lyot stop
-         param lsobs := 20;           #      outside the program, as well as the file name of the apodizer solution.
-         param lsspiders :=02;
-         param gap :=01;
-         param lsgap :=00;
-         
-         param OD :=0.98;
-         
-         #---------------------
-         param Normterm := 1.00; 	# 0.380
-         
-         #---------------------
-         param CoeffOverSizePup :=1.0*OD;
          """.format(self.design['Image']['c'], self.design['FPM']['rad'], self.design['Image']['iwa'], self.design['Image']['owa'], \
                     self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['_Nimg'], \
                     self.design['Image']['oca'], self.design['Image']['bw'], self.design['Image']['Nlam'])
@@ -886,7 +874,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          param dmx := 2*Rmask/(2*M);
          param dmy := dmx;
          
-         param dxi := (Fmax/Nimg)*(1/CoeffOverSizePup);
+         param dxi := rho2/Nimg;
          param deta := dxi;
  
          #---------------------
