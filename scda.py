@@ -899,12 +899,12 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          """
 
          if self.design['Image']['Nlam'] > 1 and self.design['Image']['bw'] > 0:
-             define_wavelengths = """\
+             define_wavelengths = """
              set Ls := setof {l in 1..Nlam} lam0*(1+((l-1)/(Nlam-1)-0.5)*dl);
              """
          else:
-             define_wavelengths = """\
-             set Ls := 1;
+             define_wavelengths = """
+             set Ls := setof {l in 1..1} lam0*l;
              """
 
          sets_and_arrays = """
