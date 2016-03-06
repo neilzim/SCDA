@@ -354,6 +354,8 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                 if param not in self.design[keycat] or (self.design[keycat][param] is None and \
                                                         self._design_fields[keycat][param][1] is not None):
                     self.design[keycat][param] = self._design_fields[keycat][param][1]
+        if self.design['Image']['co'] is None: # An OCA different from OWA is meaningless without a corresponding outer contrast constraint
+            self.design['Image']['oca'] = self.design['Image']['owa']
         # Finally, set a private attribute for the number of image plane samples between the center and the OCA
         self.design['Image']['_Nimg'] = int( np.ceil( self.design['Image']['fpres']*self.design['Image']['oca']/(1. - self.design['Image']['bw']/2) ) )
         if verbose: # Print summary of the set parameters

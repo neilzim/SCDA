@@ -15,7 +15,8 @@ if __name__ == "__main__":
     scda.configure_log("wrapper_test.log")
 
     test_dir = "test_scda_aplc" # nominal destination for new AMPL programs
-    aux_dir = "~/SCDA/2d AMPL script - quarter pupil"
+    #aux_dir = "~/SCDA/2d AMPL script - quarter pupil"
+    aux_dir = "../2d AMPL script - quarter pupil"
 
     fileorg = {'work dir': test_dir, 'TelAp dir': aux_dir, 'FPM dir': aux_dir, 'LS dir': aux_dir,
                'TelAp fname': "CircPupil_N=0300_obs=20_center_quarter_spiders3=01_gaps=01.dat",
