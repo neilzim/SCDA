@@ -354,6 +354,8 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                 if param not in self.design[keycat] or (self.design[keycat][param] is None and \
                                                         self._design_fields[keycat][param][1] is not None):
                     self.design[keycat][param] = self._design_fields[keycat][param][1]
+        if self.design['Image']['co'] is None: # An OCA different from OWA is meaningless without a corresponding outer contrast constraint
+            self.design['Image']['oca'] = self.design['Image']['owa']
         # Finally, set a private attribute for the number of image plane samples between the center and the OCA
         self.design['Image']['_Nimg'] = int( np.ceil( self.design['Image']['fpres']*self.design['Image']['oca']/(1. - self.design['Image']['bw']/2) ) )
         if verbose: # Print summary of the set parameters
@@ -894,9 +896,16 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          
          set MXs := setof {i in 0.5..M-0.5 by 1} i*dmx;
          set MYs := setof {j in 0.5..M-0.5 by 1} j*dmy;
-         
-         set Ls := setof {l in 1..Nlam} lam0*(1+((l-1)/(Nlam-1)-0.5)*dl);
          """
+
+         if self.design['Image']['Nlam'] > 1 and self.design['Image']['bw'] > 0:
+             define_wavelengths = """
+             set Ls := setof {l in 1..Nlam} lam0*(1+((l-1)/(Nlam-1)-0.5)*dl);
+             """
+         else:
+             define_wavelengths = """
+             set Ls := setof {l in 1..1} lam0*l;
+             """
 
          sets_and_arrays = """
          #---------------------
@@ -987,6 +996,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          mod_fobj.write( textwrap.dedent(params) )
          mod_fobj.write( textwrap.dedent(load_masks) )
          mod_fobj.write( textwrap.dedent(define_coords) )
+         mod_fobj.write( textwrap.dedent(define_wavelengths) )
          mod_fobj.write( textwrap.dedent(sets_and_arrays) )
          mod_fobj.write( textwrap.dedent(field_propagation) )
          mod_fobj.write( textwrap.dedent(constraints) )
