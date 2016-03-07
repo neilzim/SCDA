@@ -10,6 +10,7 @@ import sys
 import logging
 import datetime
 import textwrap
+import csv
 import numpy as np
 import pdb
 import getpass
@@ -20,18 +21,19 @@ import pprint
 
 def configure_log(log_fname=None):
     logger = logging.getLogger("scda.logger")
-    if not len(logger.handlers):
-        logger.setLevel(logging.DEBUG)
-        ch = logging.StreamHandler(sys.stdout) # console dump
-        ch.setLevel(logging.INFO)
-        logger.addHandler(ch)
-        if sys.version_info[0] >= 3:
-            ch.setFormatter(WrappedFixedIndentingLog(indent=8, width=120))
-
-        if log_fname is not None: # optional file log in addition to the console dump
-            fh = logging.FileHandler(log_fname, mode="w")
-            fh.setLevel(logging.DEBUG)
-            logger.addHandler(fh)
+    logger.setLevel(logging.INFO)
+#    if not len(logger.handlers):
+#        logger.setLevel(logging.DEBUG)
+#        ch = logging.StreamHandler(sys.stdout) # console dump
+#        ch.setLevel(logging.INFO)
+#        logger.addHandler(ch)
+#        if sys.version_info[0] >= 3:
+#            ch.setFormatter(WrappedFixedIndentingLog(indent=8, width=120))
+#
+#        if log_fname is not None: # optional file log in addition to the console dump
+#            fh = logging.FileHandler(log_fname, mode="w")
+#            fh.setLevel(logging.DEBUG)
+#            logger.addHandler(fh)
 
 class WrappedFixedIndentingLog(logging.Formatter):
     def __init__(self, fmt=None, datefmt=None, style='%', width=70, indent=4):
@@ -44,29 +46,29 @@ class WrappedFixedIndentingLog(logging.Formatter):
 class DesignParamSurvey(object):
     def __init__(self, coron_class, survey_config, **kwargs):
         self.logger = logging.getLogger('scda.logger')
-        _param_menu = coron_class._design_fields.copy()
-        _file_fields = coron_class._file_fields.copy()
+        self._param_menu = coron_class._design_fields.copy()
+        self._file_fields = coron_class._file_fields.copy()
         setattr(self, 'survey_config', {})
         for keycat, param_dict in survey_config.items():
             self.survey_config[keycat] = {}
-            if keycat in _param_menu:
+            if keycat in self._param_menu:
                 for param, values in param_dict.items():
-                    if param in _param_menu[keycat]:
+                    if param in self._param_menu[keycat]:
                         if values is not None:
                             if hasattr(values, '__iter__'): #check the type of all items
-                                if all(isinstance(value, _param_menu[keycat][param][0]) for value in values):
+                                if all(isinstance(value, self._param_menu[keycat][param][0]) for value in values):
                                     self.survey_config[keycat][param] = values
                                     #self.survey_config[keycat][param] = tuple(values)
                                 else:
                                     warnstr = ("Warning: Invalid type found in survey set {0} for parameter {1} under category \"{2}\" " + \
-                                               "design initialization argument, expecting {3}").format(value, param, keycat, _param_menu[keycat][param][0]) 
+                                               "design initialization argument, expecting {3}").format(value, param, keycat, self._param_menu[keycat][param][0]) 
                                     self.logger.warning(warnstr)
                             else:
-                                if isinstance(values, _param_menu[keycat][param][0]):
+                                if isinstance(values, self._param_menu[keycat][param][0]):
                                     self.survey_config[keycat][param] = values
                                 else:
                                     warnstr = ("Warning: Invalid {0} for parameter \"{1}\" under category \"{2}\" " + \
-                                               "design initialization argument, expecting a {3}").format(type(value), param, keycat, _param_menu[keycat][param][0]) 
+                                               "design initialization argument, expecting a {3}").format(type(value), param, keycat, self._param_menu[keycat][param][0]) 
                                     self.logger.warning(warnstr)
                     else:
                         self.logger.warning("Warning: Unrecognized parameter \"{0}\" under category \"{1}\" in design initialization argument".format(param, keycat))
@@ -77,13 +79,13 @@ class DesignParamSurvey(object):
         varied_param_index = []
         fixed_param_flat = []
         fixed_param_index = []
-        for keycat in _param_menu: # Fill in default values where appropriate
+        for keycat in self._param_menu: # Fill in default values where appropriate
             if keycat not in self.survey_config:
                 self.survey_config[keycat] = {}
-            for param in _param_menu[keycat]:
+            for param in self._param_menu[keycat]:
                 if param not in self.survey_config[keycat] or (self.survey_config[keycat][param] is None and \
-                                                               _param_menu[keycat][param][1] is not None):
-                    self.survey_config[keycat][param] = _param_menu[keycat][param][1] # default value
+                                                               self._param_menu[keycat][param][1] is not None):
+                    self.survey_config[keycat][param] = self._param_menu[keycat][param][1] # default value
                 elif param in self.survey_config[keycat] and self.survey_config[keycat][param] is not None and \
                 not hasattr(self.survey_config[keycat][param], '__iter__'):
                     fixed_param_flat.append(self.survey_config[keycat][param])
@@ -99,6 +101,7 @@ class DesignParamSurvey(object):
         self.varied_param_index = tuple(varied_param_index)
         self.fixed_param_vals = tuple(fixed_param_flat)
         self.fixed_param_index = tuple(fixed_param_index)
+        self.N_combos = len(varied_param_combos)
 
         #////////////////////////////////////////////////////////////////////////////////////////////////////
         #   The fileorg attribute holds the locations of telescope apertures,
@@ -107,7 +110,7 @@ class DesignParamSurvey(object):
         setattr(self, 'fileorg', {})
         if 'fileorg' in kwargs:
             for namekey, location in kwargs['fileorg'].items():
-                if namekey in _file_fields['fileorg']:
+                if namekey in self._file_fields['fileorg']:
                     if location is not None:
                         if namekey.endswith('dir'):
                             self.fileorg[namekey] = os.path.abspath(os.path.expanduser(location)) # Convert all directory names to absolute paths
@@ -122,7 +125,7 @@ class DesignParamSurvey(object):
         # Handle missing directory values
         if 'work dir' not in self.fileorg or self.fileorg['work dir'] is None:
             self.fileorg['work dir'] = os.getcwd()
-        for namekey in _file_fields['fileorg']: # Set other missing directory locations to 'work dir'
+        for namekey in self._file_fields['fileorg']: # Set other missing directory locations to 'work dir'
             if namekey.endswith('dir') and ( namekey not in self.fileorg or self.fileorg[namekey] is None ):
                 self.fileorg[namekey] = self.fileorg['work dir']
       
@@ -181,7 +184,7 @@ class DesignParamSurvey(object):
          
         setattr(self, 'coron_list', [])
         design = {}
-        for keycat in _param_menu:
+        for keycat in self._param_menu:
             design[keycat] = {}
         for (fixed_keycat, fixed_parname), fixed_val in zip(self.fixed_param_index, self.fixed_param_vals):
             design[fixed_keycat][fixed_parname] = fixed_val
@@ -193,7 +196,132 @@ class DesignParamSurvey(object):
 
     def write_ampl_batch(self, overwrite=False, override_infile_status=False):
         for coron in self.coron_list:
-            coron.write_ampl(overwrite, override_infile_status)
+            coron.write_ampl(overwrite, override_infile_status, verbose=False)
+        self.logger.info("Wrote the batch of design survey AMPL programs into {:s}".format(self.fileorg['ampl src dir']))
+
+    def write_spreadsheet(self, overwrite=False, csv_fname=None):
+        if csv_fname is None:
+            csv_fname_tail = "scda_survey_{:s}_{:s}.csv".format(getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
+            self.csv_fname = os.path.join(self.fileorg['work dir'], csv_fname_tail)
+        with open(self.csv_fname, 'wb') as survey_spreadsheet:
+            surveywriter = csv.writer(survey_spreadsheet)
+            #/////////////////////////////////////////////////
+            #    Write a header for the spreadsheet
+            #/////////////////////////////////////////////////
+            surveywriter.writerow(["Created by {:s} on {:s} at {:s}".format(getpass.getuser(), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))])
+            surveywriter.writerow(["Work dir", self.fileorg['work dir']])
+            surveywriter.writerow(["AMPL source location", self.fileorg['ampl src dir']])
+            surveywriter.writerow(["Solution location", self.fileorg['sol dir']])
+            surveywriter.writerow(["Telescope aperture location", self.fileorg['TelAp dir']])
+            surveywriter.writerow(["Focal plane mask location", self.fileorg['FPM dir']])
+            surveywriter.writerow(["Lyot stop location", self.fileorg['LS dir']])
+            #/////////////////////////////////////////////////
+            #    Write out the fixed design parameters
+            #/////////////////////////////////////////////////
+            surveywriter.writerow([""])
+            surveywriter.writerow(["FIXED design parameters"])
+            fixed_param_category_row = []
+            fixed_param_subheading_row = []
+            for cat in self._param_menu:
+                fixed_param_category_row.extend([cat,''])
+                fixed_param_subheading_row.extend(['param name', 'value'])
+            surveywriter.writerow(fixed_param_category_row)
+            surveywriter.writerow(fixed_param_subheading_row)
+            self.fixed_param_table = []
+            max_N_params = 0
+            for cat in self._param_menu:
+                param_col = []
+                val_col = []
+                for (param_cat, param) in self.fixed_param_index:
+                    if param_cat is cat:
+                        param_col.append(param)
+                        val_col.append(self.survey_config[cat][param])
+                N_params = len(param_col)
+                if N_params > max_N_params:
+                    max_N_params = N_params
+                self.fixed_param_table.append(param_col)
+                self.fixed_param_table.append(val_col)
+            N_cols = len(self.fixed_param_table)
+            for ci in range(N_cols):
+                N_rows = len(self.fixed_param_table[ci])
+                if N_rows < max_N_params:
+                    self.fixed_param_table[ci].extend(['']*(max_N_params - N_rows))
+            for ri in range(max_N_params):
+                fixed_table_row = []
+                for ci in range(N_cols):
+                    fixed_table_row.append(self.fixed_param_table[ci][ri])
+                surveywriter.writerow(fixed_table_row)
+            #/////////////////////////////////////////////////
+            #    Write out the varied design parameters
+            #/////////////////////////////////////////////////
+            surveywriter.writerow([""])
+            surveywriter.writerow(["VARIED design parameters ({:d} total combinations)".format(self.N_combos)])
+            varied_param_category_row = []
+            varied_param_subheading_row = []
+            for cat in self._param_menu:
+                varied_param_category_row.extend([cat,'',''])
+                varied_param_subheading_row.extend(['param name', 'value list', 'num'])
+            surveywriter.writerow(varied_param_category_row)
+            surveywriter.writerow(varied_param_subheading_row)
+            self.varied_param_table = []
+            max_N_params = 0
+            for cat in self._param_menu:
+                param_col = []
+                vals_col = []
+                num_col = []
+                for (param_cat, param) in self.varied_param_index:
+                    if param_cat is cat:
+                        param_col.append(param)
+                        vals_col.append(self.survey_config[cat][param])
+                        num_col.append(len(self.survey_config[cat][param]))
+                N_params = len(param_col)
+                if N_params > max_N_params:
+                    max_N_params = N_params
+                self.varied_param_table.append(param_col)
+                self.varied_param_table.append(vals_col)
+                self.varied_param_table.append(num_col)
+            N_cols = len(self.varied_param_table)
+            for ci in range(N_cols):
+                N_rows = len(self.varied_param_table[ci])
+                if N_rows < max_N_params:
+                    self.varied_param_table[ci].extend(['']*(max_N_params - N_rows))
+            for ri in range(max_N_params):
+                varied_table_row = []
+                for ci in range(N_cols):
+                    varied_table_row.append(self.varied_param_table[ci][ri])
+                surveywriter.writerow(varied_table_row)
+            #/////////////////////////////////////////////////////////
+            #    Write out the survey design parameter combinations
+            #/////////////////////////////////////////////////////////
+            surveywriter.writerow([""])
+            surveywriter.writerow(["SURVEY TABLE"])
+            catrow = []
+            paramrow = []
+            if len(self.varied_param_index) > 0: # Write varied headers
+                for (cat, name) in self.varied_param_index:
+                    catrow.append(cat)
+                    paramrow.append(name)
+                catrow.extend(['', 'AMPL source', '', 'Solution', ''])# 'Apodizer solution', 'Throughput', 'FWHM area', 'FWHM width'])
+                paramrow.extend(['', 'filename', 'exists?', 'filename', 'exists?'])
+                surveywriter.writerow(catrow)
+                surveywriter.writerow(paramrow)
+                for ii, param_combo in enumerate(self.varied_param_combos):
+                    param_combo_row = list(param_combo)
+                    param_combo_row.append('')
+                    param_combo_row.append(os.path.basename(self.coron_list[ii].fileorg['ampl src fname'])) 
+                    if os.path.exists(self.coron_list[ii].fileorg['ampl src fname']):
+                        param_combo_row.append('Y')
+                    else:
+                        param_combo_row.append('N')
+                    param_combo_row.append(os.path.basename(self.coron_list[ii].fileorg['sol fname'])) 
+                    if os.path.exists(self.coron_list[ii].fileorg['sol fname']):
+                        param_combo_row.append('Y')
+                    else:
+                        param_combo_row.append('N')
+                    surveywriter.writerow(param_combo_row)
+                    
+        survey_spreadsheet.close()
+        self.logger.info("Wrote design survey spreadsheet to {:s}".format(self.csv_fname))
 
 class LyotCoronagraph(object): # Lyot coronagraph base class
     _file_fields = { 'fileorg': ['work dir', 'ampl src dir', 'TelAp dir', 'FPM dir', 'LS dir', 'sol dir', 'eval dir',
@@ -463,7 +591,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
                                                          "{0:s}{1:02d}D{2:02d}_clear_N{3:04d}.dat".format(self.design['LS']['shape'],
                                                          self.design['LS']['id'], self.design['LS']['od'], self.design['Pupil']['N'])) )
         self.check_ampl_input_files()
-    def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None):
+    def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None, verbose=True):
         if self.ampl_infile_status is False and not override_infile_status:
             self.logger.error("Error: the most recent input file check for this design configuration failed.")
             self.logger.error("The override_infile_status switch is off, so write_ampl() will now abort.")
@@ -477,13 +605,15 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
                 self.fileorg['ampl src dir'] = os.path.dirname(self.fileorg['ampl src fname'])
         if os.path.exists(self.fileorg['ampl src fname']):
             if overwrite == True:
-                self.logger.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
+                if verbose:
+                    self.logger.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
             else:
                 self.logger.warning("Error: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
                 return
         elif not os.path.exists(self.fileorg['ampl src dir']):
             os.mkdir(self.fileorg['ampl src dir'])
-            self.logger.info("Created new AMPL source code directory, {0:s}".format(self.fileorg['ampl src dir']))
+            if verbose:
+                self.logger.info("Created new AMPL source code directory, {0:s}".format(self.fileorg['ampl src dir']))
 #        self.logger.info("Writing the AMPL program for the specified half-plane APLC")
         mod_fobj = open(self.fileorg['ampl src fname'], "w")
 
@@ -739,7 +869,8 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         mod_fobj.write( textwrap.dedent(store_results) )
 
         mod_fobj.close()
-        self.logger.info("Wrote %s"%self.fileorg['ampl src fname'])
+        if verbose:
+            self.logger.info("Wrote %s"%self.fileorg['ampl src fname'])
 
 class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plane symmetry case
      def __init__(self, **kwargs):
@@ -780,7 +911,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
                                                           "{0:s}{1:02d}D{2:02d}_clear_N{3:04d}.dat".format(self.design['LS']['shape'],
                                                           self.design['LS']['id'], self.design['LS']['od'], self.design['Pupil']['N'])) )
          self.check_ampl_input_files()
-     def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None):
+     def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None, verbose=True):
          if self.ampl_infile_status is False and not override_infile_status:
              self.logger.error("Error: the most recent input file check for this design configuration failed.")
              self.logger.error("The override_infile_status switch is off, so write_ampl() will now abort.")
@@ -794,13 +925,15 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
                  self.fileorg['ampl src dir'] = os.path.dirname(self.fileorg['ampl src fname'])
          if os.path.exists(self.fileorg['ampl src fname']):
              if overwrite == True:
-                 self.logger.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
+                 if verbose:
+                     self.logger.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
              else:
                  self.logger.warning("Error: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
                  return
          elif not os.path.exists(self.fileorg['ampl src dir']):
              os.mkdir(self.fileorg['ampl src dir'])
-             self.logger.info("Created new AMPL source code directory, {0:s}".format(self.fileorg['ampl src dir']))
+             if verbose:
+                 self.logger.info("Created new AMPL source code directory, {0:s}".format(self.fileorg['ampl src dir']))
  #        self.logger.info("Writing the AMPL program for the specified quarter-plane APLC")
          mod_fobj = open(self.fileorg['ampl src fname'], "w")
  
@@ -995,4 +1128,5 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          mod_fobj.write( textwrap.dedent(store_results) )
  
          mod_fobj.close()
-         self.logger.info("Wrote %s"%self.fileorg['ampl src fname'])
+         if verbose:
+             self.logger.info("Wrote %s"%self.fileorg['ampl src fname'])
