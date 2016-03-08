@@ -193,17 +193,64 @@ class DesignParamSurvey(object):
             for (varied_keycat, varied_parname), current_val in zip(self.varied_param_index, param_combo):
                 design[varied_keycat][varied_parname] = current_val
             self.coron_list.append( coron_class(design=design, fileorg=self.fileorg, solver=self.solver) )
+ 
+        setattr(self, 'ampl_infile_status', None)
+        self.check_ampl_input_files()
+        setattr(self, 'ampl_src_status', None)
+        setattr(self, 'solution_status', None)
+        setattr(self, 'evaluation_status', None)
 
     def write_ampl_batch(self, overwrite=False, override_infile_status=False):
         for coron in self.coron_list:
             coron.write_ampl(overwrite, override_infile_status, verbose=False)
         self.logger.info("Wrote the batch of design survey AMPL programs into {:s}".format(self.fileorg['ampl src dir']))
+ 
+    def check_ampl_input_files(self):
+        survey_status = True
+        for coron in self.coron_list: # Update all individual statuses
+            coron_status = coron.check_ampl_input_files()
+            if coron_status is False: # If one is missing input files, set the survey-wide input file status to False
+                survey_status = False
+        self.ampl_infile_status = survey_status
+        return survey_status
+
+    def check_ampl_src_files(self):
+        status = True
+        for coron in self.coron_list:
+            if not os.path.exists(coron.fileorg['ampl src fname']):
+                status = False
+                break
+        self.ampl_src_status = status
+        return status
+
+    def check_solution_files(self):
+        status = True
+        for coron in self.coron_list:
+            if not os.path.exists(coron.fileorg['sol fname']):
+                status = False
+                break
+        self.solution_status = status
+        return status
+
+    def check_eval_status(self):
+        status = True
+        for coron in self.coron_list: # Update all individual statuses
+            if coron.eval_metrics['thrupt'] is None or coron.eval_metrics['psf area'] is None \
+               or coron.eval_metrics['psf width'] is None:
+                status = False
+                break
+        self.eval_status = status
+        return status
 
     def write_spreadsheet(self, overwrite=False, csv_fname=None):
         if csv_fname is None:
             csv_fname_tail = "scda_survey_{:s}_{:s}.csv".format(getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
             self.csv_fname = os.path.join(self.fileorg['work dir'], csv_fname_tail)
         with open(self.csv_fname, 'wb') as survey_spreadsheet:
+            self.check_ampl_src_files()
+            self.check_ampl_input_files()
+            self.check_solution_files()
+            self.check_eval_status()
             surveywriter = csv.writer(survey_spreadsheet)
             #/////////////////////////////////////////////////
             #    Write a header for the spreadsheet
@@ -215,6 +262,22 @@ class DesignParamSurvey(object):
             surveywriter.writerow(["Telescope aperture location", self.fileorg['TelAp dir']])
             surveywriter.writerow(["Focal plane mask location", self.fileorg['FPM dir']])
             surveywriter.writerow(["Lyot stop location", self.fileorg['LS dir']])
+            if self.ampl_src_status is True:
+                surveywriter.writerow(["All AMPL source files exist?", 'Y'])
+            else:
+                surveywriter.writerow(["All AMPL source files exist?", 'N'])
+            if self.ampl_infile_status is True:
+                surveywriter.writerow(["All input files exist?", 'Y'])
+            else:
+                surveywriter.writerow(["All input files exist?", 'N'])
+            if self.solution_status is True:
+                surveywriter.writerow(["All solution files exist?", 'Y'])
+            else:
+                surveywriter.writerow(["All solution files exist?", 'N'])
+            if self.eval_status is True:
+                surveywriter.writerow(["All evaluation metrics extracted?", 'Y'])
+            else:
+                surveywriter.writerow(["All evaluation metrics extracted?", 'N'])
             #/////////////////////////////////////////////////
             #    Write out the fixed design parameters
             #/////////////////////////////////////////////////
@@ -297,12 +360,12 @@ class DesignParamSurvey(object):
             surveywriter.writerow(["SURVEY TABLE"])
             catrow = []
             paramrow = []
-            if len(self.varied_param_index) > 0: # Write varied headers
+            if len(self.varied_param_index) > 0:
                 for (cat, name) in self.varied_param_index:
                     catrow.append(cat)
                     paramrow.append(name)
-                catrow.extend(['', 'AMPL source', '', 'Solution', '', 'Evaluation metrics', '', ''])# 'Apodizer solution', 'Throughput', 'FWHM area', 'FWHM width'])
-                paramrow.extend(['', 'filename', 'exists?', 'filename', 'exists?', 'Thrupt', 'PSF area', 'PSF width'])
+                catrow.extend(['', 'AMPL source', '', '', 'Solution', '', 'Evaluation metrics', '', ''])# 'Apodizer solution', 'Throughput', 'FWHM area', 'FWHM width'])
+                paramrow.extend(['', 'filename', 'exists?', 'input files?', 'filename', 'exists?', 'Thrupt', 'PSF area', 'PSF width'])
                 surveywriter.writerow(catrow)
                 surveywriter.writerow(paramrow)
                 for ii, param_combo in enumerate(self.varied_param_combos):
@@ -310,6 +373,10 @@ class DesignParamSurvey(object):
                     param_combo_row.append('')
                     param_combo_row.append(os.path.basename(self.coron_list[ii].fileorg['ampl src fname'])) 
                     if os.path.exists(self.coron_list[ii].fileorg['ampl src fname']):
+                        param_combo_row.append('Y')
+                    else:
+                        param_combo_row.append('N')
+                    if self.coron_list[ii].ampl_infile_status is True:
                         param_combo_row.append('Y')
                     else:
                         param_combo_row.append('N')
@@ -428,6 +495,11 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         if not issubclass(self.__class__, LyotCoronagraph):
             self.check_ampl_input_files()
 
+        setattr(self, 'eval_metrics', {})
+        self.eval_metrics['thrupt'] = None
+        self.eval_metrics['psf area'] = None
+        self.eval_metrics['psf width'] = None
+
     def check_ampl_input_files(self):
         status = True
         checklist = ['TelAp fname', 'FPM fname', 'LS fname']
@@ -436,6 +508,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                 status = False
                 break
         self.ampl_infile_status = status
+        return status
 
 class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 1000)), ('pm',(str, 'hex1')), ('ss',(str, 'x')), 
