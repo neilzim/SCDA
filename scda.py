@@ -301,8 +301,8 @@ class DesignParamSurvey(object):
                 for (cat, name) in self.varied_param_index:
                     catrow.append(cat)
                     paramrow.append(name)
-                catrow.extend(['', 'AMPL source', '', 'Solution', ''])# 'Apodizer solution', 'Throughput', 'FWHM area', 'FWHM width'])
-                paramrow.extend(['', 'filename', 'exists?', 'filename', 'exists?'])
+                catrow.extend(['', 'AMPL source', '', 'Solution', '', 'Evaluation metrics', '', ''])# 'Apodizer solution', 'Throughput', 'FWHM area', 'FWHM width'])
+                paramrow.extend(['', 'filename', 'exists?', 'filename', 'exists?', 'Thrupt', 'PSF area', 'PSF width'])
                 surveywriter.writerow(catrow)
                 surveywriter.writerow(paramrow)
                 for ii, param_combo in enumerate(self.varied_param_combos):
