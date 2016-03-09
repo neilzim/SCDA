@@ -1181,7 +1181,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          #---------------------
          
          var ED00_real := 0.0;
-         subject to st_ED00_real: ED00_real = 4.*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*PupilFile[x,y])*dx*dy;
+         subject to st_ED00_real: ED00_real = 4.*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*TelAp[x,y])*dx*dy;
          """
  
          constraints = """
