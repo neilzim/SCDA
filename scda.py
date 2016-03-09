@@ -1081,38 +1081,14 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          """.format(self.design['Image']['c'], self.design['FPM']['rad'], self.design['Image']['iwa'], self.design['Image']['owa'], \
                     self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['_Nimg'], \
                     self.design['Image']['oca'], self.design['Image']['bw'], self.design['Image']['Nlam'])
-         
-         load_masks = """\
-         #---------------------
-         # Loading Pupil
-         param PupilFile {{1..N,1..N}};
-         
-         read {{i in 1..N,j in 1..N}} PupilFile[i,j] < "{0:s}";
-         close "{1:s}";
-         
-         # Loading FPM
-         param MaskFile {{1..M,1..M}};
-         
-         read {{i in 1..M,j in 1..M}} MaskFile[i,j] < "{2:s}"; 
-         close "{3:s}";
-         
-         # Loading Lyot stop
-         param LyotFile {{1..N,1..N}};
-         
-         read {{i in 1..N,j in 1..N}} LyotFile[i,j] < "{4:s}";
-         close "{5:s}";
-         """.format(self.fileorg['TelAp fname'], self.fileorg['TelAp fname'], self.fileorg['FPM fname'], self.fileorg['FPM fname'], \
-                    self.fileorg['LS fname'], self.fileorg['LS fname'])
- 
-         define_coords = """\
-          
+
+         define_coords = """
          #---------------------
          # steps in each plane
          param dx := 1/(2*N);
-         
          param dy := dx;
          
-         param dmx := 2*Rmask/(2*M);
+         param dmx := Rmask/M;
          param dmy := dmx;
          
          param dxi := rho2/Nimg;
@@ -1125,7 +1101,33 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          
          set MXs := setof {i in 0.5..M-0.5 by 1} i*dmx;
          set MYs := setof {j in 0.5..M-0.5 by 1} j*dmy;
+
+         set Xis := setof {i in 0..Nimg-1 by 1} i*dxi;
+         set Etas := setof {j in 0..Nimg-1 by 1} j*deta;
          """
+         
+         load_masks = """\
+         #---------------------
+         # Load telescope aperture
+         param TelAp {{x in Xs, y in Ys}};
+         
+         read {{y in Ys, x in Xs}} TelAp[x,y] < "{0:s}";
+         close "{1:s}";
+         
+         # Load FPM
+         param FPM {{mx in MXs, my in MYs}};
+         
+         read {{my in MYs, mx in MXs}} FPM[mx,my] < "{2:s}"; 
+         close "{3:s}";
+         
+         # Load Lyot stop
+         param LS {{x in Xs, y in Ys}};
+         
+         read {{y in Ys,x in Xs}} LS[x,y] < "{4:s}";
+         close "{5:s}";
+         """.format(self.fileorg['TelAp fname'], self.fileorg['TelAp fname'], self.fileorg['FPM fname'], self.fileorg['FPM fname'], \
+                    self.fileorg['LS fname'], self.fileorg['LS fname'])
+ 
 
          if self.design['Image']['Nlam'] > 1 and self.design['Image']['bw'] > 0:
              define_wavelengths = """
@@ -1139,51 +1141,47 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          sets_and_arrays = """
          #---------------------
 
-         set Pupil := setof {x in Xs, y in Ys: PupilFile[round(x/dx+0.5),round(y/dy+0.5)] != 0.} (x,y);
-         set Mask := setof {mx in MXs, my in MYs: MaskFile[round(mx/dmx+0.5),round(my/dmy+0.5)] != 0.} (mx,my);
-         set Lyot := setof {x in Xs, y in Ys: LyotFile[round(x/dx+0.5),round(y/dy+0.5)] != 0.} (x,y);
+         set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] != 0.} (x,y);
+         set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] != 0.} (mx,my);
+         set Lyot := setof {x in Xs, y in Ys: LS[x,y] != 0.} (x,y);
 
-         param TR := sum {i in 1..N, j in 1..N} PupilFile[i,j]*dx*dy; # Transmission of the Pupil. Used for calibration.
-         param I00 := (sum {i in 1..N, j in 1..N} PupilFile[i,j]*LyotFile[i,j]*dx*dy)^2; # Peak intensity in the absence of coronagraph (Pupil and Lyot terms are squared but square exponiential is unnecessary because of the binary values).
+         param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
+         param I00 := (sum {(x,y) in Pupil} TelAp[x,y]*LS[x,y]*dx*dy)^2; # Peak intensity in the absence of coronagraph
+         param A_all {{x in Xs, y in Ys}};
          
-         var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
+         var A {(x,y) in Pupil} >= 0, <= 1, := 0.5;
          
          #---------------------
          
-         set Xis := setof {i in 0..Nimg-1 by 1} i*dxi;
-         set Etas := setof {j in 0..Nimg-1 by 1} j*deta;
-         
-         set DarkHole := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= rho0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta); # Only for 360deg masks.
+         set DarkHole := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= rho0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta);
          """
  
          field_propagation = """
          #---------------------
-         var EBm_real_X {mx in MXs, y in Ys, lam in Ls} := 0.0;
-         var EBm_real {mx in MXs, my in MYs, lam in Ls} := 0.0;
+         var EBm_real_X {mx in MXs, y in Ys, lam in Ls};
+         var EBm_real {mx in MXs, my in MYs, lam in Ls};
          
-         subject to st_EBm_real_X {mx in MXs, y in Ys, lam in Ls}: EBm_real_X[mx,y,lam] = 2.*sum {x in Xs: (x,y) in Pupil} A[x,y]*PupilFile[round(x/dx+0.5),round(y/dy+0.5)]*cos(2.*pi*x*mx*(lam0/lam))*dx;
+         subject to st_EBm_real_X {mx in MXs, y in Ys, lam in Ls}: EBm_real_X[mx,y,lam] = 2.*sum {x in Xs: (x,y) in Pupil} A[x,y]*TelAp[x,y]*cos(2.*pi*x*mx*(lam0/lam))*dx;
          subject to st_EBm_real {(mx, my) in Mask, lam in Ls}: EBm_real[mx,my,lam] = 2.*(lam0/lam)*sum {y in Ys} EBm_real_X[mx,y,lam]*cos(2.*pi*y*my*(lam0/lam))*dy;
          
-         
          #---------------------
-         var ECm_real_X {x in Xs, my in MYs, lam in Ls} := 0.0;
-         var ECm_real {x in Xs, y in Ys, lam in Ls} := 0.0;
+         var ECm_real_X {x in Xs, my in MYs, lam in Ls};
+         var ECm_real {x in Xs, y in Ys, lam in Ls};
          
          subject to st_ECm_real_X {x in Xs, my in MYs, lam in Ls}: ECm_real_X[x,my,lam] = 2.*sum {mx in MXs: (mx,my) in Mask} EBm_real[mx,my,lam]*cos(2.*pi*x*mx*(lam0/lam))*dmx;
          subject to st_ECm_real {(x,y) in Lyot, lam in Ls}: ECm_real[x,y,lam] = 2.*(lam0/lam)*sum {my in MYs} ECm_real_X[x,my,lam]*cos(2.*pi*y*my*(lam0/lam))*dmy;
          
-         
          #---------------------
-         var ED_real_X {xi in Xis, y in Ys, lam in Ls} := 0.0;
-         var ED_real {xi in Xis, eta in Etas, lam in Ls} := 0.0;
+         var ED_real_X {xi in Xis, y in Ys, lam in Ls};
+         var ED_real {xi in Xis, eta in Etas, lam in Ls};
          
-         subject to st_ED_real_X {xi in Xis, y in Ys, lam in Ls}: ED_real_X[xi,y,lam] = 2.*sum {x in Xs: (x,y) in Lyot} (A[x,y]*PupilFile[round(x/dx+0.5),round(y/dy+0.5)]-ECm_real[x,y,lam])*cos(2.*pi*x*xi*(lam0/lam))*dx;
+         subject to st_ED_real_X {xi in Xis, y in Ys, lam in Ls}: ED_real_X[xi,y,lam] = 2.*sum {x in Xs: (x,y) in Lyot} (A[x,y]*TelAp[x,y]-ECm_real[x,y,lam])*cos(2.*pi*x*xi*(lam0/lam))*dx;
          subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] = 2.*(lam0/lam)*sum {y in Ys} ED_real_X[xi,y,lam]*cos(2.*pi*y*eta*(lam0/lam))*dy;
          
          #---------------------
          
          var ED00_real := 0.0;
-         subject to st_ED00_real: ED00_real = 4.*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*PupilFile[round(x/dx+0.5),round(y/dy+0.5)])*dx*dy;
+         subject to st_ED00_real: ED00_real = 4.*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*PupilFile[x,y])*dx*dy;
          """
  
          constraints = """
@@ -1217,19 +1215,23 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
  
          store_results = """
          #---------------------
+
+         param A_fin {{x in Xs, y in Ys}};
+         let {{x in Xs, y in Ys}} A_fin[x,y] := 0;
+         let {{(x,y) in Pupil}} A_fin[x,y] := A[x,y];
  
-         printf {{x in Xs, y in Ys}}: "%15g %15g %15g \\n", x, y, A[x,y] > "{0:s}";
+         printf {{x in Xs, y in Ys}}: "%15g %15g %15g \\n", x, y, A_fin[x,y] > "{0:s}";
          """.format(self.fileorg['sol fname'])
  
          mod_fobj.write( textwrap.dedent(header) )
          mod_fobj.write( textwrap.dedent(params) )
-         mod_fobj.write( textwrap.dedent(load_masks) )
          mod_fobj.write( textwrap.dedent(define_coords) )
+         mod_fobj.write( textwrap.dedent(load_masks) )
          mod_fobj.write( textwrap.dedent(define_wavelengths) )
          mod_fobj.write( textwrap.dedent(sets_and_arrays) )
          mod_fobj.write( textwrap.dedent(field_propagation) )
          mod_fobj.write( textwrap.dedent(constraints) )
-         mod_fobj.write( textwrap.dedent(misc_options) )
+         #mod_fobj.write( textwrap.dedent(misc_options) )
          mod_fobj.write( textwrap.dedent(solver) )
          mod_fobj.write( textwrap.dedent(solver_options) )
          mod_fobj.write( textwrap.dedent(execute) )
