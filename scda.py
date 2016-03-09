@@ -10,6 +10,7 @@ import sys
 import logging
 import datetime
 import textwrap
+import csv
 import numpy as np
 import pdb
 import getpass
@@ -17,9 +18,12 @@ import socket
 from collections import defaultdict, OrderedDict
 import itertools
 import pprint
+import pickle
 
 def configure_log(log_fname=None):
-    logger = logging.getLogger("scda.logger")
+#    logger = logging.getLogger("scda.logger")
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
     if not len(logger.handlers):
         logger.setLevel(logging.DEBUG)
         ch = logging.StreamHandler(sys.stdout) # console dump
@@ -32,6 +36,12 @@ def configure_log(log_fname=None):
             fh = logging.FileHandler(log_fname, mode="w")
             fh.setLevel(logging.DEBUG)
             logger.addHandler(fh)
+    
+def load_design_param_survey(pkl_fname):
+    fobj = open(pkl_fname, 'rb')
+    survey_obj = pickle.load(fobj)
+    fobj.close() 
+    return survey_obj
 
 class WrappedFixedIndentingLog(logging.Formatter):
     def __init__(self, fmt=None, datefmt=None, style='%', width=70, indent=4):
@@ -43,47 +53,49 @@ class WrappedFixedIndentingLog(logging.Formatter):
 
 class DesignParamSurvey(object):
     def __init__(self, coron_class, survey_config, **kwargs):
-        self.logger = logging.getLogger('scda.logger')
-        _param_menu = coron_class._design_fields.copy()
-        _file_fields = coron_class._file_fields.copy()
+        #self.logger = logging.getLogger('scda.logger')
+        setattr(self, 'coron_class', coron_class)
+        self._param_menu = coron_class._design_fields.copy()
+        self._file_fields = coron_class._file_fields.copy()
+        self._file_fields['fileorg'].append('survey fname')
         setattr(self, 'survey_config', {})
         for keycat, param_dict in survey_config.items():
             self.survey_config[keycat] = {}
-            if keycat in _param_menu:
+            if keycat in self._param_menu:
                 for param, values in param_dict.items():
-                    if param in _param_menu[keycat]:
+                    if param in self._param_menu[keycat]:
                         if values is not None:
                             if hasattr(values, '__iter__'): #check the type of all items
-                                if all(isinstance(value, _param_menu[keycat][param][0]) for value in values):
+                                if all(isinstance(value, self._param_menu[keycat][param][0]) for value in values):
                                     self.survey_config[keycat][param] = values
                                     #self.survey_config[keycat][param] = tuple(values)
                                 else:
                                     warnstr = ("Warning: Invalid type found in survey set {0} for parameter {1} under category \"{2}\" " + \
-                                               "design initialization argument, expecting {3}").format(value, param, keycat, _param_menu[keycat][param][0]) 
-                                    self.logger.warning(warnstr)
+                                               "design initialization argument, expecting {3}").format(value, param, keycat, self._param_menu[keycat][param][0]) 
+                                    logging.warning(warnstr)
                             else:
-                                if isinstance(values, _param_menu[keycat][param][0]):
+                                if isinstance(values, self._param_menu[keycat][param][0]):
                                     self.survey_config[keycat][param] = values
                                 else:
                                     warnstr = ("Warning: Invalid {0} for parameter \"{1}\" under category \"{2}\" " + \
-                                               "design initialization argument, expecting a {3}").format(type(value), param, keycat, _param_menu[keycat][param][0]) 
-                                    self.logger.warning(warnstr)
+                                               "design initialization argument, expecting a {3}").format(type(value), param, keycat, self._param_menu[keycat][param][0]) 
+                                    logging.warning(warnstr)
                     else:
-                        self.logger.warning("Warning: Unrecognized parameter \"{0}\" under category \"{1}\" in design initialization argument".format(param, keycat))
+                        logging.warning("Warning: Unrecognized parameter \"{0}\" under category \"{1}\" in design initialization argument".format(param, keycat))
             else:
-                self.logger.warning("Warning: Unrecognized key category \"{0}\" in design initialization argument".format(keycat))
+                logging.warning("Warning: Unrecognized key category \"{0}\" in design initialization argument".format(keycat))
                 self.survey_config[keycat] = None
         varied_param_flat = []
         varied_param_index = []
         fixed_param_flat = []
         fixed_param_index = []
-        for keycat in _param_menu: # Fill in default values where appropriate
+        for keycat in self._param_menu: # Fill in default values where appropriate
             if keycat not in self.survey_config:
                 self.survey_config[keycat] = {}
-            for param in _param_menu[keycat]:
+            for param in self._param_menu[keycat]:
                 if param not in self.survey_config[keycat] or (self.survey_config[keycat][param] is None and \
-                                                               _param_menu[keycat][param][1] is not None):
-                    self.survey_config[keycat][param] = _param_menu[keycat][param][1] # default value
+                                                               self._param_menu[keycat][param][1] is not None):
+                    self.survey_config[keycat][param] = self._param_menu[keycat][param][1] # default value
                 elif param in self.survey_config[keycat] and self.survey_config[keycat][param] is not None and \
                 not hasattr(self.survey_config[keycat][param], '__iter__'):
                     fixed_param_flat.append(self.survey_config[keycat][param])
@@ -99,6 +111,7 @@ class DesignParamSurvey(object):
         self.varied_param_index = tuple(varied_param_index)
         self.fixed_param_vals = tuple(fixed_param_flat)
         self.fixed_param_index = tuple(fixed_param_index)
+        self.N_combos = len(varied_param_combos)
 
         #////////////////////////////////////////////////////////////////////////////////////////////////////
         #   The fileorg attribute holds the locations of telescope apertures,
@@ -107,22 +120,22 @@ class DesignParamSurvey(object):
         setattr(self, 'fileorg', {})
         if 'fileorg' in kwargs:
             for namekey, location in kwargs['fileorg'].items():
-                if namekey in _file_fields['fileorg']:
+                if namekey in self._file_fields['fileorg']:
                     if location is not None:
                         if namekey.endswith('dir'):
                             self.fileorg[namekey] = os.path.abspath(os.path.expanduser(location)) # Convert all directory names to absolute paths
                             if not os.path.exists(self.fileorg[namekey]):
-                                self.logger.warning("Warning: The specified location of '{0}', \"{1}\" does not exist".format(namekey, self.fileorg[namekey]))
+                                logging.warning("Warning: The specified location of '{0}', \"{1}\" does not exist".format(namekey, self.fileorg[namekey]))
                         else:
                             self.fileorg[namekey] = location
                     else:
                         self.fileorg[namekey] = None
                 else:
-                    self.logger.warning("Warning: Unrecognized field {0} in fileorg argument".format(dirkey))
+                    logging.warning("Warning: Unrecognized field {0} in fileorg argument".format(namekey))
         # Handle missing directory values
         if 'work dir' not in self.fileorg or self.fileorg['work dir'] is None:
             self.fileorg['work dir'] = os.getcwd()
-        for namekey in _file_fields['fileorg']: # Set other missing directory locations to 'work dir'
+        for namekey in self._file_fields['fileorg']: # Set other missing directory locations to 'work dir'
             if namekey.endswith('dir') and ( namekey not in self.fileorg or self.fileorg[namekey] is None ):
                 self.fileorg[namekey] = self.fileorg['work dir']
       
@@ -139,7 +152,7 @@ class DesignParamSurvey(object):
             if os.path.exists(try_fname):
                 self.fileorg['TelAp fname'] = try_fname
             else:
-                self.logger.warning("Warning: Could not find the specified telescope aperture file \"{0}\" in {1}".format(self.fileorg['TelAp fname'],
+                logging.warning("Warning: Could not find the specified telescope aperture file \"{0}\" in {1}".format(self.fileorg['TelAp fname'],
                                     self.fileorg['TelAp dir']))
         if 'FPM fname' in self.fileorg and self.fileorg['FPM fname'] is not None and \
         not os.path.exists(self.fileorg['FPM fname']) and os.path.exists(self.fileorg['FPM dir']) and \
@@ -148,7 +161,7 @@ class DesignParamSurvey(object):
             if os.path.exists(try_fname):
                 self.fileorg['FPM fname'] = try_fname
             else:
-                self.logger.warning("Warning: Could not find the specified FPM file \"{0}\" in {1}".format(self.fileorg['FPM fname'],
+                logging.warning("Warning: Could not find the specified FPM file \"{0}\" in {1}".format(self.fileorg['FPM fname'],
                                     self.fileorg['FPM dir']))
         if 'LS fname' in self.fileorg and self.fileorg['LS fname'] is not None and \
         not os.path.exists(self.fileorg['LS fname']) and os.path.exists(self.fileorg['LS dir']) and \
@@ -157,7 +170,7 @@ class DesignParamSurvey(object):
             if os.path.exists(try_fname):
                 self.fileorg['LS fname'] = try_fname
             else:
-                self.logger.warning("Warning: Could not find the specified LS file \"{0}\" in {1}".format(self.fileorg['LS fname'],
+                logging.warning("Warning: Could not find the specified LS file \"{0}\" in {1}".format(self.fileorg['LS fname'],
                                     self.fileorg['LS dir']))
         #////////////////////////////////////////////////////////////////////////////////////////////////////
         #   The solver attribute holds the options handed from AMPL to Gurobi, 
@@ -170,9 +183,9 @@ class DesignParamSurvey(object):
                     if value in self._solver_menu[field]:
                         self.solver[field] = value
                     else:
-                        self.logger.warning("Warning: Unrecognized solver option \"{0}\" in field \"{1}\", reverting to default".format(value, field))
+                        logging.warning("Warning: Unrecognized solver option \"{0}\" in field \"{1}\", reverting to default".format(value, field))
                 else:
-                    self.logger.warning("Warning: Unrecognized field {0} in solver argument".format(field))
+                    logging.warning("Warning: Unrecognized field {0} in solver argument".format(field))
         # Handle missing values
         if 'constr' not in self.solver or self.solver['constr'] is None: self.solver['constr'] = 'lin'
         if 'method' not in self.solver or self.solver['method'] is None: self.solver['method'] = 'bar'
@@ -181,7 +194,7 @@ class DesignParamSurvey(object):
          
         setattr(self, 'coron_list', [])
         design = {}
-        for keycat in _param_menu:
+        for keycat in self._param_menu:
             design[keycat] = {}
         for (fixed_keycat, fixed_parname), fixed_val in zip(self.fixed_param_index, self.fixed_param_vals):
             design[fixed_keycat][fixed_parname] = fixed_val
@@ -189,11 +202,231 @@ class DesignParamSurvey(object):
         for param_combo in self.varied_param_combos: # TODO: Switch the coronagraph type depending on the symmetry of the telescope aperture and support struts 
             for (varied_keycat, varied_parname), current_val in zip(self.varied_param_index, param_combo):
                 design[varied_keycat][varied_parname] = current_val
+            coron_fileorg = self.fileorg.copy()
+            if 'survey fname' in coron_fileorg:
+                coron_fileorg.pop('survey fname')
             self.coron_list.append( coron_class(design=design, fileorg=self.fileorg, solver=self.solver) )
+ 
+        setattr(self, 'ampl_infile_status', None)
+        self.check_ampl_input_files()
+        setattr(self, 'ampl_src_status', None)
+        setattr(self, 'solution_status', None)
+        setattr(self, 'evaluation_status', None)
 
     def write_ampl_batch(self, overwrite=False, override_infile_status=False):
         for coron in self.coron_list:
-            coron.write_ampl(overwrite, override_infile_status)
+            coron.write_ampl(overwrite, override_infile_status, verbose=False)
+        logging.info("Wrote the batch of design survey AMPL programs into {:s}".format(self.fileorg['ampl src dir']))
+ 
+    def check_ampl_input_files(self):
+        survey_status = True
+        for coron in self.coron_list: # Update all individual statuses
+            coron_status = coron.check_ampl_input_files()
+            if coron_status is False: # If one is missing input files, set the survey-wide input file status to False
+                survey_status = False
+        self.ampl_infile_status = survey_status
+        return survey_status
+
+    def check_ampl_src_files(self):
+        status = True
+        for coron in self.coron_list:
+            if not os.path.exists(coron.fileorg['ampl src fname']):
+                status = False
+                break
+        self.ampl_src_status = status
+        return status
+
+    def check_solution_files(self):
+        status = True
+        for coron in self.coron_list:
+            if not os.path.exists(coron.fileorg['sol fname']):
+                status = False
+                break
+        self.solution_status = status
+        return status
+
+    def check_eval_status(self):
+        status = True
+        for coron in self.coron_list: # Update all individual statuses
+            if coron.eval_metrics['thrupt'] is None or coron.eval_metrics['psf area'] is None \
+               or coron.eval_metrics['psf width'] is None:
+                status = False
+                break
+        self.eval_status = status
+        return status
+
+    def write(self, fname=None):
+        if fname is not None:
+            if os.path.dirname(fname) is '': # if no path specified, assume work dir
+                self.fileorg['survey fname'] = os.path.join(self.fileorg['work dir'], fname)
+            else:
+                self.fileorg['survey fname'] = fname
+        else:
+            if 'survey fname' not in self.fileorg or \
+               ('survey fname' in self.fileorg and self.fileorg['survey fname'] is None): # set the filename based on the coronagraph type, user, and date
+                fname_tail = "scda_{:s}_survey_{:s}_{:s}.pkl".format(self.coron_class.__name__, getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
+                self.fileorg['survey fname'] = os.path.join(self.fileorg['work dir'], fname_tail)
+        fobj = open(self.fileorg['survey fname'], 'wb')
+        pickle.dump(self, fobj)
+        fobj.close()
+        logging.info("Wrote the design parameter survey object to {:s}".format(self.fileorg['survey fname']))
+ 
+    def write_spreadsheet(self, overwrite=False, csv_fname=None):
+        if csv_fname is not None:
+            if os.path.dirname(csv_fname) is '': # if no path specified, assume work dir
+                csv_fname = os.path.join(self.fileorg['work dir'], fname)
+            else:
+                csv_fname = fname
+        else:
+            if 'survey fname' not in self.fileorg or ('survey fname' in self.fileorg and self.fileorg['survey fname'] is None):
+                csv_fname_tail = "scda_{:s}_survey_{:s}_{:s}.csv".format(self.coron_class.__name__, getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
+                csv_fname = os.path.join(self.fileorg['work dir'], csv_fname_tail)
+            else:
+                csv_fname = self.fileorg['survey fname'][-4:] + ".csv"
+        with open(csv_fname, 'wb') as survey_spreadsheet:
+            self.check_ampl_src_files()
+            self.check_ampl_input_files()
+            self.check_solution_files()
+            self.check_eval_status()
+            surveywriter = csv.writer(survey_spreadsheet)
+            #/////////////////////////////////////////////////
+            #    Write a header for the spreadsheet
+            #/////////////////////////////////////////////////
+            surveywriter.writerow(["Created by {:s} on {:s} at {:s}".format(getpass.getuser(), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))])
+            surveywriter.writerow(["FILE ORGANIZATION AND STATUS"])
+            surveywriter.writerow(["Work dir", self.fileorg['work dir']])
+            surveywriter.writerow(["AMPL source location", self.fileorg['ampl src dir']])
+            surveywriter.writerow(["Solution location", self.fileorg['sol dir']])
+            surveywriter.writerow(["Telescope aperture location", self.fileorg['TelAp dir']])
+            surveywriter.writerow(["Focal plane mask location", self.fileorg['FPM dir']])
+            surveywriter.writerow(["Lyot stop location", self.fileorg['LS dir']])
+            if self.ampl_src_status is True:
+                surveywriter.writerow(["All AMPL source files exist?", 'Y'])
+            else:
+                surveywriter.writerow(["All AMPL source files exist?", 'N'])
+            if self.ampl_infile_status is True:
+                surveywriter.writerow(["All input files exist?", 'Y'])
+            else:
+                surveywriter.writerow(["All input files exist?", 'N'])
+            if self.solution_status is True:
+                surveywriter.writerow(["All solution files exist?", 'Y'])
+            else:
+                surveywriter.writerow(["All solution files exist?", 'N'])
+            if self.eval_status is True:
+                surveywriter.writerow(["All evaluation metrics extracted?", 'Y'])
+            else:
+                surveywriter.writerow(["All evaluation metrics extracted?", 'N'])
+            #/////////////////////////////////////////////////
+            #    Write out the fixed design parameters
+            #/////////////////////////////////////////////////
+            surveywriter.writerow([""])
+            surveywriter.writerow(["FIXED design parameters"])
+            fixed_param_category_row = []
+            fixed_param_subheading_row = []
+            for cat in self._param_menu:
+                fixed_param_category_row.extend([cat,''])
+                fixed_param_subheading_row.extend(['param name', 'value'])
+            surveywriter.writerow(fixed_param_category_row)
+            surveywriter.writerow(fixed_param_subheading_row)
+            self.fixed_param_table = []
+            max_N_params = 0
+            for cat in self._param_menu:
+                param_col = []
+                val_col = []
+                for (param_cat, param) in self.fixed_param_index:
+                    if param_cat is cat:
+                        param_col.append(param)
+                        val_col.append(self.survey_config[cat][param])
+                N_params = len(param_col)
+                if N_params > max_N_params:
+                    max_N_params = N_params
+                self.fixed_param_table.append(param_col)
+                self.fixed_param_table.append(val_col)
+            N_cols = len(self.fixed_param_table)
+            for ci in range(N_cols):
+                N_rows = len(self.fixed_param_table[ci])
+                if N_rows < max_N_params:
+                    self.fixed_param_table[ci].extend(['']*(max_N_params - N_rows))
+            for ri in range(max_N_params):
+                fixed_table_row = []
+                for ci in range(N_cols):
+                    fixed_table_row.append(self.fixed_param_table[ci][ri])
+                surveywriter.writerow(fixed_table_row)
+            #/////////////////////////////////////////////////
+            #    Write out the varied design parameters
+            #/////////////////////////////////////////////////
+            surveywriter.writerow([""])
+            surveywriter.writerow(["VARIED design parameters ({:d} total combinations)".format(self.N_combos)])
+            varied_param_category_row = []
+            varied_param_subheading_row = []
+            for cat in self._param_menu:
+                varied_param_category_row.extend([cat,'',''])
+                varied_param_subheading_row.extend(['param name', 'value list', 'num'])
+            surveywriter.writerow(varied_param_category_row)
+            surveywriter.writerow(varied_param_subheading_row)
+            self.varied_param_table = []
+            max_N_params = 0
+            for cat in self._param_menu:
+                param_col = []
+                vals_col = []
+                num_col = []
+                for (param_cat, param) in self.varied_param_index:
+                    if param_cat is cat:
+                        param_col.append(param)
+                        vals_col.append(self.survey_config[cat][param])
+                        num_col.append(len(self.survey_config[cat][param]))
+                N_params = len(param_col)
+                if N_params > max_N_params:
+                    max_N_params = N_params
+                self.varied_param_table.append(param_col)
+                self.varied_param_table.append(vals_col)
+                self.varied_param_table.append(num_col)
+            N_cols = len(self.varied_param_table)
+            for ci in range(N_cols):
+                N_rows = len(self.varied_param_table[ci])
+                if N_rows < max_N_params:
+                    self.varied_param_table[ci].extend(['']*(max_N_params - N_rows))
+            for ri in range(max_N_params):
+                varied_table_row = []
+                for ci in range(N_cols):
+                    varied_table_row.append(self.varied_param_table[ci][ri])
+                surveywriter.writerow(varied_table_row)
+            #/////////////////////////////////////////////////////////
+            #    Write out the survey design parameter combinations
+            #/////////////////////////////////////////////////////////
+            surveywriter.writerow([""])
+            surveywriter.writerow(["SURVEY TABLE"])
+            catrow = []
+            paramrow = []
+            if len(self.varied_param_index) > 0:
+                for (cat, name) in self.varied_param_index:
+                    catrow.append(cat)
+                    paramrow.append(name)
+                catrow.extend(['', 'AMPL source', '', '', 'Solution', '', 'Evaluation metrics', '', ''])
+                paramrow.extend(['', 'filename', 'exists?', 'input files?', 'filename', 'exists?', 'Thrupt', 'PSF area', 'PSF width'])
+                surveywriter.writerow(catrow)
+                surveywriter.writerow(paramrow)
+                for ii, param_combo in enumerate(self.varied_param_combos):
+                    param_combo_row = list(param_combo)
+                    param_combo_row.append('')
+                    param_combo_row.append(os.path.basename(self.coron_list[ii].fileorg['ampl src fname'])) 
+                    if os.path.exists(self.coron_list[ii].fileorg['ampl src fname']):
+                        param_combo_row.append('Y')
+                    else:
+                        param_combo_row.append('N')
+                    if self.coron_list[ii].ampl_infile_status is True:
+                        param_combo_row.append('Y')
+                    else:
+                        param_combo_row.append('N')
+                    param_combo_row.append(os.path.basename(self.coron_list[ii].fileorg['sol fname'])) 
+                    if os.path.exists(self.coron_list[ii].fileorg['sol fname']):
+                        param_combo_row.append('Y')
+                    else:
+                        param_combo_row.append('N')
+                    surveywriter.writerow(param_combo_row)
+                    
+        survey_spreadsheet.close()
+        logging.info("Wrote design survey spreadsheet to {:s}".format(csv_fname))
 
 class LyotCoronagraph(object): # Lyot coronagraph base class
     _file_fields = { 'fileorg': ['work dir', 'ampl src dir', 'TelAp dir', 'FPM dir', 'LS dir', 'sol dir', 'eval dir',
@@ -212,7 +445,6 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
     def __init__(self, verbose=False, **kwargs):
         # Only set fileorg and solver attributes in this constructor,
         # since design and eval parameter checking is design-specific. 
-        self.logger = logging.getLogger('scda.logger')
 
         #////////////////////////////////////////////////////////////////////////////////////////////////////
         #   The fileorg attribute holds the locations of telescope apertures,
@@ -226,13 +458,13 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                         if namekey.endswith('dir'):
                             self.fileorg[namekey] = os.path.abspath(os.path.expanduser(location)) # Convert all directory names to absolute paths
                             if not os.path.exists(self.fileorg[namekey]):
-                                self.logger.warning("Warning: The specified location of '{0}', \"{1}\" does not exist".format(namekey, self.fileorg[namekey]))
+                                logging.warning("Warning: The specified location of '{0}', \"{1}\" does not exist".format(namekey, self.fileorg[namekey]))
                         else:
                             self.fileorg[namekey] = location
                     else:
                         self.fileorg[namekey] = None
                 else:
-                    self.logger.warning("Warning: Unrecognized field {0} in fileorg argument".format(dirkey))
+                    logging.warning("Warning: Unrecognized field {0} in fileorg argument".format(namekey))
         # Handle missing directory values
         if 'work dir' not in self.fileorg or self.fileorg['work dir'] is None:
             self.fileorg['work dir'] = os.getcwd()
@@ -249,7 +481,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
             if os.path.exists(try_fname):
                 self.fileorg['TelAp fname'] = try_fname
             else:
-                self.logger.warning("Warning: Could not find the specified telescope aperture file \"{0}\" in {1}".format(self.fileorg['TelAp fname'], \
+                logging.warning("Warning: Could not find the specified telescope aperture file \"{0}\" in {1}".format(self.fileorg['TelAp fname'], \
                                     self.fileorg['TelAp dir']))
         if 'FPM fname' in self.fileorg and self.fileorg['FPM fname'] is not None and \
         not os.path.exists(self.fileorg['FPM fname']) and os.path.exists(self.fileorg['FPM dir']) and \
@@ -258,7 +490,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
             if os.path.exists(try_fname):
                 self.fileorg['FPM fname'] = try_fname
             else:
-                self.logger.warning("Warning: Could not find the specified FPM file \"{0}\" in {1}".format(self.fileorg['FPM fname'], \
+                logging.warning("Warning: Could not find the specified FPM file \"{0}\" in {1}".format(self.fileorg['FPM fname'], \
                                     self.fileorg['FPM dir']))
         if 'LS fname' in self.fileorg and self.fileorg['LS fname'] is not None and \
         not os.path.exists(self.fileorg['LS fname']) and os.path.exists(self.fileorg['LS dir']) and \
@@ -267,7 +499,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
             if os.path.exists(try_fname):
                 self.fileorg['LS fname'] = try_fname
             else:
-                self.logger.warning("Warning: Could not find the specified LS file \"{0}\" in {1}".format(self.fileorg['LS fname'], \
+                logging.warning("Warning: Could not find the specified LS file \"{0}\" in {1}".format(self.fileorg['LS fname'], \
                                     self.fileorg['LS dir']))
 
         # If the specified ampl source filename is a simple name with no directory, append it to the ampl source directory.
@@ -286,9 +518,9 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                     if value in self._solver_menu[field]:
                         self.solver[field] = value
                     else:
-                        self.logger.warning("Warning: Unrecognized solver option \"{0}\" in field \"{1}\", reverting to default".format(value, field))
+                        logging.warning("Warning: Unrecognized solver option \"{0}\" in field \"{1}\", reverting to default".format(value, field))
                 else:
-                    self.logger.warning("Warning: Unrecognized field {0} in solver argument".format(field))
+                    logging.warning("Warning: Unrecognized field {0} in solver argument".format(field))
         # Handle missing values
         if 'constr' not in self.solver or self.solver['constr'] is None: self.solver['constr'] = 'lin'
         if 'solver' not in self.solver or self.solver['solver'] is None: self.solver['solver'] = 'gurobi'
@@ -300,6 +532,11 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         if not issubclass(self.__class__, LyotCoronagraph):
             self.check_ampl_input_files()
 
+        setattr(self, 'eval_metrics', {})
+        self.eval_metrics['thrupt'] = None
+        self.eval_metrics['psf area'] = None
+        self.eval_metrics['psf width'] = None
+
     def check_ampl_input_files(self):
         status = True
         checklist = ['TelAp fname', 'FPM fname', 'LS fname']
@@ -308,6 +545,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                 status = False
                 break
         self.ampl_infile_status = status
+        return status
 
 class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 1000)), ('pm',(str, 'hex1')), ('ss',(str, 'x')), 
@@ -341,11 +579,11 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                                 else:
                                     warnstr = ("Warning: Invalid {0} for parameter \"{1}\" under category \"{2}\" " + \
                                                "design initialization argument, expecting a {3}").format(type(value), param, keycat, self._design_fields[keycat][param][0]) 
-                                    self.logger.warning(warnstr)
+                                    logging.warning(warnstr)
                         else:
-                            self.logger.warning("Warning: Unrecognized parameter \"{0}\" under category \"{1}\" in design initialization argument".format(param, keycat))
+                            logging.warning("Warning: Unrecognized parameter \"{0}\" under category \"{1}\" in design initialization argument".format(param, keycat))
                 else:
-                    self.logger.warning("Warning: Unrecognized key category \"{0}\" in design initialization argument".format(keycat))
+                    logging.warning("Warning: Unrecognized key category \"{0}\" in design initialization argument".format(keycat))
                     self.design[keycat] = None
         for keycat in self._design_fields: # Fill in default values where appropriate
             if keycat not in self.design:
@@ -359,9 +597,9 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         # Finally, set a private attribute for the number of image plane samples between the center and the OCA
         self.design['Image']['_Nimg'] = int( np.ceil( self.design['Image']['fpres']*self.design['Image']['oca']/(1. - self.design['Image']['bw']/2) ) )
         if verbose: # Print summary of the set parameters
-            self.logger.info("Design parameters: {}".format(self.design))
-            self.logger.info("Optimization and solver parameters: {}".format(self.solver))
-            self.logger.info("File organization parameters: {}".format(self.fileorg))
+            logging.info("Design parameters: {}".format(self.design))
+            logging.info("Optimization and solver parameters: {}".format(self.solver))
+            logging.info("File organization parameters: {}".format(self.fileorg))
      
         self.amplname_coron = "APLC_full"
         self.amplname_pupil = "{0:s}{1:s}{2:s}sm{3:d}_N{4:04d}".format(self.design['Pupil']['pm'], self.design['Pupil']['ss'], self.design['Pupil']['sst'], \
@@ -418,13 +656,13 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             self.check_ampl_input_files()
                                                               
     def write_ampl(self, overwrite=False):
-        self.logger.info("Writing the AMPL program")
+        logging.info("Writing the AMPL program")
     def read_solution(self):
-        self.logger.info("Reading in the apodizer solution and parse the optimizer log")
+        logging.info("Reading in the apodizer solution and parse the optimizer log")
     def create_eval_model(self):
-        self.logger.info("Defining a python/Poppy model to evaluate the solution")
+        logging.info("Defining a python/Poppy model to evaluate the solution")
     def eval_solution(self):
-        self.logger.info("Evaluating the design throughput, PSF FWHM, etc., and writing summary")
+        logging.info("Evaluating the design throughput, PSF FWHM, etc., and writing summary")
 
 class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symmetry case
     def __init__(self, **kwargs):
@@ -463,11 +701,11 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
                                                          "{0:s}{1:02d}D{2:02d}_clear_N{3:04d}.dat".format(self.design['LS']['shape'],
                                                          self.design['LS']['id'], self.design['LS']['od'], self.design['Pupil']['N'])) )
         self.check_ampl_input_files()
-    def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None):
+    def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None, verbose=True):
         if self.ampl_infile_status is False and not override_infile_status:
-            self.logger.error("Error: the most recent input file check for this design configuration failed.")
-            self.logger.error("The override_infile_status switch is off, so write_ampl() will now abort.")
-            self.logger.error("See previous warnings in the log to see what file was missing during the initialization")
+            logging.error("Error: the most recent input file check for this design configuration failed.")
+            logging.error("The override_infile_status switch is off, so write_ampl() will now abort.")
+            logging.error("See previous warnings in the log to see what file was missing during the initialization")
             return
         if ampl_src_fname is not None:
             if os.path.dirname(ampl_src_fname) == '' and self.fileorg['ampl src dir'] is not None:
@@ -477,14 +715,15 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
                 self.fileorg['ampl src dir'] = os.path.dirname(self.fileorg['ampl src fname'])
         if os.path.exists(self.fileorg['ampl src fname']):
             if overwrite == True:
-                self.logger.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
+                if verbose:
+                    logging.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
             else:
-                self.logger.warning("Error: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
+                logging.warning("Error: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
                 return
         elif not os.path.exists(self.fileorg['ampl src dir']):
             os.mkdir(self.fileorg['ampl src dir'])
-            self.logger.info("Created new AMPL source code directory, {0:s}".format(self.fileorg['ampl src dir']))
-#        self.logger.info("Writing the AMPL program for the specified half-plane APLC")
+            if verbose:
+                logging.info("Created new AMPL source code directory, {0:s}".format(self.fileorg['ampl src dir']))
         mod_fobj = open(self.fileorg['ampl src fname'], "w")
 
         header = """\
@@ -510,7 +749,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         param M := {9:d};				# discretization parameter (mask)
         
         param Nimg := {10:d};           # discretization parameter (image)
-        param Fmax := {11:0.2f};        # NTZ: We paramaterize our image plane resolution by fpres = sampling rate at 
+        param rho2 := {11:0.2f};        # NTZ: We paramaterize our image plane resolution by fpres = sampling rate at 
                                     #      the shortest wavelength. Then Nimg is an integer function of fpres, oca,
         #---------------------      #      and bw. This integer is not specified directly by the user, but computed "privately"
         param bw := {12:0.2f};           #      by the APLC class constructor.
@@ -571,7 +810,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         param dmx := 2*Rmask/(2*M);
         param dmy := dmx;
         
-        param dxi := (Fmax/Nimg)*(1/CoeffOverSizePup);
+        param dxi := (rho2/Nimg)*(1/CoeffOverSizePup);
         param deta := dxi;
 
         #---------------------
@@ -739,7 +978,8 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         mod_fobj.write( textwrap.dedent(store_results) )
 
         mod_fobj.close()
-        self.logger.info("Wrote %s"%self.fileorg['ampl src fname'])
+        if verbose:
+            logging.info("Wrote %s"%self.fileorg['ampl src fname'])
 
 class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plane symmetry case
      def __init__(self, **kwargs):
@@ -751,7 +991,9 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
              self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname_tail)
  
          if 'sol fname' not in self.fileorg or self.fileorg['sol fname'] is None:
-             self.fileorg['sol fname'] = self.fileorg['ampl src fname'][:-4] + "_ApodSol.dat"
+             sol_fname_tail = "ApodSol_" + self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
+                              self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".dat"
+             self.fileorg['sol fname'] = os.path.join(self.fileorg['ampl src dir'], sol_fname_tail)
  
          if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
              self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_quart_" + self.amplname_pupil + ".dat") )
@@ -778,11 +1020,11 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
                                                           "{0:s}{1:02d}D{2:02d}_clear_N{3:04d}.dat".format(self.design['LS']['shape'],
                                                           self.design['LS']['id'], self.design['LS']['od'], self.design['Pupil']['N'])) )
          self.check_ampl_input_files()
-     def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None):
+     def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None, verbose=True):
          if self.ampl_infile_status is False and not override_infile_status:
-             self.logger.error("Error: the most recent input file check for this design configuration failed.")
-             self.logger.error("The override_infile_status switch is off, so write_ampl() will now abort.")
-             self.logger.error("See previous warnings in the log to see what file was missing during the initialization")
+             logging.error("Error: the most recent input file check for this design configuration failed.")
+             logging.error("The override_infile_status switch is off, so write_ampl() will now abort.")
+             logging.error("See previous warnings in the log to see what file was missing during the initialization")
              return
          if ampl_src_fname is not None:
              if os.path.dirname(ampl_src_fname) == '' and self.fileorg['ampl src dir'] is not None:
@@ -792,14 +1034,15 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
                  self.fileorg['ampl src dir'] = os.path.dirname(self.fileorg['ampl src fname'])
          if os.path.exists(self.fileorg['ampl src fname']):
              if overwrite == True:
-                 self.logger.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
+                 if verbose:
+                     logging.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
              else:
-                 self.logger.warning("Error: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
+                 logging.warning("Error: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
                  return
          elif not os.path.exists(self.fileorg['ampl src dir']):
              os.mkdir(self.fileorg['ampl src dir'])
-             self.logger.info("Created new AMPL source code directory, {0:s}".format(self.fileorg['ampl src dir']))
- #        self.logger.info("Writing the AMPL program for the specified quarter-plane APLC")
+             if verbose:
+                 logging.info("Created new AMPL source code directory, {0:s}".format(self.fileorg['ampl src dir']))
          mod_fobj = open(self.fileorg['ampl src fname'], "w")
  
          header = """\
@@ -826,7 +1069,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          param M := {5:d};				# discretization parameter (mask)
          
          param Nimg := {6:d};           # discretization parameter (image)
-         param Fmax := {7:0.2f};        # NTZ: We paramaterize our image plane resolution by fpres = sampling rate at 
+         param rho2 := {7:0.2f};        # NTZ: We paramaterize our image plane resolution by fpres = sampling rate at 
                                      #      the shortest wavelength. Then Nimg is an integer function of fpres, oca,
          #---------------------      #      and bw. This integer is not specified directly by the user, but computed "privately"
          param bw := {8:0.2f};           #      by the APLC class constructor.
@@ -835,20 +1078,6 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          param Nlam := {9:d};
          
          #---------------------
-         param obs := 20;             # NTZ: We will eliminate this section of parameter definitions, 
-         param spiders :=01;          #      since we determine the file names of the aperture and Lyot stop
-         param lsobs := 20;           #      outside the program, as well as the file name of the apodizer solution.
-         param lsspiders :=02;
-         param gap :=01;
-         param lsgap :=00;
-         
-         param OD :=0.98;
-         
-         #---------------------
-         param Normterm := 1.00; 	# 0.380
-         
-         #---------------------
-         param CoeffOverSizePup :=1.0*OD;
          """.format(self.design['Image']['c'], self.design['FPM']['rad'], self.design['Image']['iwa'], self.design['Image']['owa'], \
                     self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['_Nimg'], \
                     self.design['Image']['oca'], self.design['Image']['bw'], self.design['Image']['Nlam'])
@@ -886,7 +1115,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          param dmx := 2*Rmask/(2*M);
          param dmy := dmx;
          
-         param dxi := (Fmax/Nimg)*(1/CoeffOverSizePup);
+         param dxi := rho2/Nimg;
          param deta := dxi;
  
          #---------------------
@@ -1007,4 +1236,5 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          mod_fobj.write( textwrap.dedent(store_results) )
  
          mod_fobj.close()
-         self.logger.info("Wrote %s"%self.fileorg['ampl src fname'])
+         if verbose:
+             logging.info("Wrote %s"%self.fileorg['ampl src fname'])
