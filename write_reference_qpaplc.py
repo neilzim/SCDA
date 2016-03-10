@@ -27,6 +27,7 @@ if __name__ == "__main__":
 #    fpm_params = {'rad': 9.898/2, 'M':50}
 #    fpm_params = {'rad': 6.466/2, 'M':50}
     fpm_params = {'rad': 8./2, 'M':50}
+
 #    ls_params = {'id': 10, 'od': 0.9}
     ls_params = {}
     image_params = {'c': 10., 'iwa':3.5, 'owa':7., 'bw':0., 'Nlam':1}
