@@ -37,4 +37,4 @@ if __name__ == "__main__":
     
     atlast_coron = scda.QuarterplaneAPLC(fileorg=fileorg, design=design_params, solver=solver_params, verbose=True)
 
-    atlast_coron.write_ampl(ampl_src_fname="ref_qpaplc_dev2.mod", overwrite=True)
+    atlast_coron.write_ampl(ampl_src_fname="ref_qpaplc_master.mod", overwrite=True)
