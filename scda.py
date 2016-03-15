@@ -1131,7 +1131,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
 
          if self.design['Image']['Nlam'] > 1 and self.design['Image']['bw'] > 0:
              define_wavelengths = """
-             set Ls := setof {l in 1..Nlam} lam0*(1+((l-1)/(Nlam-1)-0.5)*dl);
+             set Ls := setof {l in 1..Nlam} lam0*(1 - bw/2 + (l-1)*bw/(Nlam-1));
              """
          else:
              define_wavelengths = """
@@ -1201,10 +1201,34 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          solver = """
          option solver gurobi;
          """
- 
-         solver_options = """
-         option gurobi_options "outlev=1 lpmethod=2 crossover=0";
-         """
+
+         if self.solver['method'] is 'barhom':
+             if self.solver['presolve'] is True:
+                 solver_options = """
+                 option gurobi_options "outlev=1 lpmethod=2 barhomogeneous=1 crossover=0";
+                 """
+             else:
+                 solver_options = """
+                 option gurobi_options "outlev=1 lpmethod=2 barhomogeneous=1 crossover=0 presolve=0";
+                 """
+         elif self.solver['method'] is 'bar':
+             if self.solver['presolve'] is True:
+                 solver_options = """
+                 option gurobi_options "outlev=1 lpmethod=2 crossover=0";
+                 """
+             else:
+                 solver_options = """
+                 option gurobi_options "outlev=1 lpmethod=2 crossover=0 presolve=0";
+                 """
+         else: # assume dual simplex
+             if self.solver['presolve'] is True:
+                solver_options = """
+                option gurobi_options "outlev=1 lpmethod=1";
+                """
+             else:
+                solver_options = """
+                option gurobi_options "outlev=1 lpmethod=1 presolve=0";
+                """
   
          execute = """
          solve;
