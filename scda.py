@@ -1144,6 +1144,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] != 0.} (x,y);
          set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] != 0.} (mx,my);
          set Lyot := setof {x in Xs, y in Ys: LS[x,y] != 0.} (x,y);
+         set LyotPupil := Pupil inter Lyot;
 
          param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
          param I00 := (sum {(x,y) in Pupil} TelAp[x,y]*LS[x,y]*dx*dy)^2; # Peak intensity in the absence of coronagraph
@@ -1175,13 +1176,13 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          var ED_real_X {xi in Xis, y in Ys, lam in Ls};
          var ED_real {xi in Xis, eta in Etas, lam in Ls};
          
-         subject to st_ED_real_X {xi in Xis, y in Ys, lam in Ls}: ED_real_X[xi,y,lam] = 2.*sum {x in Xs: (x,y) in Lyot} (A[x,y]*TelAp[x,y]-ECm_real[x,y,lam])*cos(2.*pi*x*xi*(lam0/lam))*dx;
+         subject to st_ED_real_X {xi in Xis, y in Ys, lam in Ls}: ED_real_X[xi,y,lam] = 2.*sum {x in Xs: (x,y) in LyotPupil} (A[x,y]*TelAp[x,y]-ECm_real[x,y,lam])*cos(2.*pi*x*xi*(lam0/lam))*dx;
          subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] = 2.*(lam0/lam)*sum {y in Ys} ED_real_X[xi,y,lam]*cos(2.*pi*y*eta*(lam0/lam))*dy;
          
          #---------------------
          
          var ED00_real := 0.0;
-         subject to st_ED00_real: ED00_real = 4.*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*TelAp[x,y])*dx*dy;
+         subject to st_ED00_real: ED00_real = 4.*sum {x in Xs, y in Ys: (x,y) in LyotPupil} (A[x,y]*TelAp[x,y])*dx*dy;
          """
  
          constraints = """
