@@ -1141,15 +1141,14 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          sets_and_arrays = """
          #---------------------
 
-         set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] != 0.} (x,y);
-         set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] != 0.} (mx,my);
-         set Lyot := setof {x in Xs, y in Ys: LS[x,y] != 0.} (x,y);
-         set LyotPupil := Pupil inter Lyot;
+         set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
+         set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
+         set Lyot := setof {x in Xs, y in Ys: LS[x,y] > 0} (x,y);
 
          param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
-         param I00 := (sum {(x,y) in Pupil} TelAp[x,y]*LS[x,y]*dx*dy)^2; # Peak intensity in the absence of coronagraph
          
-         var A {(x,y) in Pupil} >= 0, <= 1, := 0.5;
+         #var A {(x,y) in Pupil} >= 0, <= 1, := 0.5;
+         var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
          
          #---------------------
          
@@ -1161,7 +1160,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          var EBm_real_X {mx in MXs, y in Ys, lam in Ls};
          var EBm_real {mx in MXs, my in MYs, lam in Ls};
          
-         subject to st_EBm_real_X {mx in MXs, y in Ys, lam in Ls}: EBm_real_X[mx,y,lam] = 2.*sum {x in Xs: (x,y) in Pupil} A[x,y]*TelAp[x,y]*cos(2.*pi*x*mx*(lam0/lam))*dx;
+         subject to st_EBm_real_X {mx in MXs, y in Ys, lam in Ls}: EBm_real_X[mx,y,lam] = 2.*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2.*pi*x*mx*(lam0/lam))*dx;
          subject to st_EBm_real {(mx, my) in Mask, lam in Ls}: EBm_real[mx,my,lam] = 2.*(lam0/lam)*sum {y in Ys} EBm_real_X[mx,y,lam]*cos(2.*pi*y*my*(lam0/lam))*dy;
          
          #---------------------
@@ -1169,19 +1168,19 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
          var ECm_real {x in Xs, y in Ys, lam in Ls};
          
          subject to st_ECm_real_X {x in Xs, my in MYs, lam in Ls}: ECm_real_X[x,my,lam] = 2.*sum {mx in MXs: (mx,my) in Mask} EBm_real[mx,my,lam]*cos(2.*pi*x*mx*(lam0/lam))*dmx;
-         subject to st_ECm_real {(x,y) in LyotPupil, lam in Ls}: ECm_real[x,y,lam] = 2.*(lam0/lam)*sum {my in MYs} ECm_real_X[x,my,lam]*cos(2.*pi*y*my*(lam0/lam))*dmy;
+         subject to st_ECm_real {(x,y) in Lyot, lam in Ls}: ECm_real[x,y,lam] = 2.*(lam0/lam)*sum {my in MYs} ECm_real_X[x,my,lam]*cos(2.*pi*y*my*(lam0/lam))*dmy;
          
          #---------------------
          var ED_real_X {xi in Xis, y in Ys, lam in Ls};
          var ED_real {xi in Xis, eta in Etas, lam in Ls};
          
-         subject to st_ED_real_X {xi in Xis, y in Ys, lam in Ls}: ED_real_X[xi,y,lam] = 2.*sum {x in Xs: (x,y) in LyotPupil} (A[x,y]*TelAp[x,y]-ECm_real[x,y,lam])*cos(2.*pi*x*xi*(lam0/lam))*dx;
+         subject to st_ED_real_X {xi in Xis, y in Ys, lam in Ls}: ED_real_X[xi,y,lam] = 2.*sum {x in Xs: (x,y) in Lyot} (TelAp[x,y]*A[x,y]-ECm_real[x,y,lam])*cos(2.*pi*x*xi*(lam0/lam))*dx;
          subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] = 2.*(lam0/lam)*sum {y in Ys} ED_real_X[xi,y,lam]*cos(2.*pi*y*eta*(lam0/lam))*dy;
          
          #---------------------
          
          var ED00_real := 0.0;
-         subject to st_ED00_real: ED00_real = 4.*sum {x in Xs, y in Ys: (x,y) in LyotPupil} (A[x,y]*TelAp[x,y])*dx*dy;
+         subject to st_ED00_real: ED00_real = 4.*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*TelAp[x,y])*dx*dy;
          """
  
          constraints = """
