@@ -19,6 +19,7 @@ from collections import defaultdict, OrderedDict
 import itertools
 import pprint
 import pickle
+from astropy.io import ascii
 
 def configure_log(log_fname=None):
 #    logger = logging.getLogger("scda.logger")
@@ -123,7 +124,7 @@ class DesignParamSurvey(object):
                 if namekey in self._file_fields['fileorg']:
                     if location is not None:
                         if namekey.endswith('dir'):
-                            self.fileorg[namekey] = os.path.abspath(os.path.expanduser(location)) # Convert all directory names to absolute paths
+                            self.fileorg[namekey] = os.path.expanduser(location)
                             if not os.path.exists(self.fileorg[namekey]):
                                 logging.warning("Warning: The specified location of '{0}', \"{1}\" does not exist".format(namekey, self.fileorg[namekey]))
                         else:
@@ -248,8 +249,8 @@ class DesignParamSurvey(object):
     def check_eval_status(self):
         status = True
         for coron in self.coron_list: # Update all individual statuses
-            if coron.eval_metrics['thrupt'] is None or coron.eval_metrics['psf area'] is None \
-               or coron.eval_metrics['psf width'] is None:
+            if coron.eval_metrics['airy thrupt'] is None or coron.eval_metrics['fwhm area'] is None \
+               or coron.eval_metrics['apod nb res ratio'] is None:
                 status = False
                 break
         self.eval_status = status
@@ -456,7 +457,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                 if namekey in self._file_fields['fileorg']:
                     if location is not None:
                         if namekey.endswith('dir'):
-                            self.fileorg[namekey] = os.path.abspath(os.path.expanduser(location)) # Convert all directory names to absolute paths
+                            self.fileorg[namekey] = os.path.expanduser(location)
                             if not os.path.exists(self.fileorg[namekey]):
                                 logging.warning("Warning: The specified location of '{0}', \"{1}\" does not exist".format(namekey, self.fileorg[namekey]))
                         else:
@@ -533,9 +534,9 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
             self.check_ampl_input_files()
 
         setattr(self, 'eval_metrics', {})
-        self.eval_metrics['thrupt'] = None
-        self.eval_metrics['psf area'] = None
-        self.eval_metrics['psf width'] = None
+        self.eval_metrics['airy thrupt'] = None
+        self.eval_metrics['fwhm area'] = None
+        self.eval_metrics['apod nb res ratio'] = None
 
     def check_ampl_input_files(self):
         status = True
@@ -711,7 +712,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             if os.path.dirname(ampl_src_fname) == '' and self.fileorg['ampl src dir'] is not None:
                 self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname)
             else:
-                self.fileorg['ampl src fname'] = os.path.abspath(ampl_src_fname)    
+                self.fileorg['ampl src fname'] = ampl_src_fname
                 self.fileorg['ampl src dir'] = os.path.dirname(self.fileorg['ampl src fname'])
         if os.path.exists(self.fileorg['ampl src fname']):
             if overwrite == True:
@@ -982,284 +983,322 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             logging.info("Wrote %s"%self.fileorg['ampl src fname'])
 
 class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plane symmetry case
-     def __init__(self, **kwargs):
-         super(QuarterplaneAPLC, self).__init__(**kwargs)
-         self.amplname_coron = "APLC_quart"
-         if 'ampl src fname' not in self.fileorg or self.fileorg['ampl src fname'] is None:
-             ampl_src_fname_tail = self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
-                                   self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".mod"
-             self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname_tail)
+    def __init__(self, **kwargs):
+        super(QuarterplaneAPLC, self).__init__(**kwargs)
+        self.amplname_coron = "APLC_quart"
+        if 'ampl src fname' not in self.fileorg or self.fileorg['ampl src fname'] is None:
+            ampl_src_fname_tail = self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
+                                  self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".mod"
+            self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname_tail)
  
-         if 'sol fname' not in self.fileorg or self.fileorg['sol fname'] is None:
-             sol_fname_tail = "ApodSol_" + self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
-                              self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".dat"
-             self.fileorg['sol fname'] = os.path.join(self.fileorg['ampl src dir'], sol_fname_tail)
+        if 'sol fname' not in self.fileorg or self.fileorg['sol fname'] is None:
+            sol_fname_tail = "ApodSol_" + self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
+                             self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".dat"
+            self.fileorg['sol fname'] = os.path.join(self.fileorg['ampl src dir'], sol_fname_tail)
  
-         if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
-             self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_quart_" + self.amplname_pupil + ".dat") )
+        if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
+            self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_quart_" + self.amplname_pupil + ".dat") )
  
-         if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
-             self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_quart_occspot_M{:03}.dat".format(self.design['FPM']['M']) )
+        if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
+            self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_quart_occspot_M{:03}.dat".format(self.design['FPM']['M']) )
 
-         if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
-             if self.design['LS']['obscure'] == 2:
-                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
-                                                          "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}sm{7:d}Pad{8:02d}_N{9:04d}.dat".format(
-                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                          self.design['Pupil']['pm'], self.design['LS']['ppad'], self.design['Pupil']['ss'],
-                                                          self.design['Pupil']['sst'], int(self.design['Pupil']['sm']), self.design['LS']['spad'],
-                                                          self.design['Pupil']['N'])) )
-             elif self.design['LS']['obscure'] == 1:
-                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
-                                                          "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}sm{5:d}Pad{6:02d}_N{7:04d}.dat".format(
-                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                          self.design['Pupil']['ss'], self.design['Pupil']['sst'], int(self.design['Pupil']['sm']),
-                                                          self.design['LS']['spad'], self.design['Pupil']['N'])) )
-             else:
-                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
-                                                          "{0:s}{1:02d}D{2:02d}_clear_N{3:04d}.dat".format(self.design['LS']['shape'],
-                                                          self.design['LS']['id'], self.design['LS']['od'], self.design['Pupil']['N'])) )
-         self.check_ampl_input_files()
-     def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None, verbose=True):
-         if self.ampl_infile_status is False and not override_infile_status:
-             logging.error("Error: the most recent input file check for this design configuration failed.")
-             logging.error("The override_infile_status switch is off, so write_ampl() will now abort.")
-             logging.error("See previous warnings in the log to see what file was missing during the initialization")
-             return
-         if ampl_src_fname is not None:
-             if os.path.dirname(ampl_src_fname) == '' and self.fileorg['ampl src dir'] is not None:
-                 self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname)
-             else:
-                 self.fileorg['ampl src fname'] = os.path.abspath(ampl_src_fname)    
-                 self.fileorg['ampl src dir'] = os.path.dirname(self.fileorg['ampl src fname'])
-         if os.path.exists(self.fileorg['ampl src fname']):
-             if overwrite == True:
-                 if verbose:
-                     logging.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
-             else:
-                 logging.warning("Error: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
-                 return
-         elif not os.path.exists(self.fileorg['ampl src dir']):
-             os.mkdir(self.fileorg['ampl src dir'])
-             if verbose:
-                 logging.info("Created new AMPL source code directory, {0:s}".format(self.fileorg['ampl src dir']))
-         mod_fobj = open(self.fileorg['ampl src fname'], "w")
+        if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
+            if self.design['LS']['obscure'] == 2:
+                self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
+                                                         "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}sm{7:d}Pad{8:02d}_N{9:04d}.dat".format(
+                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                         self.design['Pupil']['pm'], self.design['LS']['ppad'], self.design['Pupil']['ss'],
+                                                         self.design['Pupil']['sst'], int(self.design['Pupil']['sm']), self.design['LS']['spad'],
+                                                         self.design['Pupil']['N'])) )
+            elif self.design['LS']['obscure'] == 1:
+                self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
+                                                         "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}sm{5:d}Pad{6:02d}_N{7:04d}.dat".format(
+                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                         self.design['Pupil']['ss'], self.design['Pupil']['sst'], int(self.design['Pupil']['sm']),
+                                                         self.design['LS']['spad'], self.design['Pupil']['N'])) )
+            else:
+                self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
+                                                         "{0:s}{1:02d}D{2:02d}_clear_N{3:04d}.dat".format(self.design['LS']['shape'],
+                                                         self.design['LS']['id'], self.design['LS']['od'], self.design['Pupil']['N'])) )
+        self.check_ampl_input_files()
+    def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None, verbose=True):
+        if self.ampl_infile_status is False and not override_infile_status:
+            logging.error("Error: the most recent input file check for this design configuration failed.")
+            logging.error("The override_infile_status switch is off, so write_ampl() will now abort.")
+            logging.error("See previous warnings in the log to see what file was missing during the initialization")
+            return
+        if ampl_src_fname is not None:
+            if os.path.dirname(ampl_src_fname) == '' and self.fileorg['ampl src dir'] is not None:
+                self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname)
+            else:
+                self.fileorg['ampl src fname'] = ampl_src_fname
+                self.fileorg['ampl src dir'] = os.path.dirname(self.fileorg['ampl src fname'])
+        if os.path.exists(self.fileorg['ampl src fname']):
+            if overwrite == True:
+                if verbose:
+                    logging.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
+            else:
+                logging.warning("Error: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
+                return
+        elif not os.path.exists(self.fileorg['ampl src dir']):
+            os.mkdir(self.fileorg['ampl src dir'])
+            if verbose:
+                logging.info("Created new AMPL source code directory, {0:s}".format(self.fileorg['ampl src dir']))
+        mod_fobj = open(self.fileorg['ampl src fname'], "w")
  
-         header = """\
-         # AMPL program to optimize a quarter-plane symmetric APLC
-         # Created by {0:s} with {1:s} on {2:s} at {3:s}
-         load amplgsl.dll;
-         """.format(getpass.getuser(), os.path.basename(__file__), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+        header = """\
+        # AMPL program to optimize a quarter-plane symmetric APLC
+        # Created by {0:s} with {1:s} on {2:s} at {3:s}
+        load amplgsl.dll;
+        """.format(getpass.getuser(), os.path.basename(__file__), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
  
-         params = """
-         #---------------------
+        params = """
+        #---------------------
  
-         param pi:= 4*atan(1);
+        param pi:= 4*atan(1);
  
-         #---------------------
-         param c := {0:.2f};
+        #---------------------
+        param c := {0:.2f};
  
-         #---------------------
-         param Rmask := {1:0.3f};
-         param rho0 := {2:0.2f};
-         param rho1 := {3:0.2f};
-         
-         #---------------------
-         param N := {4:d};				# discretization parameter (pupil)
-         param M := {5:d};				# discretization parameter (mask)
-         
-         param Nimg := {6:d};           # discretization parameter (image)
-         param rho2 := {7:0.2f};        # NTZ: We paramaterize our image plane resolution by fpres = sampling rate at 
-                                     #      the shortest wavelength. Then Nimg is an integer function of fpres, oca,
-         #---------------------      #      and bw. This integer is not specified directly by the user, but computed "privately"
-         param bw := {8:0.2f};           #      by the APLC class constructor.
-         param lam0 := 1.;
-         param dl := bw*lam0;
-         param Nlam := {9:d};
-         
-         #---------------------
-         """.format(self.design['Image']['c'], self.design['FPM']['rad'], self.design['Image']['iwa'], self.design['Image']['owa'], \
-                    self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['_Nimg'], \
-                    self.design['Image']['oca'], self.design['Image']['bw'], self.design['Image']['Nlam'])
+        #---------------------
+        param Rmask := {1:0.3f};
+        param rho0 := {2:0.2f};
+        param rho1 := {3:0.2f};
+        
+        #---------------------
+        param N := {4:d};				# discretization parameter (pupil)
+        param M := {5:d};				# discretization parameter (mask)
+        
+        param Nimg := {6:d};           # discretization parameter (image)
+        param rho2 := {7:0.2f};        # NTZ: We paramaterize our image plane resolution by fpres = sampling rate at 
+                                    #      the shortest wavelength. Then Nimg is an integer function of fpres, oca,
+        #---------------------      #      and bw. This integer is not specified directly by the user, but computed "privately"
+        param bw := {8:0.2f};           #      by the APLC class constructor.
+        param lam0 := 1.;
+        param dl := bw*lam0;
+        param Nlam := {9:d};
+        
+        #---------------------
+        """.format(self.design['Image']['c'], self.design['FPM']['rad'], self.design['Image']['iwa'], self.design['Image']['owa'], \
+                   self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['_Nimg'], \
+                   self.design['Image']['oca'], self.design['Image']['bw'], self.design['Image']['Nlam'])
 
-         define_coords = """
-         #---------------------
-         # steps in each plane
-         param dx := 1/(2*N);
-         param dy := dx;
-         
-         param dmx := Rmask/M;
-         param dmy := dmx;
-         
-         param dxi := rho2/Nimg;
-         param deta := dxi;
+        define_coords = """
+        #---------------------
+        # steps in each plane
+        param dx := 1/(2*N);
+        param dy := dx;
+        
+        param dmx := Rmask/M;
+        param dmy := dmx;
+        
+        param dxi := rho2/Nimg;
+        param deta := dxi;
  
-         #---------------------
-         # coordinate vectors in each plane
-         set Xs := setof {i in 0.5..N-0.5 by 1} i*dx;
-         set Ys := setof {j in 0.5..N-0.5 by 1} j*dy;
-         
-         set MXs := setof {i in 0.5..M-0.5 by 1} i*dmx;
-         set MYs := setof {j in 0.5..M-0.5 by 1} j*dmy;
+        #---------------------
+        # coordinate vectors in each plane
+        set Xs := setof {i in 0.5..N-0.5 by 1} i*dx;
+        set Ys := setof {j in 0.5..N-0.5 by 1} j*dy;
+        
+        set MXs := setof {i in 0.5..M-0.5 by 1} i*dmx;
+        set MYs := setof {j in 0.5..M-0.5 by 1} j*dmy;
 
-         set Xis := setof {i in 0..Nimg-1 by 1} i*dxi;
-         set Etas := setof {j in 0..Nimg-1 by 1} j*deta;
-         """
-         
-         load_masks = """\
-         #---------------------
-         # Load telescope aperture
-         param TelAp {{x in Xs, y in Ys}};
-         
-         read {{y in Ys, x in Xs}} TelAp[x,y] < "{0:s}";
-         close "{1:s}";
-         
-         # Load FPM
-         param FPM {{mx in MXs, my in MYs}};
-         
-         read {{my in MYs, mx in MXs}} FPM[mx,my] < "{2:s}"; 
-         close "{3:s}";
-         
-         # Load Lyot stop
-         param LS {{x in Xs, y in Ys}};
-         
-         read {{y in Ys,x in Xs}} LS[x,y] < "{4:s}";
-         close "{5:s}";
-         """.format(self.fileorg['TelAp fname'], self.fileorg['TelAp fname'], self.fileorg['FPM fname'], self.fileorg['FPM fname'], \
-                    self.fileorg['LS fname'], self.fileorg['LS fname'])
+        set Xis := setof {i in 0..Nimg-1 by 1} i*dxi;
+        set Etas := setof {j in 0..Nimg-1 by 1} j*deta;
+        """
+        
+        load_masks = """\
+        #---------------------
+        # Load telescope aperture
+        param TelAp {{x in Xs, y in Ys}};
+        
+        read {{y in Ys, x in Xs}} TelAp[x,y] < "{0:s}";
+        close "{1:s}";
+        
+        # Load FPM
+        param FPM {{mx in MXs, my in MYs}};
+        
+        read {{my in MYs, mx in MXs}} FPM[mx,my] < "{2:s}"; 
+        close "{3:s}";
+        
+        # Load Lyot stop
+        param LS {{x in Xs, y in Ys}};
+        
+        read {{y in Ys,x in Xs}} LS[x,y] < "{4:s}";
+        close "{5:s}";
+        """.format(self.fileorg['TelAp fname'], self.fileorg['TelAp fname'], self.fileorg['FPM fname'], self.fileorg['FPM fname'], \
+                   self.fileorg['LS fname'], self.fileorg['LS fname'])
  
 
-         if self.design['Image']['Nlam'] > 1 and self.design['Image']['bw'] > 0:
-             define_wavelengths = """
-             set Ls := setof {l in 1..Nlam} lam0*(1 - bw/2 + (l-1)*bw/(Nlam-1));
-             """
-         else:
-             define_wavelengths = """
-             set Ls := setof {l in 1..1} lam0*l;
-             """
+        if self.design['Image']['Nlam'] > 1 and self.design['Image']['bw'] > 0:
+            define_wavelengths = """
+            set Ls := setof {l in 1..Nlam} lam0*(1 - bw/2 + (l-1)*bw/(Nlam-1));
+            """
+        else:
+            define_wavelengths = """
+            set Ls := setof {l in 1..1} lam0*l;
+            """
 
-         sets_and_arrays = """
-         #---------------------
+        sets_and_arrays = """
+        #---------------------
 
-         set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
-         set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
-         set Lyot := setof {x in Xs, y in Ys: LS[x,y] > 0} (x,y);
+        set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
+        set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
+        set Lyot := setof {x in Xs, y in Ys: LS[x,y] > 0} (x,y);
 
-         param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
-         
-         #var A {(x,y) in Pupil} >= 0, <= 1, := 0.5;
-         var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
-         
-         #---------------------
-         
-         set DarkHole := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= rho0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta);
-         """
+        param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
+        
+        var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
+        
+        #---------------------
+        
+        set DarkHole := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= rho0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta);
+        """
  
-         field_propagation = """
-         #---------------------
-         var EBm_real_X {mx in MXs, y in Ys, lam in Ls};
-         var EBm_real {mx in MXs, my in MYs, lam in Ls};
-         
-         subject to st_EBm_real_X {mx in MXs, y in Ys, lam in Ls}: EBm_real_X[mx,y,lam] = 2.*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2.*pi*x*mx*(lam0/lam))*dx;
-         subject to st_EBm_real {(mx, my) in Mask, lam in Ls}: EBm_real[mx,my,lam] = 2.*(lam0/lam)*sum {y in Ys} EBm_real_X[mx,y,lam]*cos(2.*pi*y*my*(lam0/lam))*dy;
-         
-         #---------------------
-         var ECm_real_X {x in Xs, my in MYs, lam in Ls};
-         var ECm_real {x in Xs, y in Ys, lam in Ls};
-         
-         subject to st_ECm_real_X {x in Xs, my in MYs, lam in Ls}: ECm_real_X[x,my,lam] = 2.*sum {mx in MXs: (mx,my) in Mask} EBm_real[mx,my,lam]*cos(2.*pi*x*mx*(lam0/lam))*dmx;
-         subject to st_ECm_real {(x,y) in Lyot, lam in Ls}: ECm_real[x,y,lam] = 2.*(lam0/lam)*sum {my in MYs} ECm_real_X[x,my,lam]*cos(2.*pi*y*my*(lam0/lam))*dmy;
-         
-         #---------------------
-         var ED_real_X {xi in Xis, y in Ys, lam in Ls};
-         var ED_real {xi in Xis, eta in Etas, lam in Ls};
-         
-         subject to st_ED_real_X {xi in Xis, y in Ys, lam in Ls}: ED_real_X[xi,y,lam] = 2.*sum {x in Xs: (x,y) in Lyot} (TelAp[x,y]*A[x,y]-ECm_real[x,y,lam])*cos(2.*pi*x*xi*(lam0/lam))*dx;
-         subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] = 2.*(lam0/lam)*sum {y in Ys} ED_real_X[xi,y,lam]*cos(2.*pi*y*eta*(lam0/lam))*dy;
-         
-         #---------------------
-         
-         var ED00_real := 0.0;
-         subject to st_ED00_real: ED00_real = 4.*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*TelAp[x,y])*dx*dy;
-         """
+        field_propagation = """
+        #---------------------
+        var EBm_real_X {mx in MXs, y in Ys, lam in Ls};
+        var EBm_real {mx in MXs, my in MYs, lam in Ls};
+        
+        subject to st_EBm_real_X {mx in MXs, y in Ys, lam in Ls}: EBm_real_X[mx,y,lam] = 2.*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2.*pi*x*mx*(lam0/lam))*dx;
+        subject to st_EBm_real {(mx, my) in Mask, lam in Ls}: EBm_real[mx,my,lam] = 2.*(lam0/lam)*sum {y in Ys} EBm_real_X[mx,y,lam]*cos(2.*pi*y*my*(lam0/lam))*dy;
+        
+        #---------------------
+        var ECm_real_X {x in Xs, my in MYs, lam in Ls};
+        var ECm_real {x in Xs, y in Ys, lam in Ls};
+        
+        subject to st_ECm_real_X {x in Xs, my in MYs, lam in Ls}: ECm_real_X[x,my,lam] = 2.*sum {mx in MXs: (mx,my) in Mask} EBm_real[mx,my,lam]*cos(2.*pi*x*mx*(lam0/lam))*dmx;
+        subject to st_ECm_real {(x,y) in Lyot, lam in Ls}: ECm_real[x,y,lam] = 2.*(lam0/lam)*sum {my in MYs} ECm_real_X[x,my,lam]*cos(2.*pi*y*my*(lam0/lam))*dmy;
+        
+        #---------------------
+        var ED_real_X {xi in Xis, y in Ys, lam in Ls};
+        var ED_real {xi in Xis, eta in Etas, lam in Ls};
+        
+        subject to st_ED_real_X {xi in Xis, y in Ys, lam in Ls}: ED_real_X[xi,y,lam] = 2.*sum {x in Xs: (x,y) in Lyot} (TelAp[x,y]*A[x,y]-ECm_real[x,y,lam])*cos(2.*pi*x*xi*(lam0/lam))*dx;
+        subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] = 2.*(lam0/lam)*sum {y in Ys} ED_real_X[xi,y,lam]*cos(2.*pi*y*eta*(lam0/lam))*dy;
+        
+        #---------------------
+        
+        var ED00_real := 0.0;
+        subject to st_ED00_real: ED00_real = 4.*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*TelAp[x,y])*dx*dy;
+        """
  
-         constraints = """
-         #---------------------
-         maximize throughput: sum{(x,y) in Pupil} A[x,y]*dx*dy/TR;
-         
-         subject to sidelobe_zero_real_pos {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real/sqrt(2.); 
-         subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/sqrt(2.);
-         """
+        constraints = """
+        #---------------------
+        maximize throughput: sum{(x,y) in Pupil} A[x,y]*dx*dy/TR;
+        
+        subject to sidelobe_zero_real_pos {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real/sqrt(2.); 
+        subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/sqrt(2.);
+        """
  
-         misc_options = """
-         option times 1;
-         option gentimes 1;
-         option show_stats 1;
-         """
-         
-         solver = """
-         option solver gurobi;
-         """
+        misc_options = """
+        option times 1;
+        option gentimes 1;
+        option show_stats 1;
+        """
+        
+        solver = """
+        option solver gurobi;
+        """
 
-         if self.solver['method'] is 'barhom':
-             if self.solver['presolve'] is True:
-                 solver_options = """
-                 option gurobi_options "outlev=1 lpmethod=2 barhomogeneous=1 crossover=0";
-                 """
-             else:
-                 solver_options = """
-                 option gurobi_options "outlev=1 lpmethod=2 barhomogeneous=1 crossover=0 presolve=0";
-                 """
-         elif self.solver['method'] is 'bar':
-             if self.solver['presolve'] is True:
-                 solver_options = """
-                 option gurobi_options "outlev=1 lpmethod=2 crossover=0";
-                 """
-             else:
-                 solver_options = """
-                 option gurobi_options "outlev=1 lpmethod=2 crossover=0 presolve=0";
-                 """
-         else: # assume dual simplex
-             if self.solver['presolve'] is True:
+        if self.solver['method'] is 'barhom':
+            if self.solver['presolve'] is True:
                 solver_options = """
-                option gurobi_options "outlev=1 lpmethod=1";
+                option gurobi_options "outlev=1 lpmethod=2 barhomogeneous=1 crossover=0";
                 """
-             else:
+            else:
                 solver_options = """
-                option gurobi_options "outlev=1 lpmethod=1 presolve=0";
+                option gurobi_options "outlev=1 lpmethod=2 barhomogeneous=1 crossover=0 presolve=0";
                 """
+        elif self.solver['method'] is 'bar':
+            if self.solver['presolve'] is True:
+                solver_options = """
+                option gurobi_options "outlev=1 lpmethod=2 crossover=0";
+                """
+            else:
+                solver_options = """
+                option gurobi_options "outlev=1 lpmethod=2 crossover=0 presolve=0";
+                """
+        else: # assume dual simplex
+            if self.solver['presolve'] is True:
+               solver_options = """
+               option gurobi_options "outlev=1 lpmethod=1";
+               """
+            else:
+               solver_options = """
+               option gurobi_options "outlev=1 lpmethod=1 presolve=0";
+               """
   
-         execute = """
-         solve;
+        execute = """
+        solve;
  
-         display solve_result_num, solve_result;
-         display ED00_real; 
-         """
+        display solve_result_num, solve_result;
+        display ED00_real; 
+        """
  
-         store_results = """
-         #---------------------
+        store_results = """
+        #---------------------
 
-         param A_fin {{y in Ys, x in Xs}};
-         let {{y in Ys, x in Xs}} A_fin[x,y] := 0;
-         let {{(x,y) in Pupil}} A_fin[x,y] := A[x,y];
+        param A_fin {{y in Ys, x in Xs}};
+        let {{y in Ys, x in Xs}} A_fin[x,y] := 0;
+        let {{(x,y) in Pupil}} A_fin[x,y] := A[x,y];
  
-         printf {{y in Ys, x in Xs}}: "%15g %15g %15g \\n", x, y, A_fin[x,y] > "{0:s}";
-         """.format(self.fileorg['sol fname'])
+        printf {{y in Ys, x in Xs}}: "%15g %15g %15g \\n", x, y, A_fin[x,y] > "{0:s}";
+        """.format(self.fileorg['sol fname'])
  
-         mod_fobj.write( textwrap.dedent(header) )
-         mod_fobj.write( textwrap.dedent(params) )
-         mod_fobj.write( textwrap.dedent(define_coords) )
-         mod_fobj.write( textwrap.dedent(load_masks) )
-         mod_fobj.write( textwrap.dedent(define_wavelengths) )
-         mod_fobj.write( textwrap.dedent(sets_and_arrays) )
-         mod_fobj.write( textwrap.dedent(field_propagation) )
-         mod_fobj.write( textwrap.dedent(constraints) )
-         #mod_fobj.write( textwrap.dedent(misc_options) )
-         mod_fobj.write( textwrap.dedent(solver) )
-         mod_fobj.write( textwrap.dedent(solver_options) )
-         mod_fobj.write( textwrap.dedent(execute) )
-         mod_fobj.write( textwrap.dedent(store_results) )
+        mod_fobj.write( textwrap.dedent(header) )
+        mod_fobj.write( textwrap.dedent(params) )
+        mod_fobj.write( textwrap.dedent(define_coords) )
+        mod_fobj.write( textwrap.dedent(load_masks) )
+        mod_fobj.write( textwrap.dedent(define_wavelengths) )
+        mod_fobj.write( textwrap.dedent(sets_and_arrays) )
+        mod_fobj.write( textwrap.dedent(field_propagation) )
+        mod_fobj.write( textwrap.dedent(constraints) )
+        #mod_fobj.write( textwrap.dedent(misc_options) )
+        mod_fobj.write( textwrap.dedent(solver) )
+        mod_fobj.write( textwrap.dedent(solver_options) )
+        mod_fobj.write( textwrap.dedent(execute) )
+        mod_fobj.write( textwrap.dedent(store_results) )
  
-         mod_fobj.close()
-         if verbose:
-             logging.info("Wrote %s"%self.fileorg['ampl src fname'])
+        mod_fobj.close()
+        if verbose:
+            logging.info("Wrote %s"%self.fileorg['ampl src fname'])
+    def get_metrics(self, fp2res=16, verbose=True):
+        TelAp = np.loadtxt(self.fileorg['TelAp fname'])
+        FPM = np.loadtxt(self.fileorg['FPM fname'])
+        LS = np.loadtxt(self.fileorg['LS fname'])
+        N = TelAp.shape[1]
+        A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
+        A = A_col.reshape(TelAp.shape)
+        self.eval_metrics['apod nb res ratio'] = np.sum(np.abs(A - np.round(A)))/np.sum(TelAp)
+        dx = (1./2)/N
+        dy = dx
+        xs = np.matrix(np.linspace(0.5,N-0.5,N)*dx)
+        ys = xs.copy()
+        rho1 = 3.
+        M_fp2 = int(np.ceil(rho1*fp2res))
+        dxi = 1./fp2res
+        xis = np.matrix(np.linspace(0.5,M_fp2-0.5,M_fp2)*dxi)
+        etas = xis.copy()
+        wrs = np.linspace(1.-self.design['Image']['bw']/2, 1.+self.design['Image']['bw']/2, self.design['Image']['Nlam'])
+        airy_thrupt_polychrom = []
+        fwhm_area_polychrom = []
+        for wr in wrs:
+            Psi_D_0 = 4*dx*dy/wr*np.dot(np.cos(2*np.pi/wr*np.dot(etas.T, ys)), A*TelAp*LS).dot(np.cos(2*np.pi/wr*np.dot(xs.T, xis)))
+            Intens_D_0 = np.power(np.absolute(Psi_D_0), 2)
+            Intens_D_0_peak = (4*np.sum(TelAp*A*LS)*dx*dy/wr)**2
+            fwhm_ind_APLC = np.greater_equal(Intens_D_0, Intens_D_0_peak/2)
+            Psi_TelAp = 4*dx*dy/wr*np.dot(np.cos(2*np.pi/wr*np.dot(etas.T, ys)), TelAp).dot(np.cos(2*np.pi/wr*np.dot(xs.T, xis)))
+            Intens_TelAp = np.power(np.absolute(Psi_TelAp), 2)
+            Intens_TelAp_peak = (4*np.sum(TelAp)*dx*dy/wr)**2
+            fwhm_ind_TelAp = np.greater_equal(Intens_TelAp, Intens_TelAp_peak/2)
+            fwhm_sum_TelAp = np.sum(Intens_TelAp[fwhm_ind_TelAp])
+            fwhm_sum_APLC = np.sum(Intens_D_0[fwhm_ind_APLC])
+            fwhm_area_polychrom.append(4.*np.sum(fwhm_ind_APLC)/(fp2res**2))
+            airy_thrupt_polychrom.append(fwhm_sum_APLC/fwhm_sum_TelAp)
+        self.eval_metrics['airy thrupt'] = np.mean(airy_thrupt_polychrom)
+        self.eval_metrics['fwhm area'] = np.mean(fwhm_area_polychrom)
+        if verbose:
+            print("Non-binary residuals, as a percentage of clear telescope aperture area: {:.2f}%".format(100*self.eval_metrics['apod nb res ratio']))
+            print("Band-averaged Airy throughput: {:.2f}%".format(100*self.eval_metrics['airy thrupt']))
+            print("Band-averaged FWHM PSF area / (lambda0/D)^2: {:.2f}".format(self.eval_metrics['fwhm area']))
