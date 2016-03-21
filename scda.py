@@ -1263,6 +1263,8 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         mod_fobj.close()
         if verbose:
             logging.info("Wrote %s"%self.fileorg['ampl src fname'])
+    def write_execscript(self):
+        pass    
     def get_metrics(self, fp2res=16, verbose=True):
         TelAp = np.loadtxt(self.fileorg['TelAp fname'])
         FPM = np.loadtxt(self.fileorg['FPM fname'])
