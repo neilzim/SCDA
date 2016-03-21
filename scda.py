@@ -642,7 +642,9 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                 self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname_tail)
 
             if 'sol fname' not in self.fileorg or self.fileorg['sol fname'] is None:
-                self.fileorg['sol fname'] = self.fileorg['ampl src fname'][:-4] + "_ApodSol.dat"
+                sol_fname_tail = "ApodSol_" + self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
+                                 self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".dat"
+                self.fileorg['sol fname'] = os.path.join(self.fileorg['sol dir'], sol_fname_tail)
 
             if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
                 self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_full_" + self.amplname_pupil + ".dat") )
@@ -675,7 +677,9 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname_tail)
 
         if 'sol fname' not in self.fileorg or self.fileorg['sol fname'] is None:
-            self.fileorg['sol fname'] = self.fileorg['ampl src fname'][:-4] + "_ApodSol.dat"
+            sol_fname_tail = "ApodSol_" + self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
+                             self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".dat"
+            self.fileorg['sol fname'] = os.path.join(self.fileorg['sol dir'], sol_fname_tail)
 
         if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
             self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_half_" + self.amplname_pupil + ".dat") )
@@ -994,7 +998,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         if 'sol fname' not in self.fileorg or self.fileorg['sol fname'] is None:
             sol_fname_tail = "ApodSol_" + self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
                              self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".dat"
-            self.fileorg['sol fname'] = os.path.join(self.fileorg['ampl src dir'], sol_fname_tail)
+            self.fileorg['sol fname'] = os.path.join(self.fileorg['sol dir'], sol_fname_tail)
  
         if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
             self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_quart_" + self.amplname_pupil + ".dat") )
