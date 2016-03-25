@@ -430,8 +430,10 @@ class DesignParamSurvey(object):
         logging.info("Wrote design survey spreadsheet to {:s}".format(csv_fname))
 
 class LyotCoronagraph(object): # Lyot coronagraph base class
-    _file_fields = { 'fileorg': ['work dir', 'ampl src dir', 'TelAp dir', 'FPM dir', 'LS dir', 'sol dir', 'eval dir',
-                                 'ampl src fname', 'TelAp fname', 'FPM fname', 'LS fname', 'sol fname'],
+    _file_fields = { 'fileorg': ['work dir', 'ampl src dir', 'TelAp dir', 'FPM dir', 'LS dir',
+                                 'sol dir', 'eval dir', 'exec script dir',
+                                 'ampl src fname', 'exec script fname', 'log fname', 'job name', 
+                                 'TelAp fname', 'FPM fname', 'LS fname', 'sol fname'],
                      'solver': ['constr', 'method', 'presolve', 'threads'] }
 
     _solver_menu = { 'constr': ['lin', 'quad'], 'solver': ['LOQO', 'gurobi', 'gurobix'], 
@@ -1267,8 +1269,63 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         mod_fobj.close()
         if verbose:
             logging.info("Wrote %s"%self.fileorg['ampl src fname'])
-    def write_execscript(self):
-        pass    
+
+    def write_execscript(self, queue='24h'):
+
+        bash_fobj = open(self.fileorg['exec script fname'], "w") 
+
+        begin_script = """
+        #!/bin/bash
+    
+        #PBS -V
+        #PBS -m e -M ntz@stsci.edu
+        #SBATCH --job-name={0:s}
+        #SBATCH -o {1:s}
+        #SBATCH --account=s1649
+        
+        #SBATCH --constraint=hasw
+        #SBATCH --ntasks=1 --nodes=1
+        """.format(self.fileorg['job name'], self.fileorg['log fname'])
+
+        if queue is '24h':
+            set_queue = """
+            #SBATCH --qos=long
+            #SBATCH --time=24:00:00
+            """
+        else:
+            set_queue = """
+            #SBATCH --qos=allnccs
+            #SBATCH --time=12:00:00
+            """
+
+        intel_module = """ 
+        . /usr/share/modules/init/bash
+        module purge
+        module load comp/intel-10.1.017
+        ulimit -s unlimited
+        """
+
+        monitor_mem = """ 
+        #Optional: monitor the memory usage...
+        mkdir -p ${NOBACKUP}/policeme
+        /usr/local/other/policeme/policeme.exe -d ${NOBACKUP}/policeme
+        """
+
+        call_ampl = """ 
+        ampl {1:s}
+        
+        exit 0""".format(os.path.basename(self.fileorg['ampl src fname']))
+
+        bash_fobj.write(begin_script)
+        bash_fobj.write(set_queue)
+        bash_fobj.write(intel_module)
+        bash_fobj.write(monitor_mem)
+        bash_fobj.write(call_ampl)
+
+        mod_fobj.close()
+        if verbose:
+            logging.info("Wrote %s"%self.fileorg['exec script fname'])
+
     def get_metrics(self, fp2res=16, verbose=True):
         TelAp = np.loadtxt(self.fileorg['TelAp fname'])
         FPM = np.loadtxt(self.fileorg['FPM fname'])
