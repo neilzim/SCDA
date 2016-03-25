@@ -133,13 +133,16 @@ class DesignParamSurvey(object):
                         self.fileorg[namekey] = None
                 else:
                     logging.warning("Warning: Unrecognized field {0} in fileorg argument".format(namekey))
-        # Handle missing directory values
+        # Handle missing directory values, and create the directories if they don't exist
         if 'work dir' not in self.fileorg or self.fileorg['work dir'] is None:
             self.fileorg['work dir'] = os.getcwd()
         for namekey in self._file_fields['fileorg']: # Set other missing directory locations to 'work dir'
-            if namekey.endswith('dir') and ( namekey not in self.fileorg or self.fileorg[namekey] is None ):
-                self.fileorg[namekey] = self.fileorg['work dir']
-      
+            if namekey.endswith('dir'):
+                if namekey not in self.fileorg or self.fileorg[namekey] is None:
+                    self.fileorg[namekey] = self.fileorg['work dir']
+                if not os.path.exists(self.fileorg[namekey]):
+                    os.mkdir(self.fileorg[namekey])
+
         #////////////////////////////////////////////////////////////////////////////////////////////////////
         # In most cases we don't expect to directly specify file names for apertures, FPM, or LS files
         # for the SCDA parameter survey. However, it easy enough to make this option available.
@@ -218,6 +221,11 @@ class DesignParamSurvey(object):
         for coron in self.coron_list:
             coron.write_ampl(overwrite, override_infile_status, verbose=False)
         logging.info("Wrote the batch of design survey AMPL programs into {:s}".format(self.fileorg['ampl src dir']))
+
+    def write_exec_script_batch(self, queue_spec='12h', overwrite=False, override_infile_status=False):
+        for coron in self.coron_list:
+            coron.write_exec_script(queue_spec, overwrite, verbose=False)
+        logging.info("Wrote the batch of execution scripts into {:s}".format(self.fileorg['exec script dir']))
  
     def check_ampl_input_files(self):
         survey_status = True
@@ -404,7 +412,7 @@ class DesignParamSurvey(object):
                     catrow.append(cat)
                     paramrow.append(name)
                 catrow.extend(['', 'AMPL source', '', '', 'Solution', '', 'Evaluation metrics', '', ''])
-                paramrow.extend(['', 'filename', 'exists?', 'input files?', 'filename', 'exists?', 'Thrupt', 'PSF area', 'PSF width'])
+                paramrow.extend(['', 'filename', 'exists?', 'input files?', 'filename', 'exists?', 'Thrupt', 'PSF area'])
                 surveywriter.writerow(catrow)
                 surveywriter.writerow(paramrow)
                 for ii, param_combo in enumerate(self.varied_param_combos):
@@ -431,7 +439,7 @@ class DesignParamSurvey(object):
 
 class LyotCoronagraph(object): # Lyot coronagraph base class
     _file_fields = { 'fileorg': ['work dir', 'ampl src dir', 'TelAp dir', 'FPM dir', 'LS dir',
-                                 'sol dir', 'eval dir', 'exec script dir',
+                                 'sol dir', 'log dir', 'eval dir', 'exec script dir',
                                  'ampl src fname', 'exec script fname', 'log fname', 'job name', 
                                  'TelAp fname', 'FPM fname', 'LS fname', 'sol fname'],
                      'solver': ['constr', 'method', 'presolve', 'threads'] }
@@ -443,7 +451,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
     _aperture_menu = { 'pm': ['hex1', 'hex2', 'hex3', 'key24', 'pie12', 'pie08', 'irisao', 'atlast'],
                        'ss': ['Y60d','Yoff60d','X','Cross','T','Y90d'],
                        'sst': ['025','100'],
-                       'sm': [True, False] }
+                       'co': [True, False] }
 
     def __init__(self, verbose=False, **kwargs):
         # Only set fileorg and solver attributes in this constructor,
@@ -474,6 +482,12 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         for namekey in self._file_fields['fileorg']: # Set other missing directory locations to 'work dir'
             if namekey.endswith('dir') and ( namekey not in self.fileorg or self.fileorg[namekey] is None ):
                 self.fileorg[namekey] = self.fileorg['work dir']
+
+        # Make directories for optimization solutions and logs if they don't exist 
+        if not os.path.exists(self.fileorg['sol dir']):
+            os.mkdir(self.fileorg['sol dir'])
+        if not os.path.exists(self.fileorg['log dir']):
+            os.mkdir(self.fileorg['log dir'])
        
         # If the location of the optimizer input file is not known, 
         # look for it in the directory corresponding to its specific category
@@ -552,7 +566,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
 
 class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 1000)), ('pm',(str, 'hex1')), ('ss',(str, 'x')), 
-                                                          ('sst',(str, '100')), ('sm',(bool, True))]) ),
+                                                          ('sst',(str, '100')), ('co',(bool, True))]) ),
                                    ( 'FPM', OrderedDict([('rad',(float, 4.)), ('M',(int, 50))]) ),
                                    ( 'LS', OrderedDict([('shape',(str, 'ann')), ('id',(int, 20)), ('od',(int, 90)), ('obscure',(int, 0)),
                                                         ('spad',(int, 0)), ('ppad',(int, 0)), ('altol',(int, None))]) ),
@@ -605,17 +619,17 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             logging.info("File organization parameters: {}".format(self.fileorg))
      
         self.amplname_coron = "APLC_full"
-        self.amplname_pupil = "{0:s}{1:s}{2:s}sm{3:d}_N{4:04d}".format(self.design['Pupil']['pm'], self.design['Pupil']['ss'], self.design['Pupil']['sst'], \
-                                                                       int(self.design['Pupil']['sm']), self.design['Pupil']['N'])
+        self.amplname_pupil = "{0:s}{1:s}{2:s}c{3:d}_N{4:04d}".format(self.design['Pupil']['pm'], self.design['Pupil']['ss'], self.design['Pupil']['sst'], \
+                                                                       int(self.design['Pupil']['co']), self.design['Pupil']['N'])
 
         self.amplname_fpm = "FPM{:02}M{:03}".format(int(round(100*self.design['FPM']['rad'])), self.design['FPM']['M'])
         if self.design['LS']['obscure'] == 2: # LS includes primary and secondary aperture features
-            self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}Pad{4:02d}{5:s}{6:s}sm{7:d}Pad{8:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], \
+            self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}Pad{4:02d}{5:s}{6:s}c{7:d}Pad{8:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], \
                                self.design['LS']['od'], self.design['Pupil']['pm'], self.design['LS']['ppad'], self.design['Pupil']['ss'], self.design['Pupil']['sst'], \
-                               int(self.design['Pupil']['sm']), self.design['LS']['spad'])
+                               int(self.design['Pupil']['co']), self.design['LS']['spad'])
         elif self.design['LS']['obscure'] == 1: # LS includes secondary aperture features
-            self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}{4:s}sm{5:d}Pad{6:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'], \
-                               self.design['Pupil']['ss'], self.design['Pupil']['sst'], int(self.design['Pupil']['sm']), self.design['LS']['spad'])
+            self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}{4:s}c{5:d}Pad{6:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'], \
+                               self.design['Pupil']['ss'], self.design['Pupil']['sst'], int(self.design['Pupil']['co']), self.design['LS']['spad'])
         else: # LS aperture is unobscured
             self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}clear".format(self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'])
         if self.design['LS']['altol'] is not None:
@@ -692,16 +706,16 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
             if self.design['LS']['obscure'] == 2:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + \
-                                                         "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}sm{7:d}Pad{8:02d}_N{9:04d}.dat".format(
+                                                         "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}c{7:d}Pad{8:02d}_N{9:04d}.dat".format(
                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
                                                          self.design['Pupil']['pm'], self.design['LS']['ppad'], self.design['Pupil']['ss'],
-                                                         self.design['Pupil']['sst'], int(self.design['Pupil']['sm']), self.design['LS']['spad'],
+                                                         self.design['Pupil']['sst'], int(self.design['Pupil']['co']), self.design['LS']['spad'],
                                                          self.design['Pupil']['N'])) )
             elif self.design['LS']['obscure'] == 1:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + \
-                                                         "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}sm{5:d}Pad{6:02d}_N{7:04d}.dat".format(
+                                                         "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}c{5:d}Pad{6:02d}_N{7:04d}.dat".format(
                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                         self.design['Pupil']['ss'], self.design['Pupil']['sst'], int(self.design['Pupil']['sm']),
+                                                         self.design['Pupil']['ss'], self.design['Pupil']['sst'], int(self.design['Pupil']['co']),
                                                          self.design['LS']['spad'], self.design['Pupil']['N'])) )
             else:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + \
@@ -996,11 +1010,21 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             ampl_src_fname_tail = self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
                                   self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".mod"
             self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname_tail)
+
+        if 'job name' not in self.fileorg or self.fileorg['job name'] is None:
+            self.fileorg['job name'] = os.path.basename(self.fileorg['ampl src fname'])[:-4]
  
         if 'sol fname' not in self.fileorg or self.fileorg['sol fname'] is None:
-            sol_fname_tail = "ApodSol_" + self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
-                             self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".dat"
+            sol_fname_tail = "ApodSol_" + self.fileorg['job name'] + ".dat"
             self.fileorg['sol fname'] = os.path.join(self.fileorg['sol dir'], sol_fname_tail)
+
+        if 'exex script fname' not in self.fileorg or self.fileorg['exec script fname'] is None:
+            exec_script_fname_tail = self.fileorg['job name'] + ".sh"
+            self.fileorg['exec script fname'] = os.path.join(self.fileorg['exec script dir'], exec_script_fname_tail)
+
+        if 'log fname' not in self.fileorg or self.fileorg['log fname'] is None:
+            log_fname_tail = self.fileorg['job name'] + ".log"
+            self.fileorg['log fname'] = os.path.join(self.fileorg['log dir'], log_fname_tail)
  
         if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
             self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_quart_" + self.amplname_pupil + ".dat") )
@@ -1011,16 +1035,16 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
             if self.design['LS']['obscure'] == 2:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
-                                                         "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}sm{7:d}Pad{8:02d}_N{9:04d}.dat".format(
+                                                         "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}c{7:d}Pad{8:02d}_N{9:04d}.dat".format(
                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
                                                          self.design['Pupil']['pm'], self.design['LS']['ppad'], self.design['Pupil']['ss'],
-                                                         self.design['Pupil']['sst'], int(self.design['Pupil']['sm']), self.design['LS']['spad'],
+                                                         self.design['Pupil']['sst'], int(self.design['Pupil']['co']), self.design['LS']['spad'],
                                                          self.design['Pupil']['N'])) )
             elif self.design['LS']['obscure'] == 1:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
-                                                         "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}sm{5:d}Pad{6:02d}_N{7:04d}.dat".format(
+                                                         "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}c{5:d}Pad{6:02d}_N{7:04d}.dat".format(
                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                         self.design['Pupil']['ss'], self.design['Pupil']['sst'], int(self.design['Pupil']['sm']),
+                                                         self.design['Pupil']['ss'], self.design['Pupil']['sst'], int(self.design['Pupil']['co']),
                                                          self.design['LS']['spad'], self.design['Pupil']['N'])) )
             else:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
@@ -1270,24 +1294,35 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         if verbose:
             logging.info("Wrote %s"%self.fileorg['ampl src fname'])
 
-    def write_execscript(self, queue='24h'):
+    def write_exec_script(self, queue_spec='12h', overwrite=False, verbose=True):
+        if os.path.exists(self.fileorg['exec script fname']):
+            if overwrite == True:
+                if verbose:
+                    logging.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['exec script fname']))
+            else:
+                logging.warning("Error: {0} already exists and overwrite switch is off, so write_exec_script() will now abort".format(self.fileorg['exec script fname']))
+                return
+        elif not os.path.exists(self.fileorg['exec script dir']):
+            os.mkdir(self.fileorg['exec script dir'])
+            if verbose:
+                logging.info("Created new execution script directory, {0:s}".format(self.fileorg['exec script dir']))
 
         bash_fobj = open(self.fileorg['exec script fname'], "w") 
 
-        begin_script = """
+        begin_script = """\
         #!/bin/bash
-    
+
         #PBS -V
-        #PBS -m e -M ntz@stsci.edu
-        #SBATCH --job-name={0:s}
-        #SBATCH -o {1:s}
+        #PBS -m e -M {0:s}@stsci.edu
+        #SBATCH --job-name={1:s}
+        #SBATCH -o {2:s}
         #SBATCH --account=s1649
         
         #SBATCH --constraint=hasw
         #SBATCH --ntasks=1 --nodes=1
-        """.format(self.fileorg['job name'], self.fileorg['log fname'])
+        """.format(getpass.getuser(), self.fileorg['job name'], self.fileorg['log fname'])
 
-        if queue is '24h':
+        if queue_spec is '24h':
             set_queue = """
             #SBATCH --qos=long
             #SBATCH --time=24:00:00
@@ -1298,31 +1333,31 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             #SBATCH --time=12:00:00
             """
 
-        intel_module = """ 
+        intel_module = """
         . /usr/share/modules/init/bash
         module purge
         module load comp/intel-10.1.017
         ulimit -s unlimited
         """
 
-        monitor_mem = """ 
+        monitor_mem = """
         #Optional: monitor the memory usage...
         mkdir -p ${NOBACKUP}/policeme
         /usr/local/other/policeme/policeme.exe -d ${NOBACKUP}/policeme
         """
 
-        call_ampl = """ 
-        ampl {1:s}
+        call_ampl = """
+        ampl {0:s}
         
-        exit 0""".format(os.path.basename(self.fileorg['ampl src fname']))
+        exit 0""".format(self.fileorg['ampl src fname'])
 
-        bash_fobj.write(begin_script)
-        bash_fobj.write(set_queue)
-        bash_fobj.write(intel_module)
-        bash_fobj.write(monitor_mem)
-        bash_fobj.write(call_ampl)
+        bash_fobj.write( textwrap.dedent(begin_script) )
+        bash_fobj.write( textwrap.dedent(set_queue) )
+        bash_fobj.write( textwrap.dedent(intel_module) )
+        bash_fobj.write( textwrap.dedent(monitor_mem) )
+        bash_fobj.write( textwrap.dedent(call_ampl) )
 
-        mod_fobj.close()
+        bash_fobj.close()
         if verbose:
             logging.info("Wrote %s"%self.fileorg['exec script fname'])
 
