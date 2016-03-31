@@ -1175,7 +1175,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         header = """\
         # AMPL program to optimize a quarter-plane symmetric APLC
         # Created by {0:s} with {1:s} on {2:s} at {3:s}
-        load amplgsl.dll;
+        # load amplgsl.dll;
         """.format(getpass.getuser(), os.path.basename(__file__), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
  
         if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
