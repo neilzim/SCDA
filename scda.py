@@ -6,6 +6,7 @@ Segmented Coronagraph Design & Analysis investigation
 """
 
 import os
+import shutil
 import sys
 import logging
 import datetime
@@ -37,12 +38,6 @@ def configure_log(log_fname=None):
             fh = logging.FileHandler(log_fname, mode="w")
             fh.setLevel(logging.DEBUG)
             logger.addHandler(fh)
-    
-def load_design_param_survey(pkl_fname):
-    fobj = open(pkl_fname, 'rb')
-    survey_obj = pickle.load(fobj)
-    fobj.close() 
-    return survey_obj
 
 class WrappedFixedIndentingLog(logging.Formatter):
     def __init__(self, fmt=None, datefmt=None, style='%', width=70, indent=4):
@@ -51,6 +46,49 @@ class WrappedFixedIndentingLog(logging.Formatter):
         #self.wrapper = textwrap.TextWrapper(width=width, subsequent_indent=' '*indent)
     def format(self, record):
         return self.wrapper.fill(super().format(record))
+
+def make_ampl_bundle(coron_list, bundled_dir, queue_spec='12h'):
+    bundled_coron_list = []
+    if not os.path.exists(bundled_dir):
+        os.makedirs(bundled_dir)
+        
+    cwd = os.getcwd()
+    os.chdir(bundled_dir)
+    bundled_fileorg = {'work dir': "."}
+    
+    bash_fname = "run_" + os.path.basename(os.path.normpath(bundled_dir)) + ".sh"
+    bash_fobj = open(bash_fname, "w")
+    bash_fobj.write("#! /bin/bash -x\n")
+    
+    for coron in coron_list:
+        shutil.copy2(coron.fileorg['TelAp fname'], ".")
+        shutil.copy2(coron.fileorg['FPM fname'], ".")
+        shutil.copy2(coron.fileorg['LS fname'], ".")
+        if 'LDZ fname' in coron.fileorg and coron.fileorg['LDZ fname'] is not None:
+            shutil.copy2(coron.fileorg['LDZ fname'], ".")
+        design_params = coron.design.copy()
+        design_params['Image'].pop('Nimg',None)
+        design_params['LS'].pop('s',None)
+        bundled_coron = coron.__class__(design=coron.design, fileorg=bundled_fileorg,
+                                        solver=coron.solver)
+        bundled_coron_list.append(bundled_coron)
+        if bundled_coron.check_ampl_input_files() is True:
+            bundled_coron.write_ampl(overwrite=True)
+            bundled_coron.write_exec_script(queue_spec, overwrite=True, verbose=False)
+        else:
+            scda.logging.warning("Input file configuration check failed; AMPL source file not written")
+            scda.logging.warning("Bundled file organization: {0}".format(bundled_coron.fileorg))
+        bash_fobj.write("ampl {0:s}\n".format(bundled_coron.fileorg['ampl src fname']))
+    bash_fobj.close()
+    os.chmod(bash_fname, 0775)
+    os.chdir(cwd)
+    return bundled_coron_list
+    
+def load_design_param_survey(pkl_fname):
+    fobj = open(pkl_fname, 'rb')
+    survey_obj = pickle.load(fobj)
+    fobj.close() 
+    return survey_obj
 
 class DesignParamSurvey(object):
     def __init__(self, coron_class, survey_config, **kwargs):
@@ -442,7 +480,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                                  'sol dir', 'log dir', 'eval dir', 'exec script dir',
                                  'ampl src fname', 'exec script fname', 'log fname', 'job name', 
                                  'TelAp fname', 'FPM fname', 'LS fname', 'LDZ fname', 'sol fname'],
-                     'solver': ['constr', 'method', 'presolve', 'threads'] }
+                     'solver': ['constr', 'method', 'presolve', 'threads', 'solver'] }
 
     _solver_menu = { 'constr': ['lin', 'quad'], 'solver': ['LOQO', 'gurobi', 'gurobix'], 
                      'method': ['bar', 'barhom', 'dualsimp'],
@@ -732,6 +770,86 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                                                               
     def write_ampl(self, overwrite=False):
         logging.info("Writing the AMPL program")
+    def eval_onax_psf(self, fp2res=8, rho_inc=0.25, rho_out=None, Nlam=None):
+        TelAp_qp = np.loadtxt(self.fileorg['TelAp fname'])
+        TelAp = np.concatenate((np.concatenate((TelAp_qp[::-1,::-1], TelAp_qp[:,::-1]),axis=0),
+                                np.concatenate((TelAp_qp[::-1,:], TelAp_qp),axis=0)), axis=1)
+
+        FPM_qp = np.loadtxt(self.fileorg['FPM fname'])
+        FPM = np.concatenate((np.concatenate((FPM_qp[::-1,::-1], FPM_qp[:,::-1]),axis=0),
+                              np.concatenate((FPM_qp[::-1,:], FPM_qp),axis=0)), axis=1)
+        
+        LS_qp = np.loadtxt(self.fileorg['LS fname'])
+        LS = np.concatenate((np.concatenate((LS_qp[::-1,::-1], LS_qp[:,::-1]),axis=0),
+                             np.concatenate((LS_qp[::-1,:], LS_qp),axis=0)), axis=1)
+        
+        A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
+        A_qp = A_col.reshape(TelAp_qp.shape)
+        A = np.concatenate((np.concatenate((A_qp[::-1,::-1], A_qp[:,::-1]),axis=0),
+                            np.concatenate((A_qp[::-1,:], A_qp),axis=0)), axis=1)
+
+        D = 1.
+        N = self.design['Pupil']['N']
+        bw = self.design['Image']['bw']
+        M_fp1 = self.design['FPM']['M']
+        fpm_rad = self.design['FPM']['rad']
+        if rho_out is None:
+            rho_out = self.design['Image']['oda'] + 1.
+        if Nlam is None:
+            Nlam = self.design['Image']['Nlam']
+        M_fp2 = int(np.ceil(rho_out*fp2res))
+        
+        # pupil plane
+        dx = (D/2)/N
+        dy = dx
+        xs = np.matrix(np.linspace(-N+0.5,N-0.5,2*N)*dx)
+        ys = xs
+        
+        # FPM
+        dmx = fpm_rad/M_fp1
+        dmy = dmx
+        mxs = np.matrix(np.linspace(-M_fp1+0.5,M_fp1-0.5,2*M_fp1)*dmx)
+        mys = mxs
+        
+        # FP2
+        dxi = 1./fp2res
+        xis = np.matrix(np.linspace(-M_fp2+0.5,M_fp2-0.5,2*M_fp2)*dxi)
+        etas = xis
+        
+        # wavelength ratios
+        wrs = np.linspace(1.-bw/2, 1.+bw/2, Nlam)
+
+        intens_polychrom = np.zeros((Nlam, 2*M_fp2, 2*M_fp2))
+        for wi, wr in enumerate(wrs):
+            Psi_B = dx*dx/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, xs)), TelAp*A ),
+                                           np.exp(-1j*2*np.pi/wr*np.dot(xs.T, mxs)))
+            Psi_B_stop = np.multiply(Psi_B, FPM)
+            Psi_C = A*TelAp - dmx*dmx/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xs.T, mxs)), Psi_B_stop),
+                                                       np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, xs)))
+            Psi_C_stop = np.multiply(Psi_C, LS)
+            Psi_D = dx*dx/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), Psi_C_stop),
+                                           np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
+            Psi_D_0_peak = np.sum(A*TelAp*LS)*dx*dx/wr
+            intens_polychrom[wi,:,:] = np.power(np.absolute(Psi_D)/Psi_D_0_peak, 2)
+             
+        seps = np.arange(self.design['Image']['ida'], rho_out, rho_inc)
+        radial_intens_polychrom = np.zeros((len(wrs), len(seps)))
+        XXs = np.asarray(np.dot(np.matrix(np.ones(xis.shape)).T, xis))
+        YYs = np.asarray(np.dot(etas.T, np.matrix(np.ones(etas.shape))))
+        RRs = np.sqrt(XXs**2 + YYs**2)
+
+        for si, sep in enumerate(seps):
+            r_in = np.max([seps[0], sep-0.5])
+            r_out = np.min([seps[-1], sep+0.5])
+            meas_ann_mask = np.logical_and(np.greater_equal(RRs, r_in),
+                                           np.less_equal(RRs, r_out))
+            meas_ann_ind = np.nonzero(np.logical_and(np.greater_equal(RRs, r_in).ravel(),
+                                                     np.less_equal(RRs, r_out).ravel()))[0]
+            for wi, wr in enumerate(wrs):
+                radial_intens_polychrom[wi, si] = np.mean(np.ravel(intens_polychrom[wi,:,:])[meas_ann_ind])
+
+        return intens_polychrom, seps, radial_intens_polychrom
+    
     def read_solution(self):
         logging.info("Reading in the apodizer solution and parse the optimizer log")
     def create_eval_model(self):
