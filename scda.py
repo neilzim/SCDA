@@ -583,14 +583,20 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                         self.solver[field] = value
                     else:
                         logging.warning("Warning: Unrecognized solver option \"{0}\" in field \"{1}\", reverting to default".format(value, field))
+                elif field is 'convtol':
+                    if 8 <= value < 10:
+                        self.solver['convtol'] = value
+                    else:
+                        self.solver['convtol'] = None
                 else:
                     logging.warning("Warning: Unrecognized field {0} in solver argument".format(field))
         # Handle missing values
         if 'constr' not in self.solver or self.solver['constr'] is None: self.solver['constr'] = 'lin'
         if 'solver' not in self.solver or self.solver['solver'] is None: self.solver['solver'] = 'gurobi'
         if 'method' not in self.solver or self.solver['method'] is None: self.solver['method'] = 'bar'
+        if 'convtol' not in self.solver: self.solver['convtol'] = None
+        if 'threads' not in self.solver: self.solver['threads'] = None
         if 'presolve' not in self.solver or self.solver['presolve'] is None: self.solver['presolve'] = True
-        if 'threads' not in self.solver or self.solver['threads'] is None: self.solver['threads'] = None
 
         setattr(self, 'ampl_infile_status', None)
         if not issubclass(self.__class__, LyotCoronagraph):
@@ -707,6 +713,8 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             self.amplname_solver = "{}{}pre1".format(self.solver['constr'], self.solver['method'])
         else:
             self.amplname_solver = "{}{}pre0".format(self.solver['constr'], self.solver['method'])
+        if self.solver['convtol'] is not None:
+            self.amplname_solver += "convtol{0:2d}".format(int(round(10*self.solver['convtol'])))
         if self.solver['threads'] is not None:
             self.amplname_solver += "thr{:02d}".format(self.solver['threads'])
 
@@ -1530,16 +1538,16 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
            
             subject to Lyot_aligntol_constr_pos {(x,y) in LyotDarkZone, lam in Ls}: EC_real[x,y,lam] <= 10^-s;
             subject to Lyot_aligntol_constr_neg {(x,y) in LyotDarkZone, lam in Ls}: EC_real[x,y,lam] >= -10^-s;
-            subject to sidelobe_zero_real_pos {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real/sqrt(2.); 
-            subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/sqrt(2.);
+            subject to sidelobe_zero_real_pos {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real*(lam0/lam)/sqrt(2.); 
+            subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real*(lam0/lam)/sqrt(2.);
             """
         else:
             constraints = """
             #---------------------
             maximize throughput: sum{(x,y) in Pupil} A[x,y]*dx*dy/TR;
             
-            subject to sidelobe_zero_real_pos {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real/sqrt(2.); 
-            subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/sqrt(2.);
+            subject to sidelobe_zero_real_pos {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real*(lam0/lam)/sqrt(2.); 
+            subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real*(lam0/lam)/sqrt(2.);
             """
  
         misc_options = """
@@ -1552,34 +1560,22 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         option solver gurobi;
         """
 
-        if self.solver['method'] is 'barhom':
-            if self.solver['presolve'] is True:
-                solver_options = """
-                option gurobi_options "outlev=1 lpmethod=2 barhomogeneous=1 crossover=0";
-                """
-            else:
-                solver_options = """
-                option gurobi_options "outlev=1 lpmethod=2 barhomogeneous=1 crossover=0 presolve=0";
-                """
-        elif self.solver['method'] is 'bar':
-            if self.solver['presolve'] is True:
-                solver_options = """
-                option gurobi_options "outlev=1 lpmethod=2 crossover=0";
-                """
-            else:
-                solver_options = """
-                option gurobi_options "outlev=1 lpmethod=2 crossover=0 presolve=0";
-                """
+        gurobi_opt_str = "outlev=1"
+        if self.solver['presolve'] is False:
+            gurobi_opt_str += " presolve=0"
+        if self.solver['method'] is 'bar' or self.solver['method'] is 'barhom':
+            gurobi_opt_str += " lpmethod=2 crossover=0"
+            if self.solver['convtol'] is not None:
+                gurobi_opt_str += " barconvtol={0:.1e}".format(np.power(10,-self.solver['convtol']))
+            if self.solver['method'] is 'barhom':
+                gurobi_opt_str += " barhomogeneous=1"
         else: # assume dual simplex
-            if self.solver['presolve'] is True:
-               solver_options = """
-               option gurobi_options "outlev=1 lpmethod=1";
-               """
-            else:
-               solver_options = """
-               option gurobi_options "outlev=1 lpmethod=1 presolve=0";
-               """
-  
+            gurobi_opt_str += " lpmethod=1"
+
+        solver_options = """
+        option gurobi_options "{0:s}";
+        """.format(gurobi_opt_str)
+
         execute = """
         solve;
  
