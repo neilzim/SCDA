@@ -1488,7 +1488,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             var ECm_real_X {x in Xs, my in MYs, lam in Ls};
             var EC_real {x in Xs, y in Ys, lam in Ls};
             
-            subject to st_ECm_real_X {x in Xs, my in MYs, lam in Ls}: ECm_real_X[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} EBm_real[mx,my,lam]*cos(2*pi*x*mx/lam))*dmx;
+            subject to st_ECm_real_X {x in Xs, my in MYs, lam in Ls}: ECm_real_X[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} EBm_real[mx,my,lam]*cos(2*pi*x*mx/lam)*dmx;
             subject to st_EC_real {(x,y) in Lyot union LyotDarkZone, lam in Ls}: EC_real[x,y,lam] = TelAp[x,y]*A[x,y] - 2/lam*sum {my in MYs} ECm_real_X[x,my,lam]*cos(2*pi*y*my/lam)*dmy;
             
             #---------------------
