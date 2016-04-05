@@ -47,7 +47,7 @@ class WrappedFixedIndentingLog(logging.Formatter):
     def format(self, record):
         return self.wrapper.fill(super().format(record))
 
-def make_ampl_bundle(coron_list, bundled_dir, queue_spec='12h'):
+def make_ampl_bundle(coron_list, bundled_dir, queue_spec='auto', email=None):
     bundled_coron_list = []
     if not os.path.exists(bundled_dir):
         os.makedirs(bundled_dir)
@@ -74,7 +74,7 @@ def make_ampl_bundle(coron_list, bundled_dir, queue_spec='12h'):
         bundled_coron_list.append(bundled_coron)
         if bundled_coron.check_ampl_input_files() is True:
             bundled_coron.write_ampl(overwrite=True)
-            bundled_coron.write_exec_script(queue_spec, overwrite=True, verbose=False)
+            bundled_coron.write_exec_script(queue_spec, email, overwrite=True, verbose=False)
         else:
             scda.logging.warning("Input file configuration check failed; AMPL source file not written")
             scda.logging.warning("Bundled file organization: {0}".format(bundled_coron.fileorg))
@@ -260,9 +260,9 @@ class DesignParamSurvey(object):
             coron.write_ampl(overwrite, override_infile_status, verbose=False)
         logging.info("Wrote the batch of design survey AMPL programs into {:s}".format(self.fileorg['ampl src dir']))
 
-    def write_exec_script_batch(self, queue_spec='auto', overwrite=False, override_infile_status=False):
+    def write_exec_script_batch(self, queue_spec='auto', email=None, overwrite=False, override_infile_status=False):
         for coron in self.coron_list:
-            coron.write_exec_script(queue_spec, overwrite, verbose=False)
+            coron.write_exec_script(queue_spec, email, overwrite, verbose=False)
         logging.info("Wrote the batch of execution scripts into {:s}".format(self.fileorg['exec script dir']))
  
     def check_ampl_input_files(self):
@@ -627,7 +627,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                                    ( 'LS', OrderedDict([('shape',(str, 'ann')), ('id',(int, 20)), ('od',(int, 90)), ('obscure',(int, 0)),
                                                         ('spad',(int, 0)), ('ppad',(int, 0)), ('aligntol',(int, None)), ('aligntolcon',(float, 7.))]) ),
                                    ( 'Image', OrderedDict([('c',(float, 10.)), ('ida',(float, -0.5)), ('oda',(float, 10.)),
-                                                           ('bw',(float, 0.1)), ('Nlam',(int, 1)), ('fpres',(int,2)),
+                                                           ('bw',(float, 0.10)), ('Nlam',(int, 1)), ('fpres',(int,2)),
                                                            ('wingang',(float, None)), ('incon',(float, None)), ('wingcon',(float, None))]) ) ])
     _eval_fields =   { 'Pupil': _design_fields['Pupil'], 'FPM': _design_fields['FPM'], \
                        'LS': _design_fields['LS'], 'Image': _design_fields['Image'], \
@@ -665,8 +665,8 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                 if param not in self.design[keycat] or (self.design[keycat][param] is None and \
                                                         self._design_fields[keycat][param][1] is not None):
                     self.design[keycat][param] = self._design_fields[keycat][param][1]
-        # Set number of wavelength samples based on bandwidth
-        if self.design['Image']['Nlam'] is None:
+        # Unless Nlam is explicitly specified, set the number of wavelength samples according to the bandwidth
+        if self.design['Image']['Nlam'] == 1 and self.design['Image']['bw'] > 0:
             self.design['Image']['Nlam'] = int(np.round(self.design['Image']['bw']/(0.10/3)))
         # Finally, set a private attribute for the number of image plane samples between the center and the outer constraint angle
         if self.design['Image']['wingang'] is not None:
@@ -1610,7 +1610,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         if verbose:
             logging.info("Wrote %s"%self.fileorg['ampl src fname'])
 
-    def write_exec_script(self, queue_spec='auto', overwrite=False, verbose=True):
+    def write_exec_script(self, queue_spec='auto', email=None, overwrite=False, verbose=True):
         if os.path.exists(self.fileorg['exec script fname']):
             if overwrite == True:
                 if verbose:
@@ -1625,18 +1625,27 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
 
         bash_fobj = open(self.fileorg['exec script fname'], "w") 
 
-        begin_script = """\
-        #!/bin/bash
+        if email is not None: 
+            header = """\
+            #! /bin/bash
 
-        #PBS -V
-        #PBS -m e -M {0:s}@stsci.edu
-        #SBATCH --job-name={1:s}
-        #SBATCH -o {2:s}
+            #PBS -V
+            #PBS -m e -M {0:s}
+            """.format(email)
+        else:
+            header = """\
+            #! /bin/bash
+
+            """
+
+        begin_script = """\
+        #SBATCH --job-name={0:s}
+        #SBATCH -o {1:s}
         #SBATCH --account=s1649
         
         #SBATCH --constraint=hasw
         #SBATCH --ntasks=1 --nodes=1
-        """.format(getpass.getuser(), self.fileorg['job name'], self.fileorg['log fname'])
+        """.format(self.fileorg['job name'], self.fileorg['log fname'])
 
         if queue_spec is 'auto':
             if self.design['LS']['aligntol'] is None:
@@ -1680,8 +1689,10 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         call_ampl = """
         ampl {0:s}
         
-        exit 0""".format(self.fileorg['ampl src fname'])
+        exit 0
+        """.format(self.fileorg['ampl src fname'])
 
+        bash_fobj.write( textwrap.dedent(header) )
         bash_fobj.write( textwrap.dedent(begin_script) )
         bash_fobj.write( textwrap.dedent(set_queue) )
         bash_fobj.write( textwrap.dedent(intel_module) )
