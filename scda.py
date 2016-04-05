@@ -110,14 +110,14 @@ class DesignParamSurvey(object):
                                     #self.survey_config[keycat][param] = tuple(values)
                                 else:
                                     warnstr = ("Warning: Invalid type found in survey set {0} for parameter {1} under category \"{2}\" " + \
-                                               "design initialization argument, expecting {3}").format(value, param, keycat, self._param_menu[keycat][param][0]) 
+                                               "design initialization argument, expecting {3}").format(values, param, keycat, self._param_menu[keycat][param][0]) 
                                     logging.warning(warnstr)
                             else:
                                 if isinstance(values, self._param_menu[keycat][param][0]):
                                     self.survey_config[keycat][param] = values
                                 else:
                                     warnstr = ("Warning: Invalid {0} for parameter \"{1}\" under category \"{2}\" " + \
-                                               "design initialization argument, expecting a {3}").format(type(value), param, keycat, self._param_menu[keycat][param][0]) 
+                                               "design initialization argument, expecting a {3}").format(type(values), param, keycat, self._param_menu[keycat][param][0]) 
                                     logging.warning(warnstr)
                     else:
                         logging.warning("Warning: Unrecognized parameter \"{0}\" under category \"{1}\" in design initialization argument".format(param, keycat))
@@ -260,7 +260,7 @@ class DesignParamSurvey(object):
             coron.write_ampl(overwrite, override_infile_status, verbose=False)
         logging.info("Wrote the batch of design survey AMPL programs into {:s}".format(self.fileorg['ampl src dir']))
 
-    def write_exec_script_batch(self, queue_spec='12h', overwrite=False, override_infile_status=False):
+    def write_exec_script_batch(self, queue_spec='auto', overwrite=False, override_infile_status=False):
         for coron in self.coron_list:
             coron.write_exec_script(queue_spec, overwrite, verbose=False)
         logging.info("Wrote the batch of execution scripts into {:s}".format(self.fileorg['exec script dir']))
@@ -626,9 +626,9 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                                    ( 'FPM', OrderedDict([('rad',(float, 4.)), ('M',(int, 50))]) ),
                                    ( 'LS', OrderedDict([('shape',(str, 'ann')), ('id',(int, 20)), ('od',(int, 90)), ('obscure',(int, 0)),
                                                         ('spad',(int, 0)), ('ppad',(int, 0)), ('aligntol',(int, None)), ('aligntolcon',(float, 7.))]) ),
-                                   ( 'Image', OrderedDict([('c',(float, 10.)), ('ida',(float, 4.)), ('oda',(float, 10.)),
-                                                         ('bw',(float, 0.1)), ('Nlam',(int, 3)), ('fpres',(int,2)),
-                                                         ('wingang',(float, None)), ('incon',(float, None)), ('wingcon',(float, None))]) ) ])
+                                   ( 'Image', OrderedDict([('c',(float, 10.)), ('ida',(float, -0.5)), ('oda',(float, 10.)),
+                                                           ('bw',(float, 0.1)), ('Nlam',(int, 1)), ('fpres',(int,2)),
+                                                           ('wingang',(float, None)), ('incon',(float, None)), ('wingcon',(float, None))]) ) ])
     _eval_fields =   { 'Pupil': _design_fields['Pupil'], 'FPM': _design_fields['FPM'], \
                        'LS': _design_fields['LS'], 'Image': _design_fields['Image'], \
                        'Tel': {'TelAp diam':(float, 12.)}, 'Target': {}, 'Aber': {}, 'WFSC': {} }
@@ -665,13 +665,16 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                 if param not in self.design[keycat] or (self.design[keycat][param] is None and \
                                                         self._design_fields[keycat][param][1] is not None):
                     self.design[keycat][param] = self._design_fields[keycat][param][1]
+        # Set number of wavelength samples based on bandwidth
+        if self.design['Image']['Nlam'] is None:
+            self.design['Image']['Nlam'] = int(np.round(self.design['Image']['bw']/(0.10/3)))
         # Finally, set a private attribute for the number of image plane samples between the center and the outer constraint angle
         if self.design['Image']['wingang'] is not None:
             self.design['Image']['Nimg'] = int( np.ceil( self.design['Image']['fpres']*self.design['Image']['wingang']/(1. - self.design['Image']['bw']/2) ) )
         else:
             self.design['Image']['Nimg'] = int( np.ceil( self.design['Image']['fpres']*self.design['Image']['oda']/(1. - self.design['Image']['bw']/2) ) )
         if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon']:
-            # The Lyot dark zone field suppression factor increases with the square of pupil array size. The units of input parameter are arbitrarily normalized to N=125.
+            # The Lyot dark zone field suppression factor decreases with the square of pupil array size. The units of input parameter are arbitrarily normalized to N=125.
             self.design['LS']['s'] = self.design['LS']['aligntolcon'] - 2*np.log10(self.design['Pupil']['N']/125.)
         if verbose: # Print summary of the set parameters
             logging.info("Design parameters: {}".format(self.design))
@@ -697,12 +700,12 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
 
         if self.design['Image']['wingang'] is not None:
             self.amplname_image = "Img{:03}C_{:02}DA{:03}W{:03}_BW{:02}Nlam{:02}fpres{:1}".format(int(round(10*self.design['Image']['c'])), \
-                                   int(round(10*self.design['Image']['ida'])), int(round(10*self.design['Image']['oda'])), \
+                                   int(round(10*(self.design['FPM']['rad']+self.design['Image']['ida']))), int(round(10*self.design['Image']['oda'])), \
                                    int(round(10*self.design['Image']['wingang'])), int(round(100*self.design['Image']['bw'])), \
                                    self.design['Image']['Nlam'], self.design['Image']['fpres'])
         else:
             self.amplname_image = "Img{:03}C_{:02}DA{:03}_BW{:02}Nlam{:02}fpres{:1}".format(int(round(10*self.design['Image']['c'])), \
-                                   int(round(10*self.design['Image']['ida'])), int(round(10*self.design['Image']['oda'])), \
+                                   int(round(10*(self.design['FPM']['rad']+self.design['Image']['ida']))), int(round(10*self.design['Image']['oda'])), \
                                    int(round(100*self.design['Image']['bw'])), self.design['Image']['Nlam'], self.design['Image']['fpres'])
         if self.design['Image']['incon'] is not None:
             self.amplname_image += "Cin{:03}".format(self.design['Image']['incon'])
@@ -840,7 +843,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             Psi_D_0_peak = np.sum(A*TelAp*LS)*dx*dx/wr
             intens_polychrom[wi,:,:] = np.power(np.absolute(Psi_D)/Psi_D_0_peak, 2)
              
-        seps = np.arange(self.design['Image']['ida'], rho_out, rho_inc)
+        seps = np.arange(self.design['FPM']['rad']+self.design['Image']['ida'], rho_out, rho_inc)
         radial_intens_polychrom = np.zeros((len(wrs), len(seps)))
         XXs = np.asarray(np.dot(np.matrix(np.ones(xis.shape)).T, xis))
         YYs = np.asarray(np.dot(etas.T, np.matrix(np.ones(etas.shape))))
@@ -996,8 +999,8 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         #---------------------
         param CoeffOverSizePup :=0.824*OD;
         """.format(getpass.getuser(), os.path.basename(__file__), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), \
-                   self.design['Image']['c'], self.design['FPM']['rad'], self.design['Image']['ida'], self.design['Image']['oda'], \
-                   self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['Nimg'], \
+                   self.design['Image']['c'], self.design['FPM']['rad'], self.design['FPM']['rad']+self.design['Image']['ida'],
+                   self.design['Image']['oda'], self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['Nimg'], \
                    self.design['Image']['bw'], self.design['Image']['Nlam'])
         
         load_masks = """\
@@ -1326,14 +1329,12 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
                                   
             #---------------------
             param bw := {8:0.2f};
-            param lam0 := 1.;
-            param dl := bw*lam0;
             param Nlam := {9:d};
             
             #---------------------
-            """.format(self.design['Image']['c'], self.design['LS']['s'], self.design['FPM']['rad'], self.design['Image']['ida'], \
-                       self.design['Image']['oda'], self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['Nimg'], \
-                       self.design['Image']['bw'], self.design['Image']['Nlam'])
+            """.format(self.design['Image']['c'], self.design['LS']['s'], self.design['FPM']['rad'], \
+                       self.design['FPM']['rad']+self.design['Image']['ida'], self.design['Image']['oda'], self.design['Pupil']['N'], \
+                       self.design['FPM']['M'], self.design['Image']['Nimg'], self.design['Image']['bw'], self.design['Image']['Nlam'])
         else:
             params = """
             #---------------------
@@ -1355,13 +1356,11 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
                                   
             #---------------------
             param bw := {7:0.2f};
-            param lam0 := 1.;
-            param dl := bw*lam0;
             param Nlam := {8:d};
             
             #---------------------
-            """.format(self.design['Image']['c'], self.design['FPM']['rad'], self.design['Image']['ida'], self.design['Image']['oda'], \
-                       self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['Nimg'], \
+            """.format(self.design['Image']['c'], self.design['FPM']['rad'], self.design['FPM']['rad']+self.design['Image']['ida'],
+                       self.design['Image']['oda'], self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['Nimg'], \
                        self.design['Image']['bw'], self.design['Image']['Nlam'])
 
         define_coords = """
@@ -1437,11 +1436,11 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
 
         if self.design['Image']['Nlam'] > 1 and self.design['Image']['bw'] > 0:
             define_wavelengths = """
-            set Ls := setof {l in 1..Nlam} lam0*(1 - bw/2 + (l-1)*bw/(Nlam-1));
+            set Ls := setof {l in 1..Nlam} 1 - bw/2 + (l-1)*bw/(Nlam-1);
             """
         else:
             define_wavelengths = """
-            set Ls := setof {l in 1..1} lam0*l;
+            set Ls := setof {l in 1..1} 1;
             """
 
         if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
@@ -1482,22 +1481,22 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             var EBm_real_X {mx in MXs, y in Ys, lam in Ls};
             var EBm_real {mx in MXs, my in MYs, lam in Ls};
             
-            subject to st_EBm_real_X {mx in MXs, y in Ys, lam in Ls}: EBm_real_X[mx,y,lam] = 2.*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2.*pi*x*mx*(lam0/lam))*dx;
-            subject to st_EBm_real {(mx, my) in Mask, lam in Ls}: EBm_real[mx,my,lam] = 2.*(lam0/lam)*sum {y in Ys} EBm_real_X[mx,y,lam]*cos(2.*pi*y*my*(lam0/lam))*dy;
+            subject to st_EBm_real_X {mx in MXs, y in Ys, lam in Ls}: EBm_real_X[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
+            subject to st_EBm_real {(mx, my) in Mask, lam in Ls}: EBm_real[mx,my,lam] = 2/lam*sum {y in Ys} EBm_real_X[mx,y,lam]*cos(2*pi*y*my/lam)*dy;
             
             #---------------------
             var ECm_real_X {x in Xs, my in MYs, lam in Ls};
             var EC_real {x in Xs, y in Ys, lam in Ls};
             
-            subject to st_ECm_real_X {x in Xs, my in MYs, lam in Ls}: ECm_real_X[x,my,lam] = 2.*sum {mx in MXs: (mx,my) in Mask} EBm_real[mx,my,lam]*cos(2.*pi*x*mx*(lam0/lam))*dmx;
-            subject to st_EC_real {(x,y) in Lyot union LyotDarkZone, lam in Ls}: EC_real[x,y,lam] = TelAp[x,y]*A[x,y] - 2.*(lam0/lam)*sum {my in MYs} ECm_real_X[x,my,lam]*cos(2.*pi*y*my*(lam0/lam))*dmy;
+            subject to st_ECm_real_X {x in Xs, my in MYs, lam in Ls}: ECm_real_X[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} EBm_real[mx,my,lam]*cos(2*pi*x*mx/lam))*dmx;
+            subject to st_EC_real {(x,y) in Lyot union LyotDarkZone, lam in Ls}: EC_real[x,y,lam] = TelAp[x,y]*A[x,y] - 2/lam*sum {my in MYs} ECm_real_X[x,my,lam]*cos(2*pi*y*my/lam)*dmy;
             
             #---------------------
             var ED_real_X {xi in Xis, y in Ys, lam in Ls};
             var ED_real {xi in Xis, eta in Etas, lam in Ls};
             
-            subject to st_ED_real_X {xi in Xis, y in Ys, lam in Ls}: ED_real_X[xi,y,lam] = 2.*sum {x in Xs: (x,y) in Lyot} EC_real[x,y,lam]*cos(2.*pi*x*xi*(lam0/lam))*dx;
-            subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] = 2.*(lam0/lam)*sum {y in Ys} ED_real_X[xi,y,lam]*cos(2.*pi*y*eta*(lam0/lam))*dy;
+            subject to st_ED_real_X {xi in Xis, y in Ys, lam in Ls}: ED_real_X[xi,y,lam] = 2*sum {x in Xs: (x,y) in Lyot} EC_real[x,y,lam]*cos(2*pi*x*xi/lam)*dx;
+            subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] = 2/lam*sum {y in Ys} ED_real_X[xi,y,lam]*cos(2*pi*y*eta/lam)*dy;
             
             #---------------------
             var ED00_real := 0.0;
@@ -1509,26 +1508,26 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             var EBm_real_X {mx in MXs, y in Ys, lam in Ls};
             var EBm_real {mx in MXs, my in MYs, lam in Ls};
             
-            subject to st_EBm_real_X {mx in MXs, y in Ys, lam in Ls}: EBm_real_X[mx,y,lam] = 2.*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2.*pi*x*mx*(lam0/lam))*dx;
-            subject to st_EBm_real {(mx, my) in Mask, lam in Ls}: EBm_real[mx,my,lam] = 2.*(lam0/lam)*sum {y in Ys} EBm_real_X[mx,y,lam]*cos(2.*pi*y*my*(lam0/lam))*dy;
+            subject to st_EBm_real_X {mx in MXs, y in Ys, lam in Ls}: EBm_real_X[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
+            subject to st_EBm_real {(mx, my) in Mask, lam in Ls}: EBm_real[mx,my,lam] = 2/lam*sum {y in Ys} EBm_real_X[mx,y,lam]*cos(2*pi*y*my/lam)*dy;
             
             #---------------------
             var ECm_real_X {x in Xs, my in MYs, lam in Ls};
             var ECm_real {x in Xs, y in Ys, lam in Ls};
             
-            subject to st_ECm_real_X {x in Xs, my in MYs, lam in Ls}: ECm_real_X[x,my,lam] = 2.*sum {mx in MXs: (mx,my) in Mask} EBm_real[mx,my,lam]*cos(2.*pi*x*mx*(lam0/lam))*dmx;
-            subject to st_ECm_real {(x,y) in Lyot, lam in Ls}: ECm_real[x,y,lam] = 2.*(lam0/lam)*sum {my in MYs} ECm_real_X[x,my,lam]*cos(2.*pi*y*my*(lam0/lam))*dmy;
+            subject to st_ECm_real_X {x in Xs, my in MYs, lam in Ls}: ECm_real_X[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} EBm_real[mx,my,lam]*cos(2*pi*x*mx/lam)*dmx;
+            subject to st_ECm_real {(x,y) in Lyot, lam in Ls}: ECm_real[x,y,lam] = 2/lam*sum {my in MYs} ECm_real_X[x,my,lam]*cos(2*pi*y*my/lam)*dmy;
             
             #---------------------
             var ED_real_X {xi in Xis, y in Ys, lam in Ls};
             var ED_real {xi in Xis, eta in Etas, lam in Ls};
             
-            subject to st_ED_real_X {xi in Xis, y in Ys, lam in Ls}: ED_real_X[xi,y,lam] = 2.*sum {x in Xs: (x,y) in Lyot} (TelAp[x,y]*A[x,y]-ECm_real[x,y,lam])*cos(2.*pi*x*xi*(lam0/lam))*dx;
-            subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] = 2.*(lam0/lam)*sum {y in Ys} ED_real_X[xi,y,lam]*cos(2.*pi*y*eta*(lam0/lam))*dy;
+            subject to st_ED_real_X {xi in Xis, y in Ys, lam in Ls}: ED_real_X[xi,y,lam] = 2*sum {x in Xs: (x,y) in Lyot} (TelAp[x,y]*A[x,y]-ECm_real[x,y,lam])*cos(2*pi*x*xi/lam)*dx;
+            subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] = 2/lam*sum {y in Ys} ED_real_X[xi,y,lam]*cos(2*pi*y*eta/lam)*dy;
             
             #---------------------
             var ED00_real := 0.0;
-            subject to st_ED00_real: ED00_real = 4.*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*TelAp[x,y])*dx*dy;
+            subject to st_ED00_real: ED00_real = 4*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*TelAp[x,y])*dx*dy;
             """
 
         if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None:
@@ -1538,16 +1537,16 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
            
             subject to Lyot_aligntol_constr_pos {(x,y) in LyotDarkZone, lam in Ls}: EC_real[x,y,lam] <= 10^-s;
             subject to Lyot_aligntol_constr_neg {(x,y) in LyotDarkZone, lam in Ls}: EC_real[x,y,lam] >= -10^-s;
-            subject to sidelobe_zero_real_pos {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real*(lam0/lam)/sqrt(2.); 
-            subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real*(lam0/lam)/sqrt(2.);
+            subject to sidelobe_zero_real_pos {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real/lam/sqrt(2.);
+            subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/lam/sqrt(2.);
             """
         else:
             constraints = """
             #---------------------
             maximize throughput: sum{(x,y) in Pupil} A[x,y]*dx*dy/TR;
             
-            subject to sidelobe_zero_real_pos {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real*(lam0/lam)/sqrt(2.); 
-            subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real*(lam0/lam)/sqrt(2.);
+            subject to sidelobe_zero_real_pos {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real/lam/sqrt(2.);
+            subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/lam/sqrt(2.);
             """
  
         misc_options = """
@@ -1611,7 +1610,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         if verbose:
             logging.info("Wrote %s"%self.fileorg['ampl src fname'])
 
-    def write_exec_script(self, queue_spec='12h', overwrite=False, verbose=True):
+    def write_exec_script(self, queue_spec='auto', overwrite=False, verbose=True):
         if os.path.exists(self.fileorg['exec script fname']):
             if overwrite == True:
                 if verbose:
@@ -1639,12 +1638,27 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         #SBATCH --ntasks=1 --nodes=1
         """.format(getpass.getuser(), self.fileorg['job name'], self.fileorg['log fname'])
 
-        if queue_spec is '24h':
+        if queue_spec is 'auto':
+            if self.design['LS']['aligntol'] is None:
+                time_est_hrs = int(np.ceil(1*(self.design['Pupil']['N']/125.)**2*(self.design['Image']['Nlam']/3.)**3))
+            else:
+                time_est_hrs = int(np.ceil(3*(self.design['Pupil']['N']/125.)**2*(self.design['Image']['Nlam']/3.)**3))
+            if time_est_hrs > 12:
+                set_queue = """
+                #SBATCH --qos=long
+                #SBATCH --time={0:02d}:00:00
+                """.format(time_est_hrs)
+            else:
+                set_queue = """
+                #SBATCH --qos=allnccs
+                #SBATCH --time={0:02d}:00:00
+                """.format(time_est_hrs)
+        elif queue_spec is '24h':
             set_queue = """
             #SBATCH --qos=long
             #SBATCH --time=24:00:00
             """
-        else:
+        elif queue_spec is '12h':
             set_queue = """
             #SBATCH --qos=allnccs
             #SBATCH --time=12:00:00
