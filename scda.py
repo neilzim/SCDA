@@ -1666,7 +1666,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
                 set_queue = """
                 #SBATCH --qos=long
                 #SBATCH --time={0:02d}:00:00
-                """.format(time_est_hrs)
+                """.format(np.min([24, time_est_hrs]))
             else:
                 set_queue = """
                 #SBATCH --qos=allnccs
