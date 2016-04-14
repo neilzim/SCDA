@@ -16,10 +16,13 @@ import numpy as np
 import pdb
 import getpass
 import socket
-from collections import defaultdict, OrderedDict
 import itertools
 import pprint
 import pickle
+try:
+    from collections import OrderedDict
+except ImportError:
+    from ordereddict import OrderedDict
 from astropy.io import ascii
 
 def configure_log(log_fname=None):
