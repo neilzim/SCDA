@@ -23,7 +23,6 @@ try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
-from astropy.io import ascii
 
 def configure_log(log_fname=None):
 #    logger = logging.getLogger("scda.logger")
