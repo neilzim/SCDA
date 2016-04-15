@@ -288,9 +288,9 @@ class DesignParamSurvey(object):
             else:
                 write_count += 1
         if write_count == self.N_combos:
-            logging.info("Wrote all {0:d} of {1:d} design survey slurm scripts into {2:s}".format(write_count, self.N_combos, self.fileorg['slurm script dir']))
+            logging.info("Wrote all {0:d} of {1:d} design survey slurm scripts into {2:s}".format(write_count, self.N_combos, self.fileorg['slurm dir']))
         else:
-            logging.warning("Wrote {0:d} of {1:d} design survey AMPL programs into {2:s}. {3:d} already existed and were denied overwriting.".format(write_count, self.N_combos, self.fileorg['slurm script dir'], overwrite_deny_count))
+            logging.warning("Wrote {0:d} of {1:d} design survey AMPL programs into {2:s}. {3:d} already existed and were denied overwriting.".format(write_count, self.N_combos, self.fileorg['slurm dir'], overwrite_deny_count))
 
     def check_ampl_input_files(self):
         survey_status = True
@@ -354,7 +354,7 @@ class DesignParamSurvey(object):
         else:
             if 'survey fname' not in self.fileorg or ('survey fname' in self.fileorg and self.fileorg['survey fname'] is None):
                 #csv_fname_tail = "scda_{:s}_survey_{:s}_{:s}.csv".format(self.coron_class.__name__, getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
-                csv_fname_tail = "{0:s}_{1:s}_{2:s}.pkl".format(os.path.basename(self.fileorg['work dir']), getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
+                csv_fname_tail = "{0:s}_{1:s}_{2:s}.csv".format(os.path.basename(self.fileorg['work dir']), getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
                 csv_fname = os.path.join(self.fileorg['work dir'], csv_fname_tail)
             else:
                 csv_fname = self.fileorg['survey fname'][-4:] + ".csv"
@@ -513,8 +513,8 @@ class DesignParamSurvey(object):
 
 class LyotCoronagraph(object): # Lyot coronagraph base class
     _file_fields = { 'fileorg': ['work dir', 'ampl src dir', 'TelAp dir', 'FPM dir', 'LS dir',
-                                 'sol dir', 'log dir', 'eval dir', 'slurm script dir',
-                                 'ampl src fname', 'slurm script fname', 'log fname', 'job name', 
+                                 'sol dir', 'log dir', 'eval dir', 'slurm dir',
+                                 'ampl src fname', 'slurm fname', 'log fname', 'job name', 
                                  'TelAp fname', 'FPM fname', 'LS fname', 'LDZ fname', 'sol fname'],
                      'solver': ['constr', 'method', 'presolve', 'threads', 'solver'] }
 
@@ -1261,9 +1261,9 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             sol_fname_tail = "ApodSol_" + self.fileorg['job name'] + ".dat"
             self.fileorg['sol fname'] = os.path.join(self.fileorg['sol dir'], sol_fname_tail)
 
-        if 'exex script fname' not in self.fileorg or self.fileorg['slurm script fname'] is None:
+        if 'slurm fname' not in self.fileorg or self.fileorg['slurm fname'] is None:
             exec_script_fname_tail = self.fileorg['job name'] + ".sh"
-            self.fileorg['slurm script fname'] = os.path.join(self.fileorg['slurm script dir'], exec_script_fname_tail)
+            self.fileorg['slurm fname'] = os.path.join(self.fileorg['slurm dir'], exec_script_fname_tail)
 
         if 'log fname' not in self.fileorg or self.fileorg['log fname'] is None:
             log_fname_tail = self.fileorg['job name'] + ".log"
@@ -1652,20 +1652,20 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         return 0
 
     def write_slurm_script(self, queue_spec='auto', account='s1649', email=None, arch=None, overwrite=False, verbose=True):
-        if os.path.exists(self.fileorg['slurm script fname']):
+        if os.path.exists(self.fileorg['slurm fname']):
             if overwrite == True:
                 if verbose:
-                    logging.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['slurm script fname']))
+                    logging.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['slurm fname']))
             else:
                 if verbose:
-                    logging.warning("Error: {0} already exists and overwrite switch is off, so write_exec_script() will now abort".format(self.fileorg['slurm script fname']))
+                    logging.warning("Error: {0} already exists and overwrite switch is off, so write_exec_script() will now abort".format(self.fileorg['slurm fname']))
                 return 1
-        elif not os.path.exists(self.fileorg['slurm script dir']):
-            os.mkdir(self.fileorg['slurm script dir'])
+        elif not os.path.exists(self.fileorg['slurm dir']):
+            os.mkdir(self.fileorg['slurm dir'])
             if verbose:
-                logging.info("Created new slurm script directory, {0:s}".format(self.fileorg['slurm script dir']))
+                logging.info("Created new slurm script directory, {0:s}".format(self.fileorg['slurm dir']))
 
-        bash_fobj = open(self.fileorg['slurm script fname'], "w") 
+        bash_fobj = open(self.fileorg['slurm fname'], "w") 
 
         if email is not None: 
             header = """\
@@ -1751,7 +1751,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
 
         bash_fobj.close()
         if verbose:
-            logging.info("Wrote %s"%self.fileorg['slurm script fname'])
+            logging.info("Wrote %s"%self.fileorg['slurm fname'])
         return 0
 
     def get_metrics(self, fp2res=16, verbose=True):
