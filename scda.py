@@ -255,21 +255,43 @@ class DesignParamSurvey(object):
         setattr(self, 'ampl_infile_status', None)
         self.check_ampl_input_files()
         setattr(self, 'ampl_src_status', None)
+        setattr(self, 'submission_status', None)
         setattr(self, 'solution_status', None)
-        setattr(self, 'evaluation_status', None)
+        setattr(self, 'eval_status', None)
 
     def write_ampl_batch(self, overwrite=False, override_infile_status=False):
+        write_count = 0
+        overwrite_deny_count = 0
+        infile_deny_count = 0
         for coron in self.coron_list:
-            coron.write_ampl(overwrite, override_infile_status, verbose=False)
-        logging.info("Wrote the batch of design survey AMPL programs into {:s}".format(self.fileorg['ampl src dir']))
+            status = coron.write_ampl(overwrite, override_infile_status, verbose=False)
+            if status == 2:
+                infine_deny_count += 1
+            elif status == 1:
+                overwrite_deny_count += 1
+            else:
+                write_count += 1
+        if write_count == self.N_combos:
+            logging.info("Wrote all {0:d} of {1:d} design survey AMPL programs into {2:s}".format(write_count, self.N_combos, self.fileorg['ampl src dir']))
+        else:
+            logging.warning("Wrote {0:d} of {1:d} design survey AMPL programs into {2:s}. {3:d} already existed and were denied overwriting. {4:d} were denied writing because of a failed input file configuration status.".format(write_count, self.N_combos, self.fileorg['ampl src dir'], overwrite_deny_count, infile_deny_count))
 
-    def write_exec_script_batch(self, queue_spec='auto', account='s1649', email=None, arch=None,
-                                overwrite=False, override_infile_status=False):
+    def write_slurm_batch(self, queue_spec='auto', account='s1649', email=None, arch=None,
+                          overwrite=False, override_infile_status=False):
+        write_count = 0
+        overwrite_deny_count = 0
         for coron in self.coron_list:
-            coron.write_exec_script(queue_spec=queue_spec, account=account, email=email, arch=arch,
-                                    overwrite=overwrite, verbose=False)
-        logging.info("Wrote the batch of execution scripts into {:s}".format(self.fileorg['exec script dir']))
- 
+            status = coron.write_slurm_script(queue_spec=queue_spec, account=account, email=email, arch=arch,
+                                              overwrite=overwrite, verbose=False)
+            if status == 1:
+                overwrite_deny_count += 1
+            else:
+                write_count += 1
+        if write_count == self.N_combos:
+            logging.info("Wrote all {0:d} of {1:d} design survey slurm scripts into {2:s}".format(write_count, self.N_combos, self.fileorg['slurm script dir']))
+        else:
+            logging.warning("Wrote {0:d} of {1:d} design survey AMPL programs into {2:s}. {3:d} already existed and were denied overwriting.".format(write_count, self.N_combos, self.fileorg['slurm script dir'], overwrite_deny_count))
+
     def check_ampl_input_files(self):
         survey_status = True
         for coron in self.coron_list: # Update all individual statuses
@@ -316,7 +338,7 @@ class DesignParamSurvey(object):
         else:
             if 'survey fname' not in self.fileorg or \
                ('survey fname' in self.fileorg and self.fileorg['survey fname'] is None): # set the filename based on the coronagraph type, user, and date
-                fname_tail = "scda_{:s}_survey_{:s}_{:s}.pkl".format(self.coron_class.__name__, getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
+                fname_tail = "{0:s}_{1:s}_{2:s}.pkl".format(os.path.basename(self.fileorg['work dir']), getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
                 self.fileorg['survey fname'] = os.path.join(self.fileorg['work dir'], fname_tail)
         fobj = open(self.fileorg['survey fname'], 'wb')
         pickle.dump(self, fobj)
@@ -331,7 +353,8 @@ class DesignParamSurvey(object):
                 csv_fname = fname
         else:
             if 'survey fname' not in self.fileorg or ('survey fname' in self.fileorg and self.fileorg['survey fname'] is None):
-                csv_fname_tail = "scda_{:s}_survey_{:s}_{:s}.csv".format(self.coron_class.__name__, getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
+                #csv_fname_tail = "scda_{:s}_survey_{:s}_{:s}.csv".format(self.coron_class.__name__, getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
+                csv_fname_tail = "{0:s}_{1:s}_{2:s}.pkl".format(os.path.basename(self.fileorg['work dir']), getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
                 csv_fname = os.path.join(self.fileorg['work dir'], csv_fname_tail)
             else:
                 csv_fname = self.fileorg['survey fname'][-4:] + ".csv"
@@ -360,6 +383,10 @@ class DesignParamSurvey(object):
                 surveywriter.writerow(["All input files exist?", 'Y'])
             else:
                 surveywriter.writerow(["All input files exist?", 'N'])
+            if self.submission_status is True:
+                surveywriter.writerow(["All AMPL jobs submitted?", 'Y'])
+            else:
+                surveywriter.writerow(["All AMPL jobs submitted?", 'N'])
             if self.solution_status is True:
                 surveywriter.writerow(["All solution files exist?", 'Y'])
             else:
@@ -454,8 +481,8 @@ class DesignParamSurvey(object):
                 for (cat, name) in self.varied_param_index:
                     catrow.append(cat)
                     paramrow.append(name)
-                catrow.extend(['', 'AMPL source', '', '', 'Solution', '', 'Evaluation metrics', '', ''])
-                paramrow.extend(['', 'filename', 'exists?', 'input files?', 'filename', 'exists?', 'Thrupt', 'PSF area'])
+                catrow.extend(['', 'AMPL program', '', '', '', 'Solution', '', 'Evaluation metrics', '', ''])
+                paramrow.extend(['', 'filename', 'exists?', 'input files?', 'submitted?', 'filename', 'exists?', 'Thrupt', 'PSF area'])
                 surveywriter.writerow(catrow)
                 surveywriter.writerow(paramrow)
                 for ii, param_combo in enumerate(self.varied_param_combos):
@@ -467,6 +494,10 @@ class DesignParamSurvey(object):
                     else:
                         param_combo_row.append('N')
                     if self.coron_list[ii].ampl_infile_status is True:
+                        param_combo_row.append('Y')
+                    else:
+                        param_combo_row.append('N')
+                    if self.coron_list[ii].ampl_submission_status is True:
                         param_combo_row.append('Y')
                     else:
                         param_combo_row.append('N')
@@ -482,8 +513,8 @@ class DesignParamSurvey(object):
 
 class LyotCoronagraph(object): # Lyot coronagraph base class
     _file_fields = { 'fileorg': ['work dir', 'ampl src dir', 'TelAp dir', 'FPM dir', 'LS dir',
-                                 'sol dir', 'log dir', 'eval dir', 'exec script dir',
-                                 'ampl src fname', 'exec script fname', 'log fname', 'job name', 
+                                 'sol dir', 'log dir', 'eval dir', 'slurm script dir',
+                                 'ampl src fname', 'slurm script fname', 'log fname', 'job name', 
                                  'TelAp fname', 'FPM fname', 'LS fname', 'LDZ fname', 'sol fname'],
                      'solver': ['constr', 'method', 'presolve', 'threads', 'solver'] }
 
@@ -606,6 +637,8 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         setattr(self, 'ampl_infile_status', None)
         if not issubclass(self.__class__, LyotCoronagraph):
             self.check_ampl_input_files()
+
+        setattr(self, 'ampl_submission_status', None) # Only changed by the queue filler program
 
         setattr(self, 'eval_metrics', {})
         self.eval_metrics['airy thrupt'] = None
@@ -1228,9 +1261,9 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             sol_fname_tail = "ApodSol_" + self.fileorg['job name'] + ".dat"
             self.fileorg['sol fname'] = os.path.join(self.fileorg['sol dir'], sol_fname_tail)
 
-        if 'exex script fname' not in self.fileorg or self.fileorg['exec script fname'] is None:
+        if 'exex script fname' not in self.fileorg or self.fileorg['slurm script fname'] is None:
             exec_script_fname_tail = self.fileorg['job name'] + ".sh"
-            self.fileorg['exec script fname'] = os.path.join(self.fileorg['exec script dir'], exec_script_fname_tail)
+            self.fileorg['slurm script fname'] = os.path.join(self.fileorg['slurm script dir'], exec_script_fname_tail)
 
         if 'log fname' not in self.fileorg or self.fileorg['log fname'] is None:
             log_fname_tail = self.fileorg['job name'] + ".log"
@@ -1283,10 +1316,11 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         self.check_ampl_input_files()
     def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None, verbose=True):
         if self.ampl_infile_status is False and not override_infile_status:
-            logging.error("Error: the most recent input file check for this design configuration failed.")
-            logging.error("The override_infile_status switch is off, so write_ampl() will now abort.")
-            logging.error("See previous warnings in the log to see what file was missing during the initialization")
-            return
+            if verbose:
+                logging.warning("Error: the most recent input file check for this design configuration failed.")
+                logging.warning("The override_infile_status switch is off, so write_ampl() will now abort.")
+                logging.warning("See previous warnings in the log to see what file was missing during the initialization")
+            return 2
         if ampl_src_fname is not None:
             if os.path.dirname(ampl_src_fname) == '' and self.fileorg['ampl src dir'] is not None:
                 self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname)
@@ -1298,8 +1332,9 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
                 if verbose:
                     logging.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
             else:
-                logging.warning("Error: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
-                return
+                if verbose:
+                    logging.warning("Error: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
+                return 1
         elif not os.path.exists(self.fileorg['ampl src dir']):
             os.mkdir(self.fileorg['ampl src dir'])
             if verbose:
@@ -1614,21 +1649,23 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         mod_fobj.close()
         if verbose:
             logging.info("Wrote %s"%self.fileorg['ampl src fname'])
+        return 0
 
-    def write_exec_script(self, queue_spec='auto', account='s1649', email=None, arch=None, overwrite=False, verbose=True):
-        if os.path.exists(self.fileorg['exec script fname']):
+    def write_slurm_script(self, queue_spec='auto', account='s1649', email=None, arch=None, overwrite=False, verbose=True):
+        if os.path.exists(self.fileorg['slurm script fname']):
             if overwrite == True:
                 if verbose:
-                    logging.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['exec script fname']))
+                    logging.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['slurm script fname']))
             else:
-                logging.warning("Error: {0} already exists and overwrite switch is off, so write_exec_script() will now abort".format(self.fileorg['exec script fname']))
-                return
-        elif not os.path.exists(self.fileorg['exec script dir']):
-            os.mkdir(self.fileorg['exec script dir'])
+                if verbose:
+                    logging.warning("Error: {0} already exists and overwrite switch is off, so write_exec_script() will now abort".format(self.fileorg['slurm script fname']))
+                return 1
+        elif not os.path.exists(self.fileorg['slurm script dir']):
+            os.mkdir(self.fileorg['slurm script dir'])
             if verbose:
-                logging.info("Created new execution script directory, {0:s}".format(self.fileorg['exec script dir']))
+                logging.info("Created new slurm script directory, {0:s}".format(self.fileorg['slurm script dir']))
 
-        bash_fobj = open(self.fileorg['exec script fname'], "w") 
+        bash_fobj = open(self.fileorg['slurm script fname'], "w") 
 
         if email is not None: 
             header = """\
@@ -1714,7 +1751,8 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
 
         bash_fobj.close()
         if verbose:
-            logging.info("Wrote %s"%self.fileorg['exec script fname'])
+            logging.info("Wrote %s"%self.fileorg['slurm script fname'])
+        return 0
 
     def get_metrics(self, fp2res=16, verbose=True):
         TelAp = np.loadtxt(self.fileorg['TelAp fname'])
