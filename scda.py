@@ -1669,7 +1669,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
 
         if email is not None: 
             header = """\
-            #! /bin/bash
+            #!/bin/bash
 
             #PBS -V
             #PBS -m e -M {0:s}
