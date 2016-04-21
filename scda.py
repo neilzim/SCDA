@@ -252,12 +252,12 @@ class DesignParamSurvey(object):
                 coron_fileorg.pop('survey fname')
             self.coron_list.append( coron_class(design=design, fileorg=self.fileorg, solver=self.solver) )
  
-        setattr(self, 'ampl_infile_status', None)
+        setattr(self, 'ampl_infile_status', False)
         self.check_ampl_input_files()
-        setattr(self, 'ampl_src_status', None)
-        setattr(self, 'submission_status', None)
-        setattr(self, 'solution_status', None)
-        setattr(self, 'eval_status', None)
+        setattr(self, 'ampl_src_status', False)
+        setattr(self, 'ampl_submission_status', False)
+        setattr(self, 'solution_status', False)
+        setattr(self, 'eval_status', False)
 
     def write_ampl_batch(self, overwrite=False, override_infile_status=False):
         write_count = 0
@@ -338,7 +338,7 @@ class DesignParamSurvey(object):
         else:
             if 'survey fname' not in self.fileorg or \
                ('survey fname' in self.fileorg and self.fileorg['survey fname'] is None): # set the filename based on the coronagraph type, user, and date
-                fname_tail = "{0:s}_{1:s}_{2:s}.pkl".format(os.path.basename(self.fileorg['work dir']), getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
+                fname_tail = "{0:s}_{1:s}_{2:s}.pkl".format(os.path.basename(os.path.abspath(self.fileorg['work dir'])), getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
                 self.fileorg['survey fname'] = os.path.join(self.fileorg['work dir'], fname_tail)
         fobj = open(self.fileorg['survey fname'], 'wb')
         pickle.dump(self, fobj)
@@ -354,7 +354,7 @@ class DesignParamSurvey(object):
         else:
             if 'survey fname' not in self.fileorg or ('survey fname' in self.fileorg and self.fileorg['survey fname'] is None):
                 #csv_fname_tail = "scda_{:s}_survey_{:s}_{:s}.csv".format(self.coron_class.__name__, getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
-                csv_fname_tail = "{0:s}_{1:s}_{2:s}.csv".format(os.path.basename(self.fileorg['work dir']), getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
+                csv_fname_tail = "{0:s}_{1:s}_{2:s}.csv".format(os.path.basename(os.path.abspath(self.fileorg['work dir'])), getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
                 csv_fname = os.path.join(self.fileorg['work dir'], csv_fname_tail)
             else:
                 csv_fname = self.fileorg['survey fname'][-4:] + ".csv"
@@ -383,7 +383,7 @@ class DesignParamSurvey(object):
                 surveywriter.writerow(["All input files exist?", 'Y'])
             else:
                 surveywriter.writerow(["All input files exist?", 'N'])
-            if self.submission_status is True:
+            if self.ampl_submission_status is True:
                 surveywriter.writerow(["All AMPL jobs submitted?", 'Y'])
             else:
                 surveywriter.writerow(["All AMPL jobs submitted?", 'N'])
