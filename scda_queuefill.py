@@ -14,11 +14,11 @@ USAGE
 Execute directly from the command line, specifying the name of the design
 survey file (extension .pkl) as an argument. For example:
 
-$ ./scda_queuefill.py /discover/nobackup/nzimmerm/april_survey01_15bw/april_survey01_15bw_ntz_2016-04-20.pkl
+$ ./scda_queuefill.py april_survey01_15bw_ntz_2016-04-20.pkl
 
 Informative output will print to stdout. To instead append the output to a text file, run
 
-$ ./scda_queuefill.py /discover/nobackup/nzimmerm/april_survey01_15bw/april_survey01_15bw_ntz_2016-04-20.pkl >> /discover/nobackup/nzimmerm/april_survey01_15bw/queuefill.log
+$ ./scda_queuefill.py april_survey01_15bw_ntz_2016-04-20.pkl >> /discover/nobackup/nzimmerm/april_survey01_15bw/queuefill.log
 
 OUTPUTS
 
@@ -53,14 +53,15 @@ import os
 import subprocess 
 import getpass
 import datetime
-sys.path.append(os.path.expanduser('~/SCDA-master'))
+SCDA_location = os.environ["SCDA"]
+sys.path.append(os.path.expanduser(SCDA_location))
 import scda
 
 QUEUE_MAX = 25
 
 assert len(sys.argv) >= 2, "Missing design survey file (.pkl) argument"
 try:
-    survey_fname = sys.argv[1]
+    survey_fname = os.path.abspath(sys.argv[1])
     survey = scda.load_design_param_survey(survey_fname)
 except:
     print("Could not load design survey file: {0}".format(survey_fname))
@@ -108,6 +109,9 @@ for coron in survey.coron_list:
 
 print("{0:d} out of {1:d} optimization jobs in the survey have been submitted, and {2:d} have solutions.".format(overall_submission_count, survey.N_combos, solution_count))
 
+if solution_count == survey.N_combos:
+    print ("Done!")
+
 # Store updated survey object
 survey.write(survey_fname)
 
@@ -118,7 +122,7 @@ if not os.path.exists(crontab_fname):
     cron_fobj = open(crontab_fname, "w")
     dt = datetime.datetime.now()
     run_minute = (dt.minute + 5) % 60
-    cron_fobj.write("{0:d} * * * *  (. /etc/profile ; . $HOME/setcronenv.sh ; cd {1:s} ; /usr/local/other/SLES11/SIVO-PyD/1.1.2/bin/python {2:s} {3:s} 1>> {4:s} 2>&1)".format(run_minute, cwd, os.path.basename(__file__), survey_fname, log_fname))
+    cron_fobj.write("{0:d} * * * *  (. /etc/profile ; . $HOME/setcronenv.sh ; /usr/local/other/SLES11/SIVO-PyD/1.1.2/bin/python $SCDA/{1:s} {2:s} 1>> {3:s} 2>&1)".format(run_minute, os.path.basename(__file__), survey_fname, log_fname))
     cron_fobj.write("\n")
     cron_fobj.close()
     print("Wrote crontab file to {0:s}".format(crontab_fname))
