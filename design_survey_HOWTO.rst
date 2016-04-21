@@ -15,17 +15,17 @@ Start from the example notebook in the github repo, https://github.com/neilzim/S
 3. Install the latest version of the SCDA python package in your home directory on NCCS Discover
 ------------------------------------------------------------------------------------------------
 
-Network restrictions disallow syncing the SCDA code directly to your home directory via ``git pull origin master``, etc. Instead, from your local workstation open the github page https://github.com/neilzim/SCDA in a web browser and click the ``Download ZIP`` button to download the current master branch.
+Network restrictions disallow syncing the SCDA code directly to your home directory via ``git pull origin master``, etc. Instead, from your local workstation open the github page https://github.com/neilzim/SCDA in a web browser and click the ``Download ZIP`` button to grab the current master version.
 
-Copy this to your Disocver home directory:
+Copy the zip file to your Disocver home directory:
 
 ``$ scp -p ~/Downloads/SCDA-master.zip discover.nccs.nasa.gov:~``
 
-Log in to Discover, and unzip it directly in the home directory:
+Then log in to Discover and unzip it directly in your home directory:
 
 ``$ unzip SCDA-master.zip``
 
-and overwrite any existing files if prompted. Finally, make sure your bash profile (``~/.bashrc``) sets the PYTHONPATH to include ~/SCDA-master, so that scripts can import the scda.py module:
+Overwrite any existing files if prompted. Finally, make sure your bash profile (``~/.bashrc``) sets the PYTHONPATH to include ~/SCDA-master, so that scripts can import the scda.py module:
 
 .. code-block:: bash
 
