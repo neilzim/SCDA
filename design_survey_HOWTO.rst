@@ -68,7 +68,7 @@ Change to the survey directory via
 
 ``$ cd /discover/nobackup/youruserid/surveydir``
 
-Launch the queue manager script
+Launch the queue manager script, specifying the existing survey archive file (extension .pkl) as the first argument, and directing the output to **queuefill.log**.
 
 ``$ scda_queuefill.py awesomesurvey.pkl >> queuefill.log``
 
