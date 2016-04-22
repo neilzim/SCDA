@@ -79,3 +79,8 @@ If you print the queue log, it should indicate that it wrote a new crontab file,
 You can edit the crontab directly, for example to modify the minute of execution, via
 
 ``$ crontab -e``
+
+4. Sync the results back to STScI
+---------------------------------
+
+``$ rsync -turp --progress discover.nccs.nasa.gov:/discover/nobackup/youruserid/surveydir/* /path/to/new/surveydir/``
