@@ -1,0 +1,6 @@
+#!/bin/bash
+export SCDA=$HOME/SCDA-master
+export AMPLBIN=$HOME/AMPL
+export AMPLLIB=$HOME/AMPL
+export PATH=${PATH}:${AMPLBIN}:${SCDA}
+export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${AMPLLIB}
