@@ -60,7 +60,7 @@ Sync the new survey:
 3. Launch the survey
 --------------------
 
-Once you back in to Discover, ssh again to the special cron node:
+Once you back in to Discover, use ssh again to switch to the special **discover-cron** node:
 
 ``$ ssh discover-cron``
 
