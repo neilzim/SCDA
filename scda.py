@@ -76,7 +76,7 @@ def make_ampl_bundle(coron_list, bundled_dir, queue_spec='auto', email=None, arc
         bundled_coron_list.append(bundled_coron)
         if bundled_coron.check_ampl_input_files() is True:
             bundled_coron.write_ampl(overwrite=True)
-            bundled_coron.write_exec_script(queue_spec=queue_spec, email=email, arch=arch, 
+            bundled_coron.write_slurm_script(queue_spec=queue_spec, email=email, arch=arch, 
                                             overwrite=True, verbose=False)
         else:
             scda.logging.warning("Input file configuration check failed; AMPL source file not written")
@@ -1658,7 +1658,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
                     logging.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['slurm fname']))
             else:
                 if verbose:
-                    logging.warning("Error: {0} already exists and overwrite switch is off, so write_exec_script() will now abort".format(self.fileorg['slurm fname']))
+                    logging.warning("Error: {0} already exists and overwrite switch is off, so write_slurm_script() will now abort".format(self.fileorg['slurm fname']))
                 return 1
         elif not os.path.exists(self.fileorg['slurm dir']):
             os.mkdir(self.fileorg['slurm dir'])
