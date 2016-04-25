@@ -51,7 +51,7 @@ From the jupyter interface, rename the notebook in a way descriptive to your sur
 
 Sync the input masks:
 
-``$ rsync -turp --progress /astro/opticslab1/SCDA/Apertures/InputMasks /discover/nobackup/youruserid/``
+``$ rsync -turp --progress /astro/opticslab1/SCDA/Apertures/InputMasks discover.nccs.nasa.gov:/discover/nobackup/youruserid/``
 
 Sync the new survey:
 
