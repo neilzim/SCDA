@@ -329,6 +329,13 @@ class DesignParamSurvey(object):
         self.eval_status = status
         return status
 
+    def eval_metrics(self, fp2res=16, verbose=False):
+        for coron in self.coron_list:
+            if os.path.exists(coron.fileorg['sol fname']) and (coron.eval_metrics['airy thrupt'] is None or coron.eval_metrics['fwhm area'] is None \
+               or coron.eval_metrics['apod nb res ratio'] is None):
+                coron.get_metrics()
+                coron.eval_status = True
+
     def write(self, fname=None):
         if fname is not None:
             if os.path.dirname(fname) is '': # if no path specified, assume work dir
@@ -348,9 +355,9 @@ class DesignParamSurvey(object):
     def write_spreadsheet(self, overwrite=False, csv_fname=None):
         if csv_fname is not None:
             if os.path.dirname(csv_fname) is '': # if no path specified, assume work dir
-                csv_fname = os.path.join(self.fileorg['work dir'], fname)
+                csv_fname = os.path.join(self.fileorg['work dir'], csv_fname)
             else:
-                csv_fname = fname
+                csv_fname = csv_fname
         else:
             if 'survey fname' not in self.fileorg or ('survey fname' in self.fileorg and self.fileorg['survey fname'] is None):
                 #csv_fname_tail = "scda_{:s}_survey_{:s}_{:s}.csv".format(self.coron_class.__name__, getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
