@@ -329,7 +329,7 @@ class DesignParamSurvey(object):
         self.eval_status = status
         return status
 
-    def eval_metrics(self, fp2res=16, verbose=False):
+    def get_metrics(self, fp2res=16, verbose=False):
         for coron in self.coron_list:
             if os.path.exists(coron.fileorg['sol fname']) and (coron.eval_metrics['airy thrupt'] is None or coron.eval_metrics['fwhm area'] is None \
                or coron.eval_metrics['apod nb res ratio'] is None):
@@ -513,6 +513,14 @@ class DesignParamSurvey(object):
                         param_combo_row.append('Y')
                     else:
                         param_combo_row.append('N')
+                    if self.coron_list[ii].eval_metrics['airy thrupt'] is not None:
+                        param_combo_row.append(self.coron_list[ii].eval_metrics['airy thrupt'])
+                    else:
+                        param_combo_row.append('')
+                    if self.coron_list[ii].eval_metrics['fwhm area'] is not None:
+                        param_combo_row.append(self.coron_list[ii].eval_metrics['fwhm area'])
+                    else:
+                        param_combo_row.append('')
                     surveywriter.writerow(param_combo_row)
                     
         survey_spreadsheet.close()
