@@ -834,7 +834,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                                                               
     def write_ampl(self, overwrite=False):
         logging.info("Writing the AMPL program")
-    def eval_onax_psf(self, fp2res=8, rho_inc=0.25, rho_out=None, Nlam=None):
+    def get_onax_psf(self, fp2res=8, rho_inc=0.25, rho_out=None, Nlam=None):
         TelAp_qp = np.loadtxt(self.fileorg['TelAp fname'])
         TelAp = np.concatenate((np.concatenate((TelAp_qp[::-1,::-1], TelAp_qp[:,::-1]),axis=0),
                                 np.concatenate((TelAp_qp[::-1,:], TelAp_qp),axis=0)), axis=1)
