@@ -31,6 +31,8 @@ In your home directory on Discover, edit the **.bashrc** file to include the fol
   export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${AMPLLIB}
   export PYTHONPATH=${PYTHONPATH}:$SCDA
   
+  module load other/comp/gcc-4.5 other/SIVO-PyD/spd
+  
 For these shell variables to take effect, you need to open a new login session or run ``source ~/.bashrc`` in every existing console.
 
 This bash profile will need to be modified if the locations of either the SCDA source tree or the AMPL/Gurobi installation change.
