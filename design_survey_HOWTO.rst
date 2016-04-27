@@ -78,7 +78,7 @@ If you print the queue log, it should indicate that it wrote a new crontab file,
 
 ``$ crontab crontab_awesomesurvey``
 
-You can edit the crontab directly, for example to modify the minute of execution, via
+Optionally, you can edit the new crontab directly (for example, to modify the execution schedule) via
 
 ``$ crontab -e``
 
