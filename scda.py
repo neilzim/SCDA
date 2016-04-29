@@ -673,17 +673,16 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         self.ampl_infile_status = status
         return status
 
-class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016)
+class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diaphragm FPM 
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 250)), ('prim',(str, 'hex3')), ('secobs',(str, 'X')), 
                                                            ('thick',(str, '025')), ('centobs',(bool, True))]) ),
-                                   ( 'FPM', OrderedDict([('r0',(float, 4.)), ('r1',(float, 10.)), ('openang',(int, 180)),
+                                   ( 'FPM', OrderedDict([('R0',(float, 4.)), ('R1',(float, 10.)), ('openang',(int, 180)),
                                                          ('orient',(str, 'H')), ('fpmres',(int, 10))]) ),
                                    ( 'LS', OrderedDict([('shape',(str, 'ann')), ('id',(int, 20)), ('od',(int, 90)),
                                                         ('obscure',(int, 0)), ('spad',(int, 0)), ('ppad',(int, 0)),
                                                         ('aligntol',(int, None)), ('aligntolcon',(float, 3.))]) ),
-                                   ( 'Image', OrderedDict([('c',(float, 10.)), ('bw',(float, 0.10)), ('Nlam',(int, 1)),
-                                                           ('ida',(float, -0.5)), ('oda',(float, 0.)), ('azda',(float, 0.)),
-                                                           ('fpres',(int,2))]) ) ])
+                                   ( 'Image', OrderedDict([('c',(float, 10.)), ('bw',(float, 0.10)), ('Nlam',(int, 5)),
+                                                           ('dR',(float, -0.5)), ('fpres',(int,2))]) ) ])
     _eval_fields =   { 'Pupil': _design_fields['Pupil'], 'FPM': _design_fields['FPM'], \
                        'LS': _design_fields['LS'], 'Image': _design_fields['Image'], \
                        'Tel': {'TelAp diam':(float, 12.)}, 'Target': {}, 'Aber': {}, 'WFSC': {} }
@@ -723,11 +722,17 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016)
         # Unless Nlam is explicitly specified, set the number of wavelength samples according to the bandwidth
         if self.design['Image']['Nlam'] == 1 and self.design['Image']['bw'] > 0:
             self.design['Image']['Nlam'] = int(np.round(self.design['Image']['bw']/(0.10/3)))
-        # Finally, set a private attribute for the number of image plane samples between the center and the outer constraint angle
+        # Set a private attribute for the number of image plane samples between the center and the outer constraint angle
         self.design['Image']['Nimg'] = int( np.ceil( self.design['Image']['fpres']*self.design['Image']['oda']/(1. - self.design['Image']['bw']/2) ) )
         if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon']:
             # The Lyot dark zone field suppression factor decreases with the square of pupil array size. The units of input parameter are arbitrarily normalized to N=125.
             self.design['LS']['s'] = self.design['LS']['aligntolcon'] - 2*np.log10(self.design['Pupil']['N']/125.)
+        if self.design['Image']['dR'] < 0: # augment optimization bandpass according to the focal plane stellar diam./pointing tolerance parameter, 'dR'
+            self.design['Image']['bw+'] = self.design['Image']['bw']*self.design['FPM']['R0']/(self.design['FPM']['R0'] + self.design['Image']['dR'])
+        else:
+            self.design['Image']['bw+'] = self.design['Image']['bw']
+        # Set a private attribute for the number of image plane samples between the center and the outer constraint angle
+        self.design['Image']['Nimg'] = int( np.ceil( self.design['Image']['fpres']*self.design['Image']['oda']/(1. - self.design['Image']['bw']/2) ) )
         if verbose: # Print summary of the set parameters
             logging.info("Design parameters: {}".format(self.design))
             logging.info("Optimization and solver parameters: {}".format(self.solver))
@@ -738,7 +743,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016)
                                                                          int(self.design['Pupil']['centobs']), self.design['Pupil']['N'])
 
         #self.amplname_fpm = "FPM{:02}M{:03}".format(int(round(100*self.design['FPM']['rad'])), self.design['FPM']['M'])
-        self.amplname_fpm = "FPM{0:02d}rho{1:03d}{2:s}{3:03d}res{2:02d}".format(int(round(10*self.design['FPM']['r0'])), int(round(10*self.design['FPM']['r1'])),
+        self.amplname_fpm = "FPM{0:02d}R{1:03d}{2:s}{3:03d}res{2:02d}".format(int(round(10*self.design['FPM']['R0'])), int(round(10*self.design['FPM']['R1'])),
                                                                                 self.design['FPM']['orient'], self.design['FPM']['openang'], self.design['FPM']['fpmres'])
         if self.design['LS']['obscure'] == 2: # LS includes primary and secondary aperture features
             self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}Pad{4:02d}{5:s}{6:s}cobs{7:d}Pad{8:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], \
@@ -752,11 +757,9 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016)
         if self.design['LS']['aligntol'] is not None:
             self.amplname_ls += "Tol{0:02d}s{1:02d}".format(self.design['LS']['aligntol'], int(round(10*self.design['LS']['aligntolcon'])))
 
-        self.amplname_image = "Img{:03}C_{:02}DA{:03}Az{:03d}_BW{:02}Nlam{:02}res{:1}".format(int(round(10*self.design['Image']['c'])), \
-                               int(round(10*(self.design['FPM']['rad']+self.design['Image']['ida']))), \
-                               int(round(10*(self.design['FPM']['rad']+self.design['Image']['oda']))), \
-                               int(round(self.design['FPM']['openang']+self.design['Image']['azda'])), \
-                               int(round(100*self.design['Image']['bw'])), self.design['Image']['Nlam'], self.design['Image']['fpres'])
+        self.amplname_image = "Img{0:03d}C_BW{1:02d}Nlam{2:02d}dR{3:1d}res{4:1d}".format(int(round(10*self.design['Image']['c'])), \
+                               int(round(100*self.design['Image']['bw'])), self.design['Image']['Nlam'], \
+                               int(round(10*self.design['Image']['dR'])), self.design['Image']['fpres'])
         if self.solver['presolve']:
             self.amplname_solver = "{}{}pre1".format(self.solver['constr'], self.solver['method'])
         else:
@@ -784,7 +787,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016)
                 self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_full_diaphragm_{0:03d}M{1:03d}_{2:s}{3:03d}deg.dat".format(
                                                                                     int(round(self.design['FPM']['fpmres']*self.design['FPM']['r0'])),
                                                                                     int(np.ceil(self.design['FPM']['fpmres']*self.design['FPM']['r1'])),
-                                                                                    self.design['FPM']['orient'], self.design['FPM']['openang'])
+                                                                                    self.design['FPM']['orient'], self.design['FPM']['openang']) )
 
             if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
                 if self.design['LS']['obscure'] == 2:
