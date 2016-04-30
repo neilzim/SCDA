@@ -674,11 +674,11 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         return status
 
 class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diaphragm FPM 
-    _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 250)), ('prim',(str, 'hex3')), ('secobs',(str, 'X')), 
+    _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 125)), ('prim',(str, 'hex3')), ('secobs',(str, 'X')), 
                                                            ('thick',(str, '025')), ('centobs',(bool, True))]) ),
                                    ( 'FPM', OrderedDict([('R0',(float, 4.)), ('R1',(float, 10.)), ('openang',(int, 180)),
                                                          ('orient',(str, 'H')), ('fpmres',(int, 10))]) ),
-                                   ( 'LS', OrderedDict([('shape',(str, 'ann')), ('id',(int, 20)), ('od',(int, 90)),
+                                   ( 'LS', OrderedDict([('N',(int, 125)), ('shape',(str, 'ann')), ('id',(int, 25)), ('od',(int, 75)),
                                                         ('obscure',(int, 0)), ('spad',(int, 0)), ('ppad',(int, 0)),
                                                         ('aligntol',(int, None)), ('aligntolcon',(float, 3.))]) ),
                                    ( 'Image', OrderedDict([('c',(float, 10.)), ('bw',(float, 0.10)), ('Nlam',(int, 5)),
@@ -719,20 +719,20 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                 if param not in self.design[keycat] or (self.design[keycat][param] is None and \
                                                         self._design_fields[keycat][param][1] is not None):
                     self.design[keycat][param] = self._design_fields[keycat][param][1]
-        # Unless Nlam is explicitly specified, set the number of wavelength samples according to the bandwidth
-        if self.design['Image']['Nlam'] == 1 and self.design['Image']['bw'] > 0:
-            self.design['Image']['Nlam'] = int(np.round(self.design['Image']['bw']/(0.10/3)))
-        # Set a private attribute for the number of image plane samples between the center and the outer constraint angle
-        self.design['Image']['Nimg'] = int( np.ceil( self.design['Image']['fpres']*self.design['Image']['oda']/(1. - self.design['Image']['bw']/2) ) )
-        if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon']:
-            # The Lyot dark zone field suppression factor decreases with the square of pupil array size. The units of input parameter are arbitrarily normalized to N=125.
-            self.design['LS']['s'] = self.design['LS']['aligntolcon'] - 2*np.log10(self.design['Pupil']['N']/125.)
-        if self.design['Image']['dR'] < 0: # augment optimization bandpass according to the focal plane stellar diam./pointing tolerance parameter, 'dR'
+        self.design['FPM']['M'] = int(np.ceil(self.design['FPM']['fpmres']*self.design['FPM']['R1']))
+        if self.design['Image']['dR'] < 0: # expand optimization bandpass according to the focal plane stellar diam./pointing tolerance parameter, 'dR'
             self.design['Image']['bw+'] = self.design['Image']['bw']*self.design['FPM']['R0']/(self.design['FPM']['R0'] + self.design['Image']['dR'])
         else:
             self.design['Image']['bw+'] = self.design['Image']['bw']
+        # Unless Nlam is explicitly specified, set the number of wavelength samples according to the bandwidth
+        if self.design['Image']['Nlam'] == 1 and self.design['Image']['bw+'] > 0:
+            self.design['Image']['Nlam'] = int(np.round(self.design['Image']['bw+']/(0.10/3)))
         # Set a private attribute for the number of image plane samples between the center and the outer constraint angle
-        self.design['Image']['Nimg'] = int( np.ceil( self.design['Image']['fpres']*self.design['Image']['oda']/(1. - self.design['Image']['bw']/2) ) )
+        self.design['Image']['Nimg'] = int( np.ceil( self.design['Image']['fpres']*self.design['FPM']['R1']/(1. - self.design['Image']['bw+']/2) ) )
+        if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon']:
+            # The Lyot dark zone field suppression factor decreases with the square of pupil array size. The units of input parameter are arbitrarily normalized to N=125.
+            self.design['LS']['s'] = self.design['LS']['aligntolcon'] - 2*np.log10(self.design['Pupil']['N']/125.)
+
         if verbose: # Print summary of the set parameters
             logging.info("Design parameters: {}".format(self.design))
             logging.info("Optimization and solver parameters: {}".format(self.solver))
@@ -742,9 +742,8 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         self.amplname_pupil = "{0:s}{1:s}{2:s}cobs{3:d}_N{4:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
                                                                          int(self.design['Pupil']['centobs']), self.design['Pupil']['N'])
 
-        #self.amplname_fpm = "FPM{:02}M{:03}".format(int(round(100*self.design['FPM']['rad'])), self.design['FPM']['M'])
-        self.amplname_fpm = "FPM{0:02d}R{1:03d}{2:s}{3:03d}res{2:02d}".format(int(round(10*self.design['FPM']['R0'])), int(round(10*self.design['FPM']['R1'])),
-                                                                                self.design['FPM']['orient'], self.design['FPM']['openang'], self.design['FPM']['fpmres'])
+        self.amplname_fpm = "FPM{0:02d}R{1:03d}{2:s}{3:03d}res{4:02d}".format(int(round(10*self.design['FPM']['R0'])), int(round(10*self.design['FPM']['R1'])),
+                                                                              self.design['FPM']['orient'], self.design['FPM']['openang'], self.design['FPM']['fpmres'])
         if self.design['LS']['obscure'] == 2: # LS includes primary and secondary aperture features
             self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}Pad{4:02d}{5:s}{6:s}cobs{7:d}Pad{8:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], \
                                self.design['LS']['od'], self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
@@ -759,7 +758,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
 
         self.amplname_image = "Img{0:03d}C_BW{1:02d}Nlam{2:02d}dR{3:1d}res{4:1d}".format(int(round(10*self.design['Image']['c'])), \
                                int(round(100*self.design['Image']['bw'])), self.design['Image']['Nlam'], \
-                               int(round(10*self.design['Image']['dR'])), self.design['Image']['fpres'])
+                               int(round(-10*self.design['Image']['dR'])), self.design['Image']['fpres'])
         if self.solver['presolve']:
             self.amplname_solver = "{}{}pre1".format(self.solver['constr'], self.solver['method'])
         else:
@@ -785,8 +784,8 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
 
             if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
                 self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_full_diaphragm_{0:03d}M{1:03d}_{2:s}{3:03d}deg.dat".format(
-                                                                                    int(round(self.design['FPM']['fpmres']*self.design['FPM']['r0'])),
-                                                                                    int(np.ceil(self.design['FPM']['fpmres']*self.design['FPM']['r1'])),
+                                                                                    int(round(self.design['FPM']['fpmres']*self.design['FPM']['R0'])),
+                                                                                    int(np.ceil(self.design['FPM']['fpmres']*self.design['FPM']['R1'])),
                                                                                     self.design['FPM']['orient'], self.design['FPM']['openang']) )
 
             if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
@@ -796,17 +795,17 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                                                              self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
                                                              self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'],
                                                              self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['spad'],
-                                                             self.design['Pupil']['N'])) )
+                                                             self.design['LS']['N'])) )
                 elif self.design['LS']['obscure'] == 1:
                     self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_full_" + \
                                                              "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}cobs{5:d}Pad{6:02d}_N{7:04d}.dat".format(
                                                              self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
                                                              self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
-                                                             self.design['LS']['spad'], self.design['Pupil']['N'])) )
+                                                             self.design['LS']['spad'], self.design['LS']['N'])) )
                 else:
                     self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_full_" + \
                                                              "{0:s}{1:02d}D{2:02d}_clear_N{3:04d}.dat".format(self.design['LS']['shape'],
-                                                             self.design['LS']['id'], self.design['LS']['od'], self.design['Pupil']['N'])) )
+                                                             self.design['LS']['id'], self.design['LS']['od'], self.design['LS']['N'])) )
 
             if self.design['LS']['aligntol'] is not None and ('LDZ fname' not in self.fileorg or self.fileorg['LDZ fname'] is None):
                 if self.design['LS']['obscure'] == 2:
@@ -815,19 +814,18 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                                                              self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
                                                              self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'],
                                                              self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['spad'],
-                                                             self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
+                                                             self.design['LS']['aligntol'], self.design['LS']['N'])) )
                 elif self.design['LS']['obscure'] == 1:
                     self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_full_" + \
                                                              "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}c{5:d}Pad{6:02d}_Tol{7:02d}_N{8:04d}.dat".format(
                                                              self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
                                                              self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
-                                                             self.design['LS']['spad'], self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
+                                                             self.design['LS']['spad'], self.design['LS']['aligntol'], self.design['LS']['N'])) )
                 else:
                     self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_full_" + \
                                                              "{0:s}{1:02d}D{2:02d}_clear_Tol{3:02d}_N{4:04d}.dat".format(
                                                              self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                             self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
-
+                                                             self.design['LS']['aligntol'], self.design['LS']['N'])) )
             self.check_ampl_input_files()
 
     def write_ampl(self, overwrite=False):
@@ -895,7 +893,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             Psi_D_0_peak = np.sum(A*TelAp*LS)*dx*dx/wr
             intens_polychrom[wi,:,:] = np.power(np.absolute(Psi_D)/Psi_D_0_peak, 2)
              
-        seps = np.arange(self.design['FPM']['r0']+self.design['Image']['ida'], rho_out, rho_inc)
+        seps = np.arange(self.design['FPM']['R0']+self.design['Image']['dR'], rho_out, rho_inc)
         radial_intens_polychrom = np.zeros((len(wrs), len(seps)))
         XXs = np.asarray(np.dot(np.matrix(np.ones(xis.shape)).T, xis))
         YYs = np.asarray(np.dot(etas.T, np.matrix(np.ones(etas.shape))))
@@ -921,6 +919,617 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                 radial_intens_polychrom[wi, si] = np.mean(np.ravel(intens_polychrom[wi,:,:])[meas_ann_ind])
 
         return intens_polychrom, seps, radial_intens_polychrom
+
+class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane symmetry case
+    def __init__(self, **kwargs):
+        super(QuarterplaneSPLC, self).__init__(**kwargs)
+        self.amplname_coron = "SPLC_quart"
+        if 'ampl src fname' not in self.fileorg or self.fileorg['ampl src fname'] is None:
+            ampl_src_fname_tail = self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
+                                  self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".mod"
+            self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname_tail)
+
+        if 'sol fname' not in self.fileorg or self.fileorg['sol fname'] is None:
+            sol_fname_tail = "ApodSol_" + self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
+                             self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".dat"
+            self.fileorg['sol fname'] = os.path.join(self.fileorg['sol dir'], sol_fname_tail)
+
+        if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
+            self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_quart_" + self.amplname_pupil + ".dat") )
+
+        if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
+            self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_quart_diaphragm_{0:03d}M{1:03d}_{2:s}{3:03d}deg.dat".format(
+                                                                                int(round(self.design['FPM']['fpmres']*self.design['FPM']['R0'])),
+                                                                                int(np.ceil(self.design['FPM']['fpmres']*self.design['FPM']['R1'])),
+                                                                                self.design['FPM']['orient'], self.design['FPM']['openang']) )
+
+        if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
+            if self.design['LS']['obscure'] == 2:
+                self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
+                                                         "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}cobs{7:d}Pad{8:02d}_N{9:04d}.dat".format(
+                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                         self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'],
+                                                         self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['spad'],
+                                                         self.design['LS']['N'])) )
+            elif self.design['LS']['obscure'] == 1:
+                self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
+                                                         "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}cobs{5:d}Pad{6:02d}_N{7:04d}.dat".format(
+                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                         self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
+                                                         self.design['LS']['spad'], self.design['LS']['N'])) )
+            else:
+                self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
+                                                         "{0:s}{1:02d}D{2:02d}_clear_N{3:04d}.dat".format(self.design['LS']['shape'],
+                                                         self.design['LS']['id'], self.design['LS']['od'], self.design['LS']['N'])) )
+
+        if self.design['LS']['aligntol'] is not None and ('LDZ fname' not in self.fileorg or self.fileorg['LDZ fname'] is None):
+            if self.design['LS']['obscure'] == 2:
+                self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_quart_" + \
+                                                         "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}c{7:d}Pad{8:02d}_Tol{9:02d}_N{10:04d}.dat".format(
+                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                         self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'],
+                                                         self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['spad'],
+                                                         self.design['LS']['aligntol'], self.design['LS']['N'])) )
+            elif self.design['LS']['obscure'] == 1:
+                self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_quart_" + \
+                                                         "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}c{5:d}Pad{6:02d}_Tol{7:02d}_N{8:04d}.dat".format(
+                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                         self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
+                                                         self.design['LS']['spad'], self.design['LS']['aligntol'], self.design['LS']['N'])) )
+            else:
+                self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_quart_" + \
+                                                         "{0:s}{1:02d}D{2:02d}_clear_Tol{3:02d}_N{4:04d}.dat".format(
+                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                         self.design['LS']['aligntol'], self.design['LS']['N'])) )
+        self.check_ampl_input_files()
+    def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None, verbose=True):
+        if self.ampl_infile_status is False and not override_infile_status:
+            if verbose:
+                logging.warning("Error: the most recent input file check for this design configuration failed.")
+                logging.warning("The override_infile_status switch is off, so write_ampl() will now abort.")
+                logging.warning("See previous warnings in the log to see what file was missing during the initialization")
+            return 2
+        if ampl_src_fname is not None:
+            if os.path.dirname(ampl_src_fname) == '' and self.fileorg['ampl src dir'] is not None:
+                self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname)
+            else:
+                self.fileorg['ampl src fname'] = ampl_src_fname
+                self.fileorg['ampl src dir'] = os.path.dirname(self.fileorg['ampl src fname'])
+        if os.path.exists(self.fileorg['ampl src fname']):
+            if overwrite == True:
+                if verbose:
+                    logging.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
+            else:
+                if verbose:
+                    logging.warning("Error: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
+                return 1
+        elif not os.path.exists(self.fileorg['ampl src dir']):
+            os.mkdir(self.fileorg['ampl src dir'])
+            if verbose:
+                logging.info("Created new AMPL source code directory, {0:s}".format(self.fileorg['ampl src dir']))
+        mod_fobj = open(self.fileorg['ampl src fname'], "w")
+ 
+        header = """\
+        # AMPL program to optimize a quarter-plane symmetric SPLC
+        # Created by {0:s} with {1:s} on {2:s} at {3:s}
+        # load amplgsl.dll;
+        """.format(getpass.getuser(), os.path.basename(__file__), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+ 
+        if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
+            params = """
+            #---------------------
+ 
+            param pi:= 4*atan(1);
+ 
+            #---------------------
+            param c := {0:.2f};
+            param s := {1:.2f};
+ 
+            #---------------------
+            param rho0 := {2:0.2f};
+            param rho1 := {3:0.2f};
+            param ang := {4:03d};
+            
+            #---------------------
+            param N_A := {5:d};				# discretization parameter (apodizer)
+            param M := {6:d};				# discretization parameter (FPM)
+            param N_L := {7:d};				# discretization parameter (Lyot plane)
+            param Nimg := {8:d};           # discretization parameter (image)
+                                  
+            #---------------------
+            param bw := {9:0.2f};
+            param Nlam := {10:d};
+            
+            #---------------------
+            """.format(self.design['Image']['c'], self.design['LS']['s'], self.design['FPM']['R0'], self.design['FPM']['R1'],
+                       self.design['FPM']['openang'], self.design['Pupil']['N'], self.design['FPM']['M'], self.design['LS']['N'],
+                       self.design['Image']['Nimg'], self.design['Image']['bw+'], self.design['Image']['Nlam'])
+        else:
+            params = """
+            #---------------------
+ 
+            param pi:= 4*atan(1);
+ 
+            #---------------------
+            param c := {0:.2f};
+ 
+            #---------------------
+            param rho0 := {1:0.2f};
+            param rho1 := {2:0.2f};
+            param ang := {3:03d};
+            
+            #---------------------
+            param N_A := {4:d};				# discretization parameter (apodizer)
+            param M := {5:d};				# discretization parameter (FPM)
+            param N_L := {6:d};				# discretization parameter (Lyot plane)
+            param Nimg := {7:d};           # discretization parameter (image)
+                                  
+            #---------------------
+            param bw := {8:0.2f};
+            param Nlam := {9:d};
+            
+            #---------------------
+            """.format(self.design['Image']['c'], self.design['FPM']['R0'], self.design['FPM']['R1'], self.design['FPM']['openang'],
+                       self.design['Pupil']['N'], self.design['FPM']['M'], self.design['LS']['N'], self.design['Image']['Nimg'],
+                       self.design['Image']['bw+'], self.design['Image']['Nlam'])
+
+        define_coords = """
+        #---------------------
+        # steps in each plane
+        param dx := 1/(2*N_A);
+        param dy := dx;
+        
+        param dmx := 1/{0:d};
+        param dmy := dmx;
+
+        param du := 1/(2*N_L);
+        param dv := du;
+        
+        param dxi := rho1/Nimg;
+        param deta := dxi;
+ 
+        #---------------------
+        # coordinate vectors in each plane
+        set Xs := setof {i in 0.5..N_A-0.5 by 1} i*dx;
+        set Ys := setof {j in 0.5..N_A-0.5 by 1} j*dy;
+        
+        set MXs := setof {i in 0.5..M-0.5 by 1} i*dmx;
+        set MYs := setof {j in 0.5..M-0.5 by 1} j*dmy;
+
+        set Us := setof {i in 0.5..N_L-0.5 by 1} i*du;
+        set Vs := setof {j in 0.5..N_L-0.5 by 1} j*dv;
+
+        set Xis := setof {i in 0..Nimg-1 by 1} i*dxi;
+        set Etas := setof {j in 0..Nimg-1 by 1} j*deta;
+        """
+       
+        if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
+            load_masks = """\
+            #---------------------
+            # Load telescope aperture
+            param TelAp {{x in Xs, y in Ys}};
+            read {{y in Ys, x in Xs}} TelAp[x,y] < "{0:s}";
+            close "{1:s}";
+            
+            # Load FPM
+            param FPM {{mx in MXs, my in MYs}};
+            read {{my in MYs, mx in MXs}} FPM[mx,my] < "{2:s}"; 
+            close "{3:s}";
+            
+            # Load Lyot stop
+            param LS {{u in Us, v in Vs}};
+            read {{v in Vs, u in Us}} LS[u,v] < "{4:s}";
+            close "{5:s}";
+            
+            # Load Lyot dark zone
+            param LDZ {{u in Us, v in Vs}};
+            read {{v in Vs, u in Us}} LDZ[u,v] < "{6:s}";
+            close "{7:s}";
+            """.format(self.fileorg['TelAp fname'], self.fileorg['TelAp fname'], self.fileorg['FPM fname'], self.fileorg['FPM fname'], \
+                       self.fileorg['LS fname'], self.fileorg['LS fname'], self.fileorg['LDZ fname'], self.fileorg['LDZ fname'])
+        else:
+            load_masks = """\
+            #---------------------
+            # Load telescope aperture
+            param TelAp {{x in Xs, y in Ys}};
+            
+            read {{y in Ys, x in Xs}} TelAp[x,y] < "{0:s}";
+            close "{1:s}";
+            
+            # Load FPM
+            param FPM {{mx in MXs, my in MYs}};
+            
+            read {{my in MYs, mx in MXs}} FPM[mx,my] < "{2:s}"; 
+            close "{3:s}";
+            
+            # Load Lyot stop
+            param LS {{u in Us, v in Vs}};
+            
+            read {{v in Vs, u in Us}} LS[u,v] < "{4:s}";
+            close "{5:s}";
+            """.format(self.fileorg['TelAp fname'], self.fileorg['TelAp fname'], self.fileorg['FPM fname'], self.fileorg['FPM fname'], \
+                       self.fileorg['LS fname'], self.fileorg['LS fname'])
+
+        if self.design['Image']['Nlam'] > 1 and self.design['Image']['bw'] > 0:
+            define_wavelengths = """
+            set Ls := setof {l in 1..Nlam} 1 - bw/2 + (l-1)*bw/(Nlam-1);
+            """
+        else:
+            define_wavelengths = """
+            set Ls := setof {l in 1..1} 1;
+            """
+
+        if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
+            sets_and_arrays_part1 = """
+            #---------------------
+
+            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
+            set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
+            set Lyot := setof {u in Us, v in Vs: LS[u,v] > 0} (u,v);
+            set LyotDarkZone := setof {u in Us, v in Vs: LDZ[u,v] > 0} (u,v);
+
+            param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
+            
+            var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
+            """
+        else:
+            sets_and_arrays_part1 = """
+            #---------------------
+
+            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
+            set FPMtrans := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
+            set FPMall := setof {mx in MXs, my in MYs: FPM[mx,my] >= 0} (mx,my);
+            set Lyot := setof {u in Us, v in Vs: LS[u,v] > 0} (u,v);
+
+            param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
+            
+            var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
+            """
+
+        if self.design['FPM']['orient'] is 'H': # Horizontal bowtie FoV
+            sets_and_arrays_part2 = """
+            #---------------------
+            set DarkHole := setof {xi in Xis, eta in Etas:
+                sqrt(xi^2+eta^2) >= rho0 && 
+                sqrt(xi^2+eta^2) <= rho1 &&
+                eta <= xi*tan(ang/2*pi/180)} (xi,eta);
+            """
+        else: # Vertical bowtie FoV
+            sets_and_arrays_part2 = """
+            #---------------------
+            set DarkHole := setof {xi in Xis, eta in Etas:
+                sqrt(xi^2+eta^2) >= rho0 && 
+                sqrt(xi^2+eta^2) <= rho1 &&
+                eta >= xi*tan(ang/2*pi/180)} (xi,eta);
+            """
+ 
+        if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
+            field_propagation = """
+            #---------------------
+            var EB_real_X {mx in MXs, y in Ys, lam in Ls};
+            var EB_real {mx in MXs, my in MYs, lam in Ls};
+            
+            subject to st_EB_real_X {mx in MXs, y in Ys, lam in Ls}:
+                EB_real_X[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
+            subject to st_EB_real {(mx, my) in FPMtrans, lam in Ls}:
+                EB_real[mx,my,lam] = 2/lam*sum {y in Ys} EB_real_X[mx,y,lam]*cos(2*pi*y*my/lam)*dy;
+            
+            #---------------------
+            var EC_real_X {u in Us, my in MYs, lam in Ls};
+            var EC_real {u in Us, v in Vs, lam in Ls};
+            
+            subject to st_EC_real_X {u in Us, my in MYs, lam in Ls}:
+                EC_real_X[x,my,lam] = 2*sum {mx in MXs: (mx,my) in FPMtrans} FPM[mx,my]*EB_real[mx,my,lam]*cos(2*pi*u*mx/lam)*dmx;
+            subject to st_EC_real {(u,v) in Lyot union LyotDarkZone, lam in Ls}:
+                EC_real[u,v,lam] = 2/lam*sum {my in MYs} EC_real_X[u,my,lam]*cos(2*pi*v*my/lam)*dmy;
+            
+            #---------------------
+            var ED_real_X {xi in Xis, v in Vs, lam in Ls};
+            var ED_real {xi in Xis, eta in Etas, lam in Ls};
+            
+            subject to st_ED_real_X {xi in Xis, v in Vs, lam in Ls}: 
+                ED_real_X[xi,v,lam] = 2*sum {u in Us: (u,v) in Lyot} EC_real[u,v,lam]*cos(2*pi*u*xi/lam)*du;
+            subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: 
+                ED_real[xi,eta,lam] = 2/lam*sum {v in Vs} ED_real_X[xi,v,lam]*cos(2*pi*v*eta/lam)*dv;
+            
+            #---------------------
+            var ED00_real := 0.0;
+            var EB00_real_X {mx in MXs, y in Ys};
+            var EB00_real {mx in MXs, my in MYs};
+            var EC00_real_X {u in Us, my in MYs};
+            var EC00_real {u in Us, v in Vs};
+            var ED00_real := 0.0;
+
+            subject to st_EB00_real_X {mx in MXs, y in Ys}:
+                EB00_real_X[mx,y] = 2*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2*pi*x*mx)*dx;
+            subject to st_EB00_real {(mx, my) in FPMall}: 
+                EB00_real[mx,my] = 2*sum {y in Ys} EB00_real_X[mx,y]*cos(2*pi*y*my)*dy;
+            subject to st_EC00_real_X {u in Us, my in MYs}:
+                EC00_real_X[x,my] = 2*sum {mx in MXs: (mx,my) in FPMall} EB00_real[mx,my]*cos(2*pi*u*mx)*dmx;
+            subject to st_EC00_real {(u,v) in Lyot}:
+                EC00_real[u,v] = 2*sum {my in MYs} EC00_real_X[u,my]*cos(2*pi*v*my)*dmy;
+            subject to st_ED00_real:
+                ED00_real = 4.*sum {u in Us, v in Vs: (u,v) in Lyot} EC00_real[u,v]*du*dv;
+            """
+        else:
+            field_propagation = """
+            #---------------------
+            var EB_real_X {mx in MXs, y in Ys, lam in Ls};
+            var EB_real {mx in MXs, my in MYs, lam in Ls};
+            
+            subject to st_EB_real_X {mx in MXs, y in Ys, lam in Ls}:
+                EB_real_X[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
+            subject to st_EB_real {(mx, my) in FPMtrans, lam in Ls}:
+                EB_real[mx,my,lam] = 2/lam*sum {y in Ys} EB_real_X[mx,y,lam]*cos(2*pi*y*my/lam)*dy;
+            
+            #---------------------
+            var EC_real_X {u in Us, my in MYs, lam in Ls};
+            var EC_real {u in Us, v in Vs, lam in Ls};
+            
+            subject to st_EC_real_X {u in Us, my in MYs, lam in Ls}:
+                EC_real_X[x,my,lam] = 2*sum {mx in MXs: (mx,my) in FPMtrans} FPM[mx,my]*EB_real[mx,my,lam]*cos(2*pi*u*mx/lam)*dmx;
+            subject to st_EC_real {(u,v) in Lyot, lam in Ls}:
+                EC_real[u,v,lam] = 2/lam*sum {my in MYs} EC_real_X[u,my,lam]*cos(2*pi*v*my/lam)*dmy;
+            
+            #---------------------
+            var ED_real_X {xi in Xis, v in Vs, lam in Ls};
+            var ED_real {xi in Xis, eta in Etas, lam in Ls};
+            
+            subject to st_ED_real_X {xi in Xis, v in Vs, lam in Ls}: 
+                ED_real_X[xi,v,lam] = 2*sum {u in Us: (u,v) in Lyot} EC_real[u,v,lam]*cos(2*pi*u*xi/lam)*du;
+            subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: 
+                ED_real[xi,eta,lam] = 2/lam*sum {v in Vs} ED_real_X[xi,v,lam]*cos(2*pi*v*eta/lam)*dv;
+            
+            #---------------------
+            var ED00_real := 0.0;
+            var EB00_real_X {mx in MXs, y in Ys};
+            var EB00_real {mx in MXs, my in MYs};
+            var EC00_real_X {u in Us, my in MYs};
+            var EC00_real {u in Us, v in Vs};
+            var ED00_real := 0.0;
+
+            subject to st_EB00_real_X {mx in MXs, y in Ys}:
+                EB00_real_X[mx,y] = 2*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2*pi*x*mx)*dx;
+            subject to st_EB00_real {(mx, my) in FPMall}: 
+                EB00_real[mx,my] = 2*sum {y in Ys} EB00_real_X[mx,y]*cos(2*pi*y*my)*dy;
+            subject to st_EC00_real_X {u in Us, my in MYs}:
+                EC00_real_X[x,my] = 2*sum {mx in MXs: (mx,my) in FPMall} EB00_real[mx,my]*cos(2*pi*u*mx)*dmx;
+            subject to st_EC00_real {(u,v) in Lyot}:
+                EC00_real[u,v] = 2*sum {my in MYs} EC00_real_X[u,my]*cos(2*pi*v*my)*dmy;
+            subject to st_ED00_real:
+                ED00_real = 4.*sum {u in Us, v in Vs: (u,v) in Lyot} EC00_real[u,v]*du*dv;
+            """
+
+        if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None:
+            constraints = """
+            #---------------------
+            maximize throughput: sum{(x,y) in Pupil} A[x,y]*dx*dy/TR;
+           
+            subject to Lyot_aligntol_constr_pos {(x,y) in LyotDarkZone, lam in Ls}:
+                EC_real[x,y,lam] <= 10^-s;
+            subject to Lyot_aligntol_constr_neg {(x,y) in LyotDarkZone, lam in Ls}:
+                EC_real[x,y,lam] >= -10^-s;
+            subject to sidelobe_zero_real_pos {(xi,eta) in DarkHole, lam in Ls}:
+                ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real/lam/sqrt(2.);
+            subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}:
+                ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/lam/sqrt(2.);
+            """
+        else:
+            constraints = """
+            #---------------------
+            maximize throughput: sum{(x,y) in Pupil} A[x,y]*dx*dy/TR;
+            
+            subject to sidelobe_zero_real_pos {(xi,eta) in DarkHole, lam in Ls}:
+                ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real/lam/sqrt(2.);
+            subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}:
+                ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/lam/sqrt(2.);
+            """
+ 
+        misc_options = """
+        option times 1;
+        option gentimes 1;
+        option show_stats 1;
+        """
+        
+        solver = """
+        option solver gurobi;
+        """
+
+        gurobi_opt_str = "outlev=1"
+        if self.solver['presolve'] is False:
+            gurobi_opt_str += " presolve=0"
+        if self.solver['method'] is 'bar' or self.solver['method'] is 'barhom':
+            gurobi_opt_str += " lpmethod=2 crossover=0"
+            if self.solver['convtol'] is not None:
+                gurobi_opt_str += " barconvtol={0:.1e}".format(np.power(10,-self.solver['convtol']))
+            if self.solver['method'] is 'barhom':
+                gurobi_opt_str += " barhomogeneous=1"
+        else: # assume dual simplex
+            gurobi_opt_str += " lpmethod=1"
+
+        solver_options = """
+        option gurobi_options "{0:s}";
+        """.format(gurobi_opt_str)
+
+        execute = """
+        solve;
+ 
+        display solve_result_num, solve_result;
+        display ED00_real; 
+        """
+ 
+        store_results = """
+        #---------------------
+
+        param A_fin {{y in Ys, x in Xs}};
+        let {{y in Ys, x in Xs}} A_fin[x,y] := 0;
+        let {{(x,y) in Pupil}} A_fin[x,y] := A[x,y];
+ 
+        printf {{y in Ys, x in Xs}}: "%15g %15g %15g \\n", x, y, A_fin[x,y] > "{0:s}";
+        """.format(self.fileorg['sol fname'])
+ 
+        mod_fobj.write( textwrap.dedent(header) )
+        mod_fobj.write( textwrap.dedent(params) )
+        mod_fobj.write( textwrap.dedent(define_coords) )
+        mod_fobj.write( textwrap.dedent(load_masks) )
+        mod_fobj.write( textwrap.dedent(define_wavelengths) )
+        mod_fobj.write( textwrap.dedent(sets_and_arrays_part1) )
+        mod_fobj.write( textwrap.dedent(sets_and_arrays_part2) )
+        mod_fobj.write( textwrap.dedent(field_propagation) )
+        mod_fobj.write( textwrap.dedent(constraints) )
+        #mod_fobj.write( textwrap.dedent(misc_options) )
+        mod_fobj.write( textwrap.dedent(solver) )
+        mod_fobj.write( textwrap.dedent(solver_options) )
+        mod_fobj.write( textwrap.dedent(execute) )
+        mod_fobj.write( textwrap.dedent(store_results) )
+ 
+        mod_fobj.close()
+        if verbose:
+            logging.info("Wrote %s"%self.fileorg['ampl src fname'])
+        return 0
+
+    def write_slurm_script(self, queue_spec='auto', account='s1649', email=None, arch=None, overwrite=False, verbose=True):
+        if os.path.exists(self.fileorg['slurm fname']):
+            if overwrite == True:
+                if verbose:
+                    logging.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['slurm fname']))
+            else:
+                if verbose:
+                    logging.warning("Error: {0} already exists and overwrite switch is off, so write_slurm_script() will now abort".format(self.fileorg['slurm fname']))
+                return 1
+        elif not os.path.exists(self.fileorg['slurm dir']):
+            os.mkdir(self.fileorg['slurm dir'])
+            if verbose:
+                logging.info("Created new slurm script directory, {0:s}".format(self.fileorg['slurm dir']))
+
+        bash_fobj = open(self.fileorg['slurm fname'], "w") 
+
+        if email is not None: 
+            header = """\
+            #!/bin/bash
+
+            #PBS -V
+            #PBS -m e -M {0:s}
+            """.format(email)
+        else:
+            header = """\
+            #! /bin/bash
+
+            """
+
+        set_job = """\
+        #SBATCH --job-name={0:s}
+        #SBATCH -o {1:s}
+        #SBATCH --account={2:s}
+        """.format(self.fileorg['job name'], self.fileorg['log fname'], account)
+       
+        if arch is not None: # can be 'hasw' for Haswell only 
+            set_node = """\
+            #SBATCH --constraint={0:s}
+            #SBATCH --ntasks=1 --nodes=1
+            """.format(arch)
+        else:
+            set_node = """\
+            #SBATCH --ntasks=1 --nodes=1
+            """.format(arch)
+
+        if queue_spec is 'auto':
+            if self.design['LS']['aligntol'] is None:
+                time_est_hrs = int(np.ceil(1*(self.design['Pupil']['N']/125.)**2*(self.design['Image']['Nlam']/3.)**3))
+            else:
+                time_est_hrs = int(np.ceil(3*(self.design['Pupil']['N']/125.)**2*(self.design['Image']['Nlam']/3.)**3))
+            if time_est_hrs > 12:
+                set_queue = """
+                #SBATCH --qos=long
+                #SBATCH --time={0:02d}:00:00
+                """.format(np.min([24, time_est_hrs]))
+            else:
+                set_queue = """
+                #SBATCH --qos=allnccs
+                #SBATCH --time={0:02d}:00:00
+                """.format(time_est_hrs)
+        elif queue_spec is '24h':
+            set_queue = """
+            #SBATCH --qos=long
+            #SBATCH --time=24:00:00
+            """
+        elif queue_spec is '12h':
+            set_queue = """
+            #SBATCH --qos=allnccs
+            #SBATCH --time=12:00:00
+            """
+
+        intel_module = """
+        . /usr/share/modules/init/bash
+        module purge
+        module load comp/intel-10.1.017
+        ulimit -s unlimited
+        """
+
+        monitor_mem = """
+        #Optional: monitor the memory usage...
+        mkdir -p ${NOBACKUP}/policeme
+        /usr/local/other/policeme/policeme.exe -d ${NOBACKUP}/policeme
+        """
+
+        call_ampl = """
+        ampl {0:s}
+        
+        exit 0
+        """.format(self.fileorg['ampl src fname'])
+
+        bash_fobj.write( textwrap.dedent(header) )
+        bash_fobj.write( textwrap.dedent(set_job) )
+        bash_fobj.write( textwrap.dedent(set_node) )
+        bash_fobj.write( textwrap.dedent(set_queue) )
+        bash_fobj.write( textwrap.dedent(intel_module) )
+        bash_fobj.write( textwrap.dedent(monitor_mem) )
+        bash_fobj.write( textwrap.dedent(call_ampl) )
+
+        bash_fobj.close()
+        if verbose:
+            logging.info("Wrote %s"%self.fileorg['slurm fname'])
+        return 0
+
+    def get_metrics(self, fp2res=16, verbose=True):
+        TelAp = np.loadtxt(self.fileorg['TelAp fname'])
+        FPM = np.loadtxt(self.fileorg['FPM fname'])
+        LS = np.loadtxt(self.fileorg['LS fname'])
+        N = TelAp.shape[1]
+        A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
+        A = A_col.reshape(TelAp.shape)
+        self.eval_metrics['apod nb res ratio'] = np.sum(np.abs(A - np.round(A)))/np.sum(TelAp)
+        dx = (1./2)/N
+        dy = dx
+        xs = np.matrix(np.linspace(0.5,N-0.5,N)*dx)
+        ys = xs.copy()
+        rho1 = 3.
+        M_fp2 = int(np.ceil(rho1*fp2res))
+        dxi = 1./fp2res
+        xis = np.matrix(np.linspace(0.5,M_fp2-0.5,M_fp2)*dxi)
+        etas = xis.copy()
+        wrs = np.linspace(1.-self.design['Image']['bw']/2, 1.+self.design['Image']['bw']/2, self.design['Image']['Nlam'])
+        airy_thrupt_polychrom = []
+        fwhm_area_polychrom = []
+        for wr in wrs:
+            Psi_D_0 = 4*dx*dy/wr*np.dot(np.cos(2*np.pi/wr*np.dot(etas.T, ys)), A*TelAp*LS).dot(np.cos(2*np.pi/wr*np.dot(xs.T, xis)))
+            Intens_D_0 = np.power(np.absolute(Psi_D_0), 2)
+            Intens_D_0_peak = (4*np.sum(TelAp*A*LS)*dx*dy/wr)**2
+            fwhm_ind_APLC = np.greater_equal(Intens_D_0, Intens_D_0_peak/2)
+            Psi_TelAp = 4*dx*dy/wr*np.dot(np.cos(2*np.pi/wr*np.dot(etas.T, ys)), TelAp).dot(np.cos(2*np.pi/wr*np.dot(xs.T, xis)))
+            Intens_TelAp = np.power(np.absolute(Psi_TelAp), 2)
+            Intens_TelAp_peak = (4*np.sum(TelAp)*dx*dy/wr)**2
+            fwhm_ind_TelAp = np.greater_equal(Intens_TelAp, Intens_TelAp_peak/2)
+            fwhm_sum_TelAp = np.sum(Intens_TelAp[fwhm_ind_TelAp])
+            fwhm_sum_APLC = np.sum(Intens_D_0[fwhm_ind_APLC])
+            fwhm_area_polychrom.append(4.*np.sum(fwhm_ind_APLC)/(fp2res**2))
+            airy_thrupt_polychrom.append(fwhm_sum_APLC/fwhm_sum_TelAp)
+        self.eval_metrics['airy thrupt'] = np.mean(airy_thrupt_polychrom)
+        self.eval_metrics['fwhm area'] = np.mean(fwhm_area_polychrom)
+        if verbose:
+            print("Non-binary residuals, as a percentage of clear telescope aperture area: {:.2f}%".format(100*self.eval_metrics['apod nb res ratio']))
+            print("Band-averaged Airy throughput: {:.2f}%".format(100*self.eval_metrics['airy thrupt']))
+            print("Band-averaged FWHM PSF area / (lambda0/D)^2: {:.2f}".format(self.eval_metrics['fwhm area']))
 
 class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 250)), ('prim',(str, 'hex3')), ('secobs',(str, 'X')), 
