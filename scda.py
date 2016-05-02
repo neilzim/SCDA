@@ -69,8 +69,10 @@ def make_ampl_bundle(coron_list, bundled_dir, queue_spec='auto', email=None, arc
         if 'LDZ fname' in coron.fileorg and coron.fileorg['LDZ fname'] is not None:
             shutil.copy2(coron.fileorg['LDZ fname'], ".")
         design_params = coron.design.copy()
-        design_params['Image'].pop('Nimg',None)
+        design_params['FPM'].pop('M',None)
         design_params['LS'].pop('s',None)
+        design_params['Image'].pop('Nimg',None)
+        design_params['Image'].pop('bw+',None)
         bundled_coron = coron.__class__(design=coron.design, fileorg=bundled_fileorg,
                                         solver=coron.solver)
         bundled_coron_list.append(bundled_coron)
@@ -774,10 +776,20 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                                       self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".mod"
                 self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname_tail)
 
+            if 'job name' not in self.fileorg or self.fileorg['job name'] is None:
+                self.fileorg['job name'] = os.path.basename(self.fileorg['ampl src fname'])[:-4]
+
             if 'sol fname' not in self.fileorg or self.fileorg['sol fname'] is None:
-                sol_fname_tail = "ApodSol_" + self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
-                                 self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".dat"
+                sol_fname_tail = "ApodSol_" + self.fileorg['job name'] + ".dat"
                 self.fileorg['sol fname'] = os.path.join(self.fileorg['sol dir'], sol_fname_tail)
+
+            if 'slurm fname' not in self.fileorg or self.fileorg['slurm fname'] is None:
+                exec_script_fname_tail = self.fileorg['job name'] + ".sh"
+                self.fileorg['slurm fname'] = os.path.join(self.fileorg['slurm dir'], exec_script_fname_tail)
+
+            if 'log fname' not in self.fileorg or self.fileorg['log fname'] is None:
+                log_fname_tail = self.fileorg['job name'] + ".log"
+                self.fileorg['log fname'] = os.path.join(self.fileorg['log dir'], log_fname_tail)
 
             if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
                 self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_full_" + self.amplname_pupil + ".dat") )
@@ -850,20 +862,21 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                             np.concatenate((A_qp[::-1,:], A_qp),axis=0)), axis=1)
 
         D = 1.
-        N = self.design['Pupil']['N']
+        N_A = self.design['Pupil']['N']
+        N_L = self.design['LS']['N']
         bw = self.design['Image']['bw']
         fpmres = self.design['FPM']['fpmres']
         M_fp1 = FPM_qp.shape[0]
         if rho_out is None:
-            rho_out = self.design['FPM']['r1'] + 1.
+            rho_out = self.design['FPM']['R1'] + 1.
         if Nlam is None:
             Nlam = self.design['Image']['Nlam']
         M_fp2 = int(np.ceil(rho_out*fp2res))
         
         # pupil plane
-        dx = (D/2)/N
+        dx = (D/2)/N_A
         dy = dx
-        xs = np.matrix(np.linspace(-N+0.5,N-0.5,2*N)*dx)
+        xs = np.matrix(np.linspace(-N_A+0.5,N_A-0.5,2*N_A)*dx)
         ys = xs
         
         # FPM
@@ -871,6 +884,12 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         dmy = dmx
         mxs = np.matrix(np.linspace(-M_fp1+0.5,M_fp1-0.5,2*M_fp1)*dmx)
         mys = mxs
+
+        # pupil plane
+        du = (D/2)/N_L
+        dv = du
+        us = np.matrix(np.linspace(-N_L+0.5,N_L-0.5,2*N_L)*du)
+        vs = us
         
         # FP2
         dxi = 1./fp2res
@@ -882,15 +901,19 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
 
         intens_polychrom = np.zeros((Nlam, 2*M_fp2, 2*M_fp2))
         for wi, wr in enumerate(wrs):
-            Psi_B = dx*dx/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, xs)), TelAp*A ),
+            Psi_B = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, xs)), TelAp*A ),
                                            np.exp(-1j*2*np.pi/wr*np.dot(xs.T, mxs)))
             Psi_B_stop = np.multiply(Psi_B, FPM)
-            Psi_C = dmx*dmx/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xs.T, mxs)), Psi_B_stop),
-                                             np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, xs)))
+            Psi_C = dmx*dmx/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(us.T, mxs)), Psi_B_stop),
+                                             np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, us)))
             Psi_C_stop = np.multiply(Psi_C, LS)
-            Psi_D = dx*dx/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), Psi_C_stop),
-                                           np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
-            Psi_D_0_peak = np.sum(A*TelAp*LS)*dx*dx/wr
+            Psi_D = du*dv/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, us)), Psi_C_stop),
+                                           np.exp(-1j*2*np.pi/wr*np.dot(us.T, xis)))
+
+            Psi_C_0 = dmx*dmx/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(us.T, mxs)), Psi_B),
+                                               np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, us)))
+            Psi_C_0_stop = np.multiply(Psi_C_0, LS)
+            Psi_D_0_peak = np.sum(Psi_C_0_stop)*du*dv/wr
             intens_polychrom[wi,:,:] = np.power(np.absolute(Psi_D)/Psi_D_0_peak, 2)
              
         seps = np.arange(self.design['FPM']['R0']+self.design['Image']['dR'], rho_out, rho_inc)
@@ -929,10 +952,20 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
                                   self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".mod"
             self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname_tail)
 
+        if 'job name' not in self.fileorg or self.fileorg['job name'] is None:
+            self.fileorg['job name'] = os.path.basename(self.fileorg['ampl src fname'])[:-4]
+
         if 'sol fname' not in self.fileorg or self.fileorg['sol fname'] is None:
-            sol_fname_tail = "ApodSol_" + self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
-                             self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".dat"
+            sol_fname_tail = "ApodSol_" + self.fileorg['job name'] + ".dat"
             self.fileorg['sol fname'] = os.path.join(self.fileorg['sol dir'], sol_fname_tail)
+
+        if 'slurm fname' not in self.fileorg or self.fileorg['slurm fname'] is None:
+            exec_script_fname_tail = self.fileorg['job name'] + ".sh"
+            self.fileorg['slurm fname'] = os.path.join(self.fileorg['slurm dir'], exec_script_fname_tail)
+
+        if 'log fname' not in self.fileorg or self.fileorg['log fname'] is None:
+            log_fname_tail = self.fileorg['job name'] + ".log"
+            self.fileorg['log fname'] = os.path.join(self.fileorg['log dir'], log_fname_tail)
 
         if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
             self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_quart_" + self.amplname_pupil + ".dat") )
@@ -1063,15 +1096,16 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             param M := {5:d};				# discretization parameter (FPM)
             param N_L := {6:d};				# discretization parameter (Lyot plane)
             param Nimg := {7:d};           # discretization parameter (image)
+            param fpmres := {8:d};         # points per center wavlength resolution element in FPM
                                   
             #---------------------
-            param bw := {8:0.2f};
-            param Nlam := {9:d};
+            param bw := {9:0.2f};
+            param Nlam := {10:d};
             
             #---------------------
             """.format(self.design['Image']['c'], self.design['FPM']['R0'], self.design['FPM']['R1'], self.design['FPM']['openang'],
                        self.design['Pupil']['N'], self.design['FPM']['M'], self.design['LS']['N'], self.design['Image']['Nimg'],
-                       self.design['Image']['bw+'], self.design['Image']['Nlam'])
+                       self.design['FPM']['fpmres'], self.design['Image']['bw+'], self.design['Image']['Nlam'])
 
         define_coords = """
         #---------------------
@@ -1079,7 +1113,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
         param dx := 1/(2*N_A);
         param dy := dx;
         
-        param dmx := 1/{0:d};
+        param dmx := 1/fpmres;
         param dmy := dmx;
 
         param du := 1/(2*N_L);
@@ -1219,7 +1253,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             var EC_real {u in Us, v in Vs, lam in Ls};
             
             subject to st_EC_real_X {u in Us, my in MYs, lam in Ls}:
-                EC_real_X[x,my,lam] = 2*sum {mx in MXs: (mx,my) in FPMtrans} FPM[mx,my]*EB_real[mx,my,lam]*cos(2*pi*u*mx/lam)*dmx;
+                EC_real_X[u,my,lam] = 2*sum {mx in MXs: (mx,my) in FPMtrans} FPM[mx,my]*EB_real[mx,my,lam]*cos(2*pi*u*mx/lam)*dmx;
             subject to st_EC_real {(u,v) in Lyot union LyotDarkZone, lam in Ls}:
                 EC_real[u,v,lam] = 2/lam*sum {my in MYs} EC_real_X[u,my,lam]*cos(2*pi*v*my/lam)*dmy;
             
@@ -1233,7 +1267,6 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
                 ED_real[xi,eta,lam] = 2/lam*sum {v in Vs} ED_real_X[xi,v,lam]*cos(2*pi*v*eta/lam)*dv;
             
             #---------------------
-            var ED00_real := 0.0;
             var EB00_real_X {mx in MXs, y in Ys};
             var EB00_real {mx in MXs, my in MYs};
             var EC00_real_X {u in Us, my in MYs};
@@ -1245,7 +1278,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             subject to st_EB00_real {(mx, my) in FPMall}: 
                 EB00_real[mx,my] = 2*sum {y in Ys} EB00_real_X[mx,y]*cos(2*pi*y*my)*dy;
             subject to st_EC00_real_X {u in Us, my in MYs}:
-                EC00_real_X[x,my] = 2*sum {mx in MXs: (mx,my) in FPMall} EB00_real[mx,my]*cos(2*pi*u*mx)*dmx;
+                EC00_real_X[u,my] = 2*sum {mx in MXs: (mx,my) in FPMall} EB00_real[mx,my]*cos(2*pi*u*mx)*dmx;
             subject to st_EC00_real {(u,v) in Lyot}:
                 EC00_real[u,v] = 2*sum {my in MYs} EC00_real_X[u,my]*cos(2*pi*v*my)*dmy;
             subject to st_ED00_real:
@@ -1267,7 +1300,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             var EC_real {u in Us, v in Vs, lam in Ls};
             
             subject to st_EC_real_X {u in Us, my in MYs, lam in Ls}:
-                EC_real_X[x,my,lam] = 2*sum {mx in MXs: (mx,my) in FPMtrans} FPM[mx,my]*EB_real[mx,my,lam]*cos(2*pi*u*mx/lam)*dmx;
+                EC_real_X[u,my,lam] = 2*sum {mx in MXs: (mx,my) in FPMtrans} FPM[mx,my]*EB_real[mx,my,lam]*cos(2*pi*u*mx/lam)*dmx;
             subject to st_EC_real {(u,v) in Lyot, lam in Ls}:
                 EC_real[u,v,lam] = 2/lam*sum {my in MYs} EC_real_X[u,my,lam]*cos(2*pi*v*my/lam)*dmy;
             
@@ -1281,7 +1314,6 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
                 ED_real[xi,eta,lam] = 2/lam*sum {v in Vs} ED_real_X[xi,v,lam]*cos(2*pi*v*eta/lam)*dv;
             
             #---------------------
-            var ED00_real := 0.0;
             var EB00_real_X {mx in MXs, y in Ys};
             var EB00_real {mx in MXs, my in MYs};
             var EC00_real_X {u in Us, my in MYs};
@@ -1293,7 +1325,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             subject to st_EB00_real {(mx, my) in FPMall}: 
                 EB00_real[mx,my] = 2*sum {y in Ys} EB00_real_X[mx,y]*cos(2*pi*y*my)*dy;
             subject to st_EC00_real_X {u in Us, my in MYs}:
-                EC00_real_X[x,my] = 2*sum {mx in MXs: (mx,my) in FPMall} EB00_real[mx,my]*cos(2*pi*u*mx)*dmx;
+                EC00_real_X[u,my] = 2*sum {mx in MXs: (mx,my) in FPMall} EB00_real[mx,my]*cos(2*pi*u*mx)*dmx;
             subject to st_EC00_real {(u,v) in Lyot}:
                 EC00_real[u,v] = 2*sum {my in MYs} EC00_real_X[u,my]*cos(2*pi*v*my)*dmy;
             subject to st_ED00_real:
