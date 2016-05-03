@@ -1061,7 +1061,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             #---------------------
             param rho0 := {2:0.2f};
             param rho1 := {3:0.2f};
-            param ang := {4:03d};
+            param ang := {4:d};
             
             #---------------------
             param N_A := {5:d};				# discretization parameter (apodizer)
@@ -1089,7 +1089,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             #---------------------
             param rho0 := {1:0.2f};
             param rho1 := {2:0.2f};
-            param ang := {3:03d};
+            param ang := {3:d};
             
             #---------------------
             param N_A := {4:d};				# discretization parameter (apodizer)
