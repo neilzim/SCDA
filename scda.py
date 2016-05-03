@@ -741,7 +741,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             logging.info("File organization parameters: {}".format(self.fileorg))
      
         self.amplname_coron = "SPLC_full"
-        self.amplname_pupil = "{0:s}{1:s}{2:s}cobs{3:d}_N{4:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
+        self.amplname_pupil = "{0:s}{1:s}{2:s}cobs{3:d}N{4:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
                                                                          int(self.design['Pupil']['centobs']), self.design['Pupil']['N'])
 
         self.amplname_fpm = "FPM{0:02d}R{1:03d}{2:s}{3:03d}res{4:02d}".format(int(round(10*self.design['FPM']['R0'])), int(round(10*self.design['FPM']['R1'])),
@@ -757,8 +757,9 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}clear".format(self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'])
         if self.design['LS']['aligntol'] is not None:
             self.amplname_ls += "Tol{0:02d}s{1:02d}".format(self.design['LS']['aligntol'], int(round(10*self.design['LS']['aligntolcon'])))
+        self.amplname_ls += "N{0:04d}".format(self.design['LS']['N'])
 
-        self.amplname_image = "Img{0:03d}C_BW{1:02d}Nlam{2:02d}dR{3:1d}res{4:1d}".format(int(round(10*self.design['Image']['c'])), \
+        self.amplname_image = "ImgC{0:03d}BW{1:02d}Nlam{2:02d}dR{3:1d}res{4:1d}".format(int(round(10*self.design['Image']['c'])), \
                                int(round(100*self.design['Image']['bw'])), self.design['Image']['Nlam'], \
                                int(round(-10*self.design['Image']['dR'])), self.design['Image']['fpres'])
         if self.solver['presolve']:
@@ -792,13 +793,18 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                 self.fileorg['log fname'] = os.path.join(self.fileorg['log dir'], log_fname_tail)
 
             if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
-                self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_full_" + self.amplname_pupil + ".dat") )
+                self.fileorg['TelAp fname'] = \
+                  os.path.join( self.fileorg['TelAp dir'], "TelAp_full_{0:s}{1:s}{2:s}cobs{3:d}_N{4:04d}.dat".format( \
+                                                            self.design['Pupil']['prim'], self.design['Pupil']['secobs'],
+                                                            self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
+                                                            self.design['Pupil']['N']) )
 
             if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
-                self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_full_diaphragm_{0:03d}M{1:03d}_{2:s}{3:03d}deg.dat".format(
-                                                                                    int(round(self.design['FPM']['fpmres']*self.design['FPM']['R0'])),
-                                                                                    int(np.ceil(self.design['FPM']['fpmres']*self.design['FPM']['R1'])),
-                                                                                    self.design['FPM']['orient'], self.design['FPM']['openang']) )
+                self.fileorg['FPM fname'] = \
+                  os.path.join( self.fileorg['FPM dir'], "FPM_full_diaphragm_{0:03d}M{1:03d}_{2:s}{3:03d}deg.dat".format(
+                                                          int(round(self.design['FPM']['fpmres']*self.design['FPM']['R0'])),
+                                                          int(np.ceil(self.design['FPM']['fpmres']*self.design['FPM']['R1'])),
+                                                          self.design['FPM']['orient'], self.design['FPM']['openang']) )
 
             if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
                 if self.design['LS']['obscure'] == 2:
@@ -968,13 +974,18 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             self.fileorg['log fname'] = os.path.join(self.fileorg['log dir'], log_fname_tail)
 
         if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
-            self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_quart_" + self.amplname_pupil + ".dat") )
+            self.fileorg['TelAp fname'] = \
+              os.path.join( self.fileorg['TelAp dir'], "TelAp_quart_{0:s}{1:s}{2:s}cobs{3:d}_N{4:04d}.dat".format(
+                                                        self.design['Pupil']['prim'], self.design['Pupil']['secobs'],
+                                                        self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
+                                                        self.design['Pupil']['N']) )
 
         if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
-            self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_quart_diaphragm_{0:03d}M{1:03d}_{2:s}{3:03d}deg.dat".format(
-                                                                                int(round(self.design['FPM']['fpmres']*self.design['FPM']['R0'])),
-                                                                                int(np.ceil(self.design['FPM']['fpmres']*self.design['FPM']['R1'])),
-                                                                                self.design['FPM']['orient'], self.design['FPM']['openang']) )
+            self.fileorg['FPM fname'] = \
+              os.path.join( self.fileorg['FPM dir'], "FPM_quart_diaphragm_{0:03d}M{1:03d}_{2:s}{3:03d}deg.dat".format(
+                                                      int(round(self.design['FPM']['fpmres']*self.design['FPM']['R0'])),
+                                                      int(np.ceil(self.design['FPM']['fpmres']*self.design['FPM']['R1'])),
+                                                      self.design['FPM']['orient'], self.design['FPM']['openang']) )
 
         if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
             if self.design['LS']['obscure'] == 2:
@@ -1262,7 +1273,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             var ED_real {xi in Xis, eta in Etas, lam in Ls};
             
             subject to st_ED_real_X {xi in Xis, v in Vs, lam in Ls}: 
-                ED_real_X[xi,v,lam] = 2*sum {u in Us: (u,v) in Lyot} EC_real[u,v,lam]*cos(2*pi*u*xi/lam)*du;
+                ED_real_X[xi,v,lam] = 2*sum {u in Us: (u,v) in Lyot} LS[u,v]*EC_real[u,v,lam]*cos(2*pi*u*xi/lam)*du;
             subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: 
                 ED_real[xi,eta,lam] = 2/lam*sum {v in Vs} ED_real_X[xi,v,lam]*cos(2*pi*v*eta/lam)*dv;
             
@@ -1282,7 +1293,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             subject to st_EC00_real {(u,v) in Lyot}:
                 EC00_real[u,v] = 2*sum {my in MYs} EC00_real_X[u,my]*cos(2*pi*v*my)*dmy;
             subject to st_ED00_real:
-                ED00_real = 4.*sum {u in Us, v in Vs: (u,v) in Lyot} EC00_real[u,v]*du*dv;
+                ED00_real = 4.*sum {u in Us, v in Vs: (u,v) in Lyot} LS[u,v]*EC00_real[u,v]*du*dv;
             """
         else:
             field_propagation = """
@@ -1309,7 +1320,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             var ED_real {xi in Xis, eta in Etas, lam in Ls};
             
             subject to st_ED_real_X {xi in Xis, v in Vs, lam in Ls}: 
-                ED_real_X[xi,v,lam] = 2*sum {u in Us: (u,v) in Lyot} EC_real[u,v,lam]*cos(2*pi*u*xi/lam)*du;
+                ED_real_X[xi,v,lam] = 2*sum {u in Us: (u,v) in Lyot} LS[u,v]*EC_real[u,v,lam]*cos(2*pi*u*xi/lam)*du;
             subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: 
                 ED_real[xi,eta,lam] = 2/lam*sum {v in Vs} ED_real_X[xi,v,lam]*cos(2*pi*v*eta/lam)*dv;
             
@@ -1329,7 +1340,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             subject to st_EC00_real {(u,v) in Lyot}:
                 EC00_real[u,v] = 2*sum {my in MYs} EC00_real_X[u,my]*cos(2*pi*v*my)*dmy;
             subject to st_ED00_real:
-                ED00_real = 4.*sum {u in Us, v in Vs: (u,v) in Lyot} EC00_real[u,v]*du*dv;
+                ED00_real = 4.*sum {u in Us, v in Vs: (u,v) in Lyot} LS[u,v]*EC00_real[u,v]*du*dv;
             """
 
         if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None:
