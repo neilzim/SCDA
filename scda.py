@@ -928,26 +928,27 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         YYs = np.asarray(np.dot(etas.T, np.matrix(np.ones(etas.shape))))
         RRs = np.sqrt(XXs**2 + YYs**2)
         theta_quad = np.rad2deg(np.arctan2(YYs[M_fp2:,M_fp2:], XXs[M_fp2:,M_fp2:]))
-        ang_mask = np.ones((2*M_fp2, 2*M_fp2))
+        #ang_mask = np.ones((2*M_fp2, 2*M_fp2))
         if self.design['FPM']['openang'] < 180:
             if self.design['FPM']['orient'] == 'V':
-                exclude_quad = np.less_equal(theta_quad, self.design['FPM']['openang']/2)
+                theta_quad_mask = np.greater_equal(theta_quad, self.design['FPM']['openang']/2)
             else:
-                exclude_quad = np.greater_equal(theta_quad, self.design['FPM']['openang']/2)
-            exclude_rhs = np.concantenate((exclude_quad[::-1,:], exclude_quad), axis=0)
-            exclude_full = np.concatenate((exclude_rhs[:,::-1], exclude_rhs), axis=1)
-            ang_mask[exclude_full] = 0
+                theta_quad_mask = np.less_equal(theta_quad, self.design['FPM']['openang']/2)
+            theta_rhs_mask = np.concatenate((theta_quad_mask[::-1,:], theta_quad_mask), axis=0)
+            theta_mask = np.concatenate((theta_rhs_mask[:,::-1], theta_rhs_mask), axis=1)
 
         for si, sep in enumerate(seps):
             r_in = np.max([seps[0], sep-0.5])
             r_out = np.min([seps[-1], sep+0.5])
             meas_ann_ind = np.nonzero(np.logical_and(np.greater_equal(RRs, r_in).ravel(),
                                                      np.less_equal(RRs, r_out).ravel(),
-                                                     ang_mask.ravel()))[0]
+                                                     np.greater(theta_mask, 0).ravel()))[0]
             for wi, wr in enumerate(wrs):
                 radial_intens_polychrom[wi, si] = np.mean(np.ravel(intens_polychrom[wi,:,:])[meas_ann_ind])
 
-        return intens_polychrom, seps, radial_intens_polychrom
+        pdb.set_trace()
+
+        return intens_polychrom, seps, radial_intens_polychrom, theta_mask
 
 class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane symmetry case
     def __init__(self, **kwargs):
