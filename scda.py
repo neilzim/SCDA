@@ -324,8 +324,8 @@ class DesignParamSurvey(object):
     def check_eval_status(self):
         status = True
         for coron in self.coron_list: # Update all individual statuses
-            if coron.eval_metrics['airy thrupt'] is None or coron.eval_metrics['fwhm area'] is None \
-               or coron.eval_metrics['apod nb res ratio'] is None:
+            if coron.eval_metrics['airy thrupt'] is None or coron.eval_metrics['rel airy thrupt'] is None \
+               or coron.eval_metrics['fwhm area'] is None or coron.eval_metrics['apod nb res ratio'] is None:
                 status = False
                 break
         self.eval_status = status
@@ -333,7 +333,8 @@ class DesignParamSurvey(object):
 
     def get_metrics(self, fp2res=16, verbose=False):
         for coron in self.coron_list:
-            if os.path.exists(coron.fileorg['sol fname']) and (coron.eval_metrics['airy thrupt'] is None or coron.eval_metrics['fwhm area'] is None \
+            if os.path.exists(coron.fileorg['sol fname']) and (coron.eval_metrics['airy thrupt'] is None \
+               or coron.eval_metrics['rel airy thrupt'] is None or coron.eval_metrics['fwhm area'] is None \
                or coron.eval_metrics['apod nb res ratio'] is None):
                 coron.get_metrics()
                 coron.eval_status = True
@@ -519,6 +520,10 @@ class DesignParamSurvey(object):
                         param_combo_row.append(self.coron_list[ii].eval_metrics['airy thrupt'])
                     else:
                         param_combo_row.append('')
+                    if self.coron_list[ii].eval_metrics['rel airy thrupt'] is not None:
+                        param_combo_row.append(self.coron_list[ii].eval_metrics['rel airy thrupt'])
+                    else:
+                        param_combo_row.append('')
                     if self.coron_list[ii].eval_metrics['fwhm area'] is not None:
                         param_combo_row.append(self.coron_list[ii].eval_metrics['fwhm area'])
                     else:
@@ -659,6 +664,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
 
         setattr(self, 'eval_metrics', {})
         self.eval_metrics['airy thrupt'] = None
+        self.eval_metrics['rel airy thrupt'] = None
         self.eval_metrics['fwhm area'] = None
         self.eval_metrics['apod nb res ratio'] = None
 
@@ -849,7 +855,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
     def write_ampl(self, overwrite=False):
         logging.info("Writing the AMPL program")
 
-    def get_onax_psf(self, fp2res=8, rho_inc=0.25, rho_out=None, Nlam=None):
+    def get_onax_psf(self, fp2res=8, rho_inc=0.25, rho_out=None, Nlam=None): # for SPLC
         TelAp_qp = np.loadtxt(self.fileorg['TelAp fname'])
         TelAp = np.concatenate((np.concatenate((TelAp_qp[::-1,::-1], TelAp_qp[:,::-1]),axis=0),
                                 np.concatenate((TelAp_qp[::-1,:], TelAp_qp),axis=0)), axis=1)
@@ -891,7 +897,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         mxs = np.matrix(np.linspace(-M_fp1+0.5,M_fp1-0.5,2*M_fp1)*dmx)
         mys = mxs
 
-        # pupil plane
+        # Lyot plane
         du = (D/2)/N_L
         dv = du
         us = np.matrix(np.linspace(-N_L+0.5,N_L-0.5,2*N_L)*du)
@@ -920,7 +926,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                                                np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, us)))
             Psi_C_0_stop = np.multiply(Psi_C_0, LS)
             Psi_D_0_peak = np.sum(Psi_C_0_stop)*du*dv/wr
-            intens_polychrom[wi,:,:] = np.power(np.absolute(Psi_D)/Psi_D_0_peak, 2)
+            intens_polychrom[wi,:,:] = np.power(np.absolute(Psi_D)/np.absolute(Psi_D_0_peak), 2)
              
         seps = np.arange(self.design['FPM']['R0']+self.design['Image']['dR'], rho_out, rho_inc)
         radial_intens_polychrom = np.zeros((len(wrs), len(seps)))
@@ -1535,44 +1541,79 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             logging.info("Wrote %s"%self.fileorg['slurm fname'])
         return 0
 
-    def get_metrics(self, fp2res=16, verbose=True):
-        TelAp = np.loadtxt(self.fileorg['TelAp fname'])
-        FPM = np.loadtxt(self.fileorg['FPM fname'])
-        LS = np.loadtxt(self.fileorg['LS fname'])
-        N = TelAp.shape[1]
+    def get_metrics(self, fp1res=8, fp2res=16, rho_out=3., verbose=True): # for SPLC class
+        TelAp_qp = np.loadtxt(self.fileorg['TelAp fname'])
+        TelAp = np.concatenate((np.concatenate((TelAp_qp[::-1,::-1], TelAp_qp[:,::-1]),axis=0),
+                                np.concatenate((TelAp_qp[::-1,:], TelAp_qp),axis=0)), axis=1)
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
-        A = A_col.reshape(TelAp.shape)
+        A_qp = A_col.reshape(TelAp_qp.shape)
+        A = np.concatenate((np.concatenate((A_qp[::-1,::-1], A_qp[:,::-1]),axis=0),
+                            np.concatenate((A_qp[::-1,:], A_qp),axis=0)), axis=1)
+        LS_qp = np.loadtxt(self.fileorg['LS fname'])
+        LS = np.concatenate((np.concatenate((LS_qp[::-1,::-1], LS_qp[:,::-1]),axis=0),
+                             np.concatenate((LS_qp[::-1,:], LS_qp),axis=0)), axis=1)
+        D = 1.
+        N_A = self.design['Pupil']['N']
+        N_L = self.design['LS']['N']
         self.eval_metrics['apod nb res ratio'] = np.sum(np.abs(A - np.round(A)))/np.sum(TelAp)
-        dx = (1./2)/N
+
+        # Pupil plane
+        dx = (D/2)/N_A
         dy = dx
-        xs = np.matrix(np.linspace(0.5,N-0.5,N)*dx)
-        ys = xs.copy()
-        rho1 = 3.
-        M_fp2 = int(np.ceil(rho1*fp2res))
+        xs = np.matrix(np.linspace(-N_A+0.5, N_A-0.5, 2*N_A)*dx)
+        ys = xs
+        # FP1
+        M_fp1 = int(np.ceil(rho_out*fp1res))
+        dmx = 1./fp1res
+        dmy = dmx
+        mxs = np.matrix(np.linspace(-M_fp1+0.5, M_fp1-0.5, 2*M_fp1)*dmx)
+        mys = mxs
+        # Lyot plane
+        du = (D/2)/N_L
+        dv = du
+        us = np.matrix(np.linspace(-N_L+0.5,N_L-0.5,2*N_L)*du)
+        vs = us
+        # FP2
+        M_fp2 = int(np.ceil(rho_out*fp2res))
         dxi = 1./fp2res
-        xis = np.matrix(np.linspace(0.5,M_fp2-0.5,M_fp2)*dxi)
+        xis = np.matrix(np.linspace(-M_fp2+0.5,M_fp2-0.5,2*M_fp2)*dxi)
         etas = xis.copy()
+        # Compute unocculted on-axis PSF
         wrs = np.linspace(1.-self.design['Image']['bw']/2, 1.+self.design['Image']['bw']/2, self.design['Image']['Nlam'])
         airy_thrupt_polychrom = []
+        rel_airy_thrupt_polychrom = []
         fwhm_area_polychrom = []
         for wr in wrs:
-            Psi_D_0 = 4*dx*dy/wr*np.dot(np.cos(2*np.pi/wr*np.dot(etas.T, ys)), A*TelAp*LS).dot(np.cos(2*np.pi/wr*np.dot(xs.T, xis)))
+            Psi_B_0 = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, xs)), TelAp*A),
+                                             np.exp(-1j*2*np.pi/wr*np.dot(xs.T, mxs)))
+            Psi_C_0 = dmx*dmy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(us.T, mxs)), Psi_B_0),
+                                               np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, us)))
+            Psi_C_0_stop = np.multiply(Psi_C_0, LS)
+            Psi_D_0 = du*dv/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, us)), Psi_C_0_stop),
+                                             np.exp(-1j*2*np.pi/wr*np.dot(us.T, xis)))
+            Psi_D_0_peak = du*dv/wr*np.sum(Psi_C_0_stop)
+
             Intens_D_0 = np.power(np.absolute(Psi_D_0), 2)
-            Intens_D_0_peak = (4*np.sum(TelAp*A*LS)*dx*dy/wr)**2
-            fwhm_ind_APLC = np.greater_equal(Intens_D_0, Intens_D_0_peak/2)
-            Psi_TelAp = 4*dx*dy/wr*np.dot(np.cos(2*np.pi/wr*np.dot(etas.T, ys)), TelAp).dot(np.cos(2*np.pi/wr*np.dot(xs.T, xis)))
+            Intens_D_0_peak = np.power(np.absolute(Psi_D_0_peak), 2)
+            fwhm_ind_SPLC = np.greater_equal(Intens_D_0, Intens_D_0_peak/2)
+            Psi_TelAp = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), TelAp),
+                                               np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
             Intens_TelAp = np.power(np.absolute(Psi_TelAp), 2)
-            Intens_TelAp_peak = (4*np.sum(TelAp)*dx*dy/wr)**2
+            Intens_TelAp_peak = (np.sum(TelAp)*dx*dy/wr)**2
             fwhm_ind_TelAp = np.greater_equal(Intens_TelAp, Intens_TelAp_peak/2)
             fwhm_sum_TelAp = np.sum(Intens_TelAp[fwhm_ind_TelAp])
-            fwhm_sum_APLC = np.sum(Intens_D_0[fwhm_ind_APLC])
-            fwhm_area_polychrom.append(4.*np.sum(fwhm_ind_APLC)/(fp2res**2))
-            airy_thrupt_polychrom.append(fwhm_sum_APLC/fwhm_sum_TelAp)
+            fwhm_sum_SPLC = np.sum(Intens_D_0[fwhm_ind_SPLC])
+            fwhm_area_polychrom.append(1.*np.sum(fwhm_ind_SPLC)/(fp2res**2))
+            airy_thrupt_polychrom.append(fwhm_sum_SPLC*dxi*dxi/np.sum(np.power(TelAp,2)*dx*dy))
+            rel_airy_thrupt_polychrom.append(fwhm_sum_SPLC/fwhm_sum_TelAp)
+            #pdb.set_trace()
         self.eval_metrics['airy thrupt'] = np.mean(airy_thrupt_polychrom)
+        self.eval_metrics['rel airy thrupt'] = np.mean(airy_thrupt_polychrom)
         self.eval_metrics['fwhm area'] = np.mean(fwhm_area_polychrom)
         if verbose:
             print("Non-binary residuals, as a percentage of clear telescope aperture area: {:.2f}%".format(100*self.eval_metrics['apod nb res ratio']))
             print("Band-averaged Airy throughput: {:.2f}%".format(100*self.eval_metrics['airy thrupt']))
+            print("Band-averaged relative Airy throughput: {:.2f}%".format(100*self.eval_metrics['rel airy thrupt']))
             print("Band-averaged FWHM PSF area / (lambda0/D)^2: {:.2f}".format(self.eval_metrics['fwhm area']))
 
 class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
@@ -1737,7 +1778,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
     def write_ampl(self, overwrite=False):
         logging.info("Writing the AMPL program")
 
-    def get_onax_psf(self, fp2res=8, rho_inc=0.25, rho_out=None, Nlam=None):
+    def get_onax_psf(self, fp2res=8, rho_inc=0.25, rho_out=None, Nlam=None): # for APLC class
         TelAp_qp = np.loadtxt(self.fileorg['TelAp fname'])
         TelAp = np.concatenate((np.concatenate((TelAp_qp[::-1,::-1], TelAp_qp[:,::-1]),axis=0),
                                 np.concatenate((TelAp_qp[::-1,:], TelAp_qp),axis=0)), axis=1)
