@@ -2215,9 +2215,9 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         var EC {x in Xs, y in Ys, lam in Ls};
         
         subject to st_EC_part_real {x in Xs, my in MYs, lam in Ls}:
-            EC_part_real[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} EBm_real[mx,my,lam]*cos(2*pi*x*mx/lam)*dmx;
+            EC_part_real[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} FPM[mx,my]*EBm_real[mx,my,lam]*cos(2*pi*x*mx/lam)*dmx;
         subject to st_EC_part_imag {x in Xs, my in MYs, lam in Ls}:
-            EC_part_imag[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} EBm_imag[mx,my,lam]*cos(2*pi*x*mx/lam)*dmx;
+            EC_part_imag[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} FPM[mx,my]*EBm_imag[mx,my,lam]*cos(2*pi*x*mx/lam)*dmx;
         subject to st_EC {(x,y) in Lyot, lam in Ls}:
             EC[x,y,lam] = TelAp[x,-y]*A[x,-y] - 2/lam*sum{my in MYs: (mx,my) in Mask} ( EC_part_real[x,my,lam]*cos(2*pi*my*y/lam) + EC_part_imag[x,my,lam]*sin(2*pi*my*y/lam) )*dmy
         
@@ -2227,7 +2227,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         var ED_imag {xi in Xis, eta in Etas, lam in Ls};
         
         subject to st_ED_part {x in Xs, eta in Etas, lam in Ls}:
-            ED_part[xi,y,lam] = 2*sum {x in Xs: (x,y) in Lyot} EC[x,y,lam]*cos(2*pi*y*eta/lam)*dx;
+            ED_part[xi,y,lam] = 2*sum {x in Xs: (x,y) in Lyot} LS[x,y]*EC[x,y,lam]*cos(2*pi*y*eta/lam)*dx;
         subject to st_ED_real {xi in Xis, eta in Etas, lam in Ls}:
             ED_real[xi,eta,lam] = 1/lam*sum {y in Ys} ED_part[xi,y,lam]*cos(2*pi*y*eta/lam)*dy;
         subject to st_ED_imag {xi in Xis, eta in Etas, lam in Ls}:
