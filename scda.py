@@ -1874,16 +1874,26 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
                                   self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".mod"
             self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname_tail)
 
+        if 'job name' not in self.fileorg or self.fileorg['job name'] is None:
+            self.fileorg['job name'] = os.path.basename(self.fileorg['ampl src fname'])[:-4]
+ 
         if 'sol fname' not in self.fileorg or self.fileorg['sol fname'] is None:
-            sol_fname_tail = "ApodSol_" + self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
-                             self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".dat"
+            sol_fname_tail = "ApodSol_" + self.fileorg['job name'] + ".dat"
             self.fileorg['sol fname'] = os.path.join(self.fileorg['sol dir'], sol_fname_tail)
 
+        if 'slurm fname' not in self.fileorg or self.fileorg['slurm fname'] is None:
+            exec_script_fname_tail = self.fileorg['job name'] + ".sh"
+            self.fileorg['slurm fname'] = os.path.join(self.fileorg['slurm dir'], exec_script_fname_tail)
+
+        if 'log fname' not in self.fileorg or self.fileorg['log fname'] is None:
+            log_fname_tail = self.fileorg['job name'] + ".log"
+            self.fileorg['log fname'] = os.path.join(self.fileorg['log dir'], log_fname_tail)
+ 
         if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
             self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_half_" + self.amplname_pupil + ".dat") )
 
         if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
-            self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_half_occspot_M{:03}.dat".format(self.design['FPM']['M']) )
+            self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_quart_occspot_M{:03}.dat".format(self.design['FPM']['M']) )
 
         if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
             if self.design['LS']['obscure'] == 2:
@@ -1928,10 +1938,11 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
 
     def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None, verbose=True):
         if self.ampl_infile_status is False and not override_infile_status:
-            logging.error("Error: the most recent input file check for this design configuration failed.")
-            logging.error("The override_infile_status switch is off, so write_ampl() will now abort.")
-            logging.error("See previous warnings in the log to see what file was missing during the initialization")
-            return
+            if verbose:
+                logging.warning("Error: the most recent input file check for this design configuration failed.")
+                logging.warning("The override_infile_status switch is off, so write_ampl() will now abort.")
+                logging.warning("See previous warnings in the log to see what file was missing during the initialization")
+            return 2
         if ampl_src_fname is not None:
             if os.path.dirname(ampl_src_fname) == '' and self.fileorg['ampl src dir'] is not None:
                 self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname)
@@ -1943,8 +1954,9 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
                 if verbose:
                     logging.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
             else:
-                logging.warning("Error: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
-                return
+                if verbose:
+                    logging.warning("Error: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
+                return 1
         elif not os.path.exists(self.fileorg['ampl src dir']):
             os.mkdir(self.fileorg['ampl src dir'])
             if verbose:
@@ -1955,118 +1967,146 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         # AMPL program to optimize a half-plane symmetric APLC
         # Created by {0:s} with {1:s} on {2:s} at {3:s}
         load amplgsl.dll;
+        """.format(getpass.getuser(), os.path.basename(__file__), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
 
+        if True:
+            params = """
+            #---------------------
+ 
+            param pi:= 4*atan(1);
+ 
+            #---------------------
+            param c := {0:.2f};
+ 
+            #---------------------
+            param Rmask := {1:0.3f};
+            param rho0 := {2:0.2f};
+            param rho1 := {3:0.2f};
+            
+            #---------------------
+            param N := {4:d};				# discretization parameter (pupil)
+            param M := {5:d};				# discretization parameter (mask)
+            param Nimg := {6:d};           # discretization parameter (image)
+                                  
+            #---------------------
+            param bw := {7:0.2f};
+            param Nlam := {8:d};
+            
+            #---------------------
+            """.format(self.design['Image']['c'], self.design['FPM']['rad'], self.design['FPM']['rad']+self.design['Image']['ida'],
+                       self.design['Image']['oda'], self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['Nimg'], \
+                       self.design['Image']['bw'], self.design['Image']['Nlam'])
 
-        #---------------------
-
-        param pi:= 4*atan(1);
-
-        #---------------------
-        param c := {4:.2f};
-
-        #---------------------
-        param Rmask := {5:0.3f};
-        param rho0 := {6:0.2f};
-        param rho1 := {7:0.2f};
-        
-        #---------------------
-        param N := {8:d};				# discretization parameter (pupil)
-        param M := {9:d};				# discretization parameter (mask)
-        param Nimg := {10:d};           # discretization parameter (image)
-        
-        #---------------------
-        param bw := {12:0.2f};
-        param lam0 := 1.;
-        param dl := bw*lam0;
-        param Nlam := {13:d};
-        
-        #---------------------
-        param obs := 20;             # NTZ: We will eliminate this section of parameter definitions, 
-        param spiders :=01;          #      since we determine the file names of the aperture and Lyot stop
-        param lsobs := 20;           #      outside the program, as well as the file name of the apodizer solution.
-        param lsspiders :=02;
-        param gap :=01;
-        param lsgap :=00;
-        
-        param OD :=0.98;
-        
-        #---------------------
-        param Normterm := 1.00; 	# 0.380
-        
-        #---------------------
-        param CoeffOverSizePup :=0.824*OD;
-        """.format(getpass.getuser(), os.path.basename(__file__), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"), \
-                   self.design['Image']['c'], self.design['FPM']['rad'], self.design['FPM']['rad']+self.design['Image']['ida'],
-                   self.design['Image']['oda'], self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['Nimg'], \
-                   self.design['Image']['bw'], self.design['Image']['Nlam'])
-        
-        load_masks = """\
-        #---------------------
-        # Loading Pupil
-        param PupilFile {{1..2*N,1..N}};
-        
-        read {{i in 1..2*N,j in 1..N}} PupilFile[i,j] < "{0:s}";
-        close "{1:s}";
-        
-        # Loading FPM
-        param MaskFile {{1..2*M,1..M}};
-        
-        read {{i in 1..2*M,j in 1..M}} MaskFile[i,j] < "{2:s}"; 
-        close "{3:s}";
-        
-        # Loading Lyot stop
-        param LyotFile {{1..2*N,1..N}};
-        
-        read {{i in 1..2*N,j in 1..N}} LyotFile[i,j] < "{4:s}";
-        close "{5:s}";
-        """.format(self.fileorg['TelAp fname'], self.fileorg['TelAp fname'], self.fileorg['FPM fname'], self.fileorg['FPM fname'], \
-                   self.fileorg['LS fname'], self.fileorg['LS fname'])
-
-        define_coords = """\
-         
+        define_coords = """
         #---------------------
         # steps in each plane
         param dx := 1/(2*N);
-        
         param dy := dx;
         
-        param dmx := 2*Rmask/(2*M);
+        param dmx := Rmask/M;
         param dmy := dmx;
         
-        param dxi := (rho1/Nimg)*(1/CoeffOverSizePup);
+        param dxi := rho1/Nimg;
         param deta := dxi;
-
+ 
         #---------------------
         # coordinate vectors in each plane
-        set Xs := setof {i in -N+0.5..N-0.5 by 1} i*dx;
+        set Xs := setof {i in 0.5..N-0.5 by 1} i*dx;
         set Ys := setof {j in 0.5..N-0.5 by 1} j*dy;
         
-        set MXs := setof {i in -M+0.5..M-0.5 by 1} i*dmx;
+        set MXs := setof {i in 0.5..M-0.5 by 1} i*dmx;
         set MYs := setof {j in 0.5..M-0.5 by 1} j*dmy;
-        
-        set Ls := setof {l in 1..Nlam} lam0*(1+((l-1)/(Nlam-1)-0.5)*dl);
-        """
 
-        sets_and_arrays = """
-        #---------------------
-        set Pupil := setof {x in Xs, y in Ys: PupilFile[round(x/dx+0.5+N),round(y/dy+0.5)] != 0} (x,y);
-        set Mask := setof {mx in MXs, my in MYs: MaskFile[round(mx/dmx+0.5+M),round(my/dmy+0.5)] != 0} (mx,my);
-        set Lyot := setof {x in Xs, y in Ys: LyotFile[round(x/dx+0.5+N),round(y/dy+0.5)] != 0} (x,y);
-        
-        param TR := sum {i in 1..2*N, j in 1..N} PupilFile[i,j]*dx*dy; # Transmission of the Pupil. Used for calibration.
-        param I00 := (sum {i in 1..2*N, j in 1..N} PupilFile[i,j]*LyotFile[i,j]*dx*dy)^2; # Peak intensity in the absence of coronagraph (Pupil and Lyot terms are squared but square exponiential is unnecessary because of the binary values).
-        
-        var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
-        
-        #---------------------
-        
-        set Xis := setof {i in -Nimg..Nimg-1 by 1} i*dxi;
+        set Xis := setof {i in 0..Nimg-1 by 1} i*dxi;
         set Etas := setof {j in 0..Nimg-1 by 1} j*deta;
-        
-        set DarkHole := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= rho0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta); # Only for 360deg masks.
-        set PSFCore := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= 0 && sqrt(xi^2+eta^2) < rho0} (xi,eta); # Only for 360deg masks.
-        set InsideArea := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= 0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta); # Only for 360deg masks.
         """
+        if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
+            load_masks = """\
+            #---------------------
+            # Load telescope aperture
+            param TelAp {{x in Xs, y in Ys}};
+            read {{y in Ys, x in Xs}} TelAp[x,y] < "{0:s}";
+            close "{1:s}";
+            
+            # Load FPM
+            param FPM {{mx in MXs, my in MYs}};
+            read {{my in MYs, mx in MXs}} FPM[mx,my] < "{2:s}"; 
+            close "{3:s}";
+            
+            # Load Lyot stop
+            param LS {{x in Xs, y in Ys}};
+            read {{y in Ys,x in Xs}} LS[x,y] < "{4:s}";
+            close "{5:s}";
+            
+            # Load Lyot dark zone
+            param LDZ {{x in Xs, y in Ys}};
+            read {{y in Ys,x in Xs}} LDZ[x,y] < "{6:s}";
+            close "{7:s}";
+            """.format(self.fileorg['TelAp fname'], self.fileorg['TelAp fname'], self.fileorg['FPM fname'], self.fileorg['FPM fname'], \
+                       self.fileorg['LS fname'], self.fileorg['LS fname'], self.fileorg['LDZ fname'], self.fileorg['LDZ fname'])
+        else:
+            load_masks = """\
+            #---------------------
+            # Load telescope aperture
+            param TelAp {{x in Xs, y in Ys}};
+            
+            read {{y in Ys, x in Xs}} TelAp[x,y] < "{0:s}";
+            close "{1:s}";
+            
+            # Load FPM
+            param FPM {{mx in MXs, my in MYs}};
+            
+            read {{my in MYs, mx in MXs}} FPM[mx,my] < "{2:s}"; 
+            close "{3:s}";
+            
+            # Load Lyot stop
+            param LS {{x in Xs, y in Ys}};
+            
+            read {{y in Ys,x in Xs}} LS[x,y] < "{4:s}";
+            close "{5:s}";
+            """.format(self.fileorg['TelAp fname'], self.fileorg['TelAp fname'], self.fileorg['FPM fname'], self.fileorg['FPM fname'], \
+                       self.fileorg['LS fname'], self.fileorg['LS fname'])
+
+        if self.design['Image']['Nlam'] > 1 and self.design['Image']['bw'] > 0:
+            define_wavelengths = """
+            set Ls := setof {l in 1..Nlam} 1 - bw/2 + (l-1)*bw/(Nlam-1);
+            """
+        else:
+            define_wavelengths = """
+            set Ls := setof {l in 1..1} 1;
+            """
+
+        if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
+            sets_and_arrays = """
+            #---------------------
+
+            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
+            set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
+            set Lyot := setof {x in Xs, y in Ys: LS[x,y] > 0} (x,y);
+            set LyotDarkZone := setof {x in Xs, y in Ys: LDZ[x,y] > 0} (x,y);
+
+            param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
+            
+            var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
+            
+            #---------------------
+            set DarkHole := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= rho0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta);
+            """
+        else:
+            sets_and_arrays = """
+            #---------------------
+
+            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
+            set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
+            set Lyot := setof {x in Xs, y in Ys: LS[x,y] > 0} (x,y);
+
+            param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
+            
+            var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
+            
+            #---------------------
+            set DarkHole := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= rho0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta);
+            """
 
         field_propagation = """
         #---------------------
@@ -2148,7 +2188,6 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         maximize throughput: sum{(x,y) in Pupil} A[x,y]*dx*dy/TR;
         
         #subject to sidelobe {(xi,eta) in DarkHole, lam in Ls}: (lam/lam0)^4*(ED_real[xi,eta,lam]^2+ED_imag[xi,eta,lam]^2) <= 10^(-c)*Normterm*I00;
-        
         
         subject to sidelobe_zero_real_pos {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real/sqrt(2.);
         subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/sqrt(2.);
