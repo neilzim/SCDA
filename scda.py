@@ -853,26 +853,34 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             self.check_ampl_input_files()
 
     def write_ampl(self, overwrite=False):
-        logging.info("Writing the AMPL program")
+        logging.info("Writing the AMPL program") # Not yet written for full-plane SPLC
 
     def get_onax_psf(self, fp2res=8, rho_inc=0.25, rho_out=None, Nlam=None): # for SPLC
-        TelAp_qp = np.loadtxt(self.fileorg['TelAp fname'])
-        TelAp = np.concatenate((np.concatenate((TelAp_qp[::-1,::-1], TelAp_qp[:,::-1]),axis=0),
-                                np.concatenate((TelAp_qp[::-1,:], TelAp_qp),axis=0)), axis=1)
-
-        FPM_qp = np.loadtxt(self.fileorg['FPM fname'])
-        FPM = np.concatenate((np.concatenate((FPM_qp[::-1,::-1], FPM_qp[:,::-1]),axis=0),
-                              np.concatenate((FPM_qp[::-1,:], FPM_qp),axis=0)), axis=1)
-        
-        LS_qp = np.loadtxt(self.fileorg['LS fname'])
-        LS = np.concatenate((np.concatenate((LS_qp[::-1,::-1], LS_qp[:,::-1]),axis=0),
-                             np.concatenate((LS_qp[::-1,:], LS_qp),axis=0)), axis=1)
-        
+        TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
-        A_qp = A_col.reshape(TelAp_qp.shape)
-        A = np.concatenate((np.concatenate((A_qp[::-1,::-1], A_qp[:,::-1]),axis=0),
-                            np.concatenate((A_qp[::-1,:], A_qp),axis=0)), axis=1)
-
+        FPM_p = np.loadtxt(self.fileorg['FPM fname'])
+        LS_p = np.loadtxt(self.fileorg['LS fname'])
+        A_p = A_col.reshape(TelAp_p.shape)
+        if isinstance(self, QuarterplaneSPLC):
+            TelAp = np.concatenate((np.concatenate((TelAp_p[::-1,::-1], TelAp_p[:,::-1]),axis=0),
+                                    np.concatenate((TelAp_p[::-1,:], TelAp_p),axis=0)), axis=1)
+            A = np.concatenate((np.concatenate((A_p[::-1,::-1], A_p[:,::-1]),axis=0),
+                                np.concatenate((A_p[::-1,:], A_p),axis=0)), axis=1)
+            FPM = np.concatenate((np.concatenate((FPM_p[::-1,::-1], FPM_p[:,::-1]),axis=0),
+                                  np.concatenate((FPM_p[::-1,:], FPM_p),axis=0)), axis=1)
+            LS = np.concatenate((np.concatenate((LS_p[::-1,::-1], LS_p[:,::-1]),axis=0),
+                                 np.concatenate((LS_p[::-1,:], LS_p),axis=0)), axis=1)
+        elif isinstance(self, HalfplaneSPLC):
+            TelAp = np.concatenate((TelAp_p[:,::-1], TelAp_p), axis=1)
+            A = np.concatenate((A_p[:,::-1], A_p), axis=1)
+            FPM = np.concatenate((FPM_p[:,::-1], FPM_p), axis=1)
+            LS = np.concatenate((LS_p[:,::-1], LS_p), axis=1)
+        else:
+            TelAp = TelAp_p
+            A = A_p
+            FPM = FPM_p
+            LS = LS_p
+        
         D = 1.
         N_A = self.design['Pupil']['N']
         N_L = self.design['LS']['N']
@@ -955,6 +963,91 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         pdb.set_trace()
 
         return intens_polychrom, seps, radial_intens_polychrom, theta_mask
+
+    def get_metrics(self, fp1res=8, fp2res=16, rho_out=3., verbose=True): # for SPLC class
+        TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
+        A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
+        LS_p = np.loadtxt(self.fileorg['LS fname'])
+        A_p = A_col.reshape(TelAp_p.shape)
+        if isinstance(self, QuarterplaneSPLC):
+            TelAp = np.concatenate((np.concatenate((TelAp_p[::-1,::-1], TelAp_p[:,::-1]),axis=0),
+                                    np.concatenate((TelAp_p[::-1,:], TelAp_p),axis=0)), axis=1)
+            A = np.concatenate((np.concatenate((A_p[::-1,::-1], A_p[:,::-1]),axis=0),
+                                np.concatenate((A_p[::-1,:], A_p),axis=0)), axis=1)
+            LS = np.concatenate((np.concatenate((LS_p[::-1,::-1], LS_p[:,::-1]),axis=0),
+                                 np.concatenate((LS_p[::-1,:], LS_p),axis=0)), axis=1)
+        elif isinstance(self, HalfplaneSPLC):
+            TelAp = np.concatenate((TelAp_p[:,::-1], TelAp_p), axis=1)
+            A = np.concatenate((A_p[:,::-1], A_p), axis=1)
+            LS = np.concatenate((LS_p[:,::-1], LS_p), axis=1)
+        else:
+            TelAp = TelAp_p
+            A = A_p
+            LS = LS_p
+            
+        D = 1.
+        N_A = self.design['Pupil']['N']
+        N_L = self.design['LS']['N']
+        self.eval_metrics['apod nb res ratio'] = np.sum(np.abs(A - np.round(A)))/np.sum(TelAp)
+
+        # Pupil plane
+        dx = (D/2)/N_A
+        dy = dx
+        xs = np.matrix(np.linspace(-N_A+0.5, N_A-0.5, 2*N_A)*dx)
+        ys = xs
+        # FP1
+        M_fp1 = int(np.ceil(rho_out*fp1res))
+        dmx = 1./fp1res
+        dmy = dmx
+        mxs = np.matrix(np.linspace(-M_fp1+0.5, M_fp1-0.5, 2*M_fp1)*dmx)
+        mys = mxs
+        # Lyot plane
+        du = (D/2)/N_L
+        dv = du
+        us = np.matrix(np.linspace(-N_L+0.5,N_L-0.5,2*N_L)*du)
+        vs = us
+        # FP2
+        M_fp2 = int(np.ceil(rho_out*fp2res))
+        dxi = 1./fp2res
+        xis = np.matrix(np.linspace(-M_fp2+0.5,M_fp2-0.5,2*M_fp2)*dxi)
+        etas = xis.copy()
+        # Compute unocculted PSF
+        wrs = np.linspace(1.-self.design['Image']['bw']/2, 1.+self.design['Image']['bw']/2, self.design['Image']['Nlam'])
+        airy_thrupt_polychrom = []
+        rel_airy_thrupt_polychrom = []
+        fwhm_area_polychrom = []
+        for wr in wrs:
+            Psi_B_0 = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, xs)), TelAp*A),
+                                             np.exp(-1j*2*np.pi/wr*np.dot(xs.T, mxs)))
+            Psi_C_0 = dmx*dmy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(us.T, mxs)), Psi_B_0),
+                                               np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, us)))
+            Psi_C_0_stop = np.multiply(Psi_C_0, LS)
+            Psi_D_0 = du*dv/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, us)), Psi_C_0_stop),
+                                             np.exp(-1j*2*np.pi/wr*np.dot(us.T, xis)))
+            Psi_D_0_peak = du*dv/wr*np.sum(Psi_C_0_stop)
+
+            Intens_D_0 = np.power(np.absolute(Psi_D_0), 2)
+            Intens_D_0_peak = np.power(np.absolute(Psi_D_0_peak), 2)
+            fwhm_ind_SPLC = np.greater_equal(Intens_D_0, Intens_D_0_peak/2)
+            Psi_TelAp = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), TelAp),
+                                               np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
+            Intens_TelAp = np.power(np.absolute(Psi_TelAp), 2)
+            Intens_TelAp_peak = (np.sum(TelAp)*dx*dy/wr)**2
+            fwhm_ind_TelAp = np.greater_equal(Intens_TelAp, Intens_TelAp_peak/2)
+            fwhm_sum_TelAp = np.sum(Intens_TelAp[fwhm_ind_TelAp])*dxi*dxi
+            fwhm_sum_SPLC = np.sum(Intens_D_0[fwhm_ind_SPLC])*dxi*dxi
+            fwhm_area_polychrom.append(np.sum(fwhm_ind_SPLC)*dxi*dxi)
+            airy_thrupt_polychrom.append(fwhm_sum_SPLC/np.sum(np.power(TelAp,2)*dx*dx))
+            rel_airy_thrupt_polychrom.append(fwhm_sum_SPLC/fwhm_sum_TelAp)
+            #pdb.set_trace()
+        self.eval_metrics['airy thrupt'] = np.mean(airy_thrupt_polychrom)
+        self.eval_metrics['rel airy thrupt'] = np.mean(rel_airy_thrupt_polychrom)
+        self.eval_metrics['fwhm area'] = np.mean(fwhm_area_polychrom)
+        if verbose:
+            print("Non-binary residuals, as a percentage of clear telescope aperture area: {:.2f}%".format(100*self.eval_metrics['apod nb res ratio']))
+            print("Band-averaged Airy throughput: {:.2f}%".format(100*self.eval_metrics['airy thrupt']))
+            print("Band-averaged relative Airy throughput: {:.2f}%".format(100*self.eval_metrics['rel airy thrupt']))
+            print("Band-averaged FWHM PSF area / (lambda0/D)^2: {:.2f}".format(self.eval_metrics['fwhm area']))
 
 class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane symmetry case
     def __init__(self, **kwargs):
@@ -1541,81 +1634,6 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             logging.info("Wrote %s"%self.fileorg['slurm fname'])
         return 0
 
-    def get_metrics(self, fp1res=8, fp2res=16, rho_out=3., verbose=True): # for SPLC class
-        TelAp_qp = np.loadtxt(self.fileorg['TelAp fname'])
-        TelAp = np.concatenate((np.concatenate((TelAp_qp[::-1,::-1], TelAp_qp[:,::-1]),axis=0),
-                                np.concatenate((TelAp_qp[::-1,:], TelAp_qp),axis=0)), axis=1)
-        A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
-        A_qp = A_col.reshape(TelAp_qp.shape)
-        A = np.concatenate((np.concatenate((A_qp[::-1,::-1], A_qp[:,::-1]),axis=0),
-                            np.concatenate((A_qp[::-1,:], A_qp),axis=0)), axis=1)
-        LS_qp = np.loadtxt(self.fileorg['LS fname'])
-        LS = np.concatenate((np.concatenate((LS_qp[::-1,::-1], LS_qp[:,::-1]),axis=0),
-                             np.concatenate((LS_qp[::-1,:], LS_qp),axis=0)), axis=1)
-        D = 1.
-        N_A = self.design['Pupil']['N']
-        N_L = self.design['LS']['N']
-        self.eval_metrics['apod nb res ratio'] = np.sum(np.abs(A - np.round(A)))/np.sum(TelAp)
-
-        # Pupil plane
-        dx = (D/2)/N_A
-        dy = dx
-        xs = np.matrix(np.linspace(-N_A+0.5, N_A-0.5, 2*N_A)*dx)
-        ys = xs
-        # FP1
-        M_fp1 = int(np.ceil(rho_out*fp1res))
-        dmx = 1./fp1res
-        dmy = dmx
-        mxs = np.matrix(np.linspace(-M_fp1+0.5, M_fp1-0.5, 2*M_fp1)*dmx)
-        mys = mxs
-        # Lyot plane
-        du = (D/2)/N_L
-        dv = du
-        us = np.matrix(np.linspace(-N_L+0.5,N_L-0.5,2*N_L)*du)
-        vs = us
-        # FP2
-        M_fp2 = int(np.ceil(rho_out*fp2res))
-        dxi = 1./fp2res
-        xis = np.matrix(np.linspace(-M_fp2+0.5,M_fp2-0.5,2*M_fp2)*dxi)
-        etas = xis.copy()
-        # Compute unocculted on-axis PSF
-        wrs = np.linspace(1.-self.design['Image']['bw']/2, 1.+self.design['Image']['bw']/2, self.design['Image']['Nlam'])
-        airy_thrupt_polychrom = []
-        rel_airy_thrupt_polychrom = []
-        fwhm_area_polychrom = []
-        for wr in wrs:
-            Psi_B_0 = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, xs)), TelAp*A),
-                                             np.exp(-1j*2*np.pi/wr*np.dot(xs.T, mxs)))
-            Psi_C_0 = dmx*dmy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(us.T, mxs)), Psi_B_0),
-                                               np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, us)))
-            Psi_C_0_stop = np.multiply(Psi_C_0, LS)
-            Psi_D_0 = du*dv/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, us)), Psi_C_0_stop),
-                                             np.exp(-1j*2*np.pi/wr*np.dot(us.T, xis)))
-            Psi_D_0_peak = du*dv/wr*np.sum(Psi_C_0_stop)
-
-            Intens_D_0 = np.power(np.absolute(Psi_D_0), 2)
-            Intens_D_0_peak = np.power(np.absolute(Psi_D_0_peak), 2)
-            fwhm_ind_SPLC = np.greater_equal(Intens_D_0, Intens_D_0_peak/2)
-            Psi_TelAp = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), TelAp),
-                                               np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
-            Intens_TelAp = np.power(np.absolute(Psi_TelAp), 2)
-            Intens_TelAp_peak = (np.sum(TelAp)*dx*dy/wr)**2
-            fwhm_ind_TelAp = np.greater_equal(Intens_TelAp, Intens_TelAp_peak/2)
-            fwhm_sum_TelAp = np.sum(Intens_TelAp[fwhm_ind_TelAp])
-            fwhm_sum_SPLC = np.sum(Intens_D_0[fwhm_ind_SPLC])
-            fwhm_area_polychrom.append(1.*np.sum(fwhm_ind_SPLC)/(fp2res**2))
-            airy_thrupt_polychrom.append(fwhm_sum_SPLC*dxi*dxi/np.sum(np.power(TelAp,2)*dx*dy))
-            rel_airy_thrupt_polychrom.append(fwhm_sum_SPLC/fwhm_sum_TelAp)
-            #pdb.set_trace()
-        self.eval_metrics['airy thrupt'] = np.mean(airy_thrupt_polychrom)
-        self.eval_metrics['rel airy thrupt'] = np.mean(airy_thrupt_polychrom)
-        self.eval_metrics['fwhm area'] = np.mean(fwhm_area_polychrom)
-        if verbose:
-            print("Non-binary residuals, as a percentage of clear telescope aperture area: {:.2f}%".format(100*self.eval_metrics['apod nb res ratio']))
-            print("Band-averaged Airy throughput: {:.2f}%".format(100*self.eval_metrics['airy thrupt']))
-            print("Band-averaged relative Airy throughput: {:.2f}%".format(100*self.eval_metrics['rel airy thrupt']))
-            print("Band-averaged FWHM PSF area / (lambda0/D)^2: {:.2f}".format(self.eval_metrics['fwhm area']))
-
 class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 250)), ('prim',(str, 'hex3')), ('secobs',(str, 'X')), 
                                                            ('thick',(str, '025')), ('centobs',(bool, True))]) ),
@@ -1779,22 +1797,30 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         logging.info("Writing the AMPL program")
 
     def get_onax_psf(self, fp2res=8, rho_inc=0.25, rho_out=None, Nlam=None): # for APLC class
-        TelAp_qp = np.loadtxt(self.fileorg['TelAp fname'])
-        TelAp = np.concatenate((np.concatenate((TelAp_qp[::-1,::-1], TelAp_qp[:,::-1]),axis=0),
-                                np.concatenate((TelAp_qp[::-1,:], TelAp_qp),axis=0)), axis=1)
-
-        FPM_qp = np.loadtxt(self.fileorg['FPM fname'])
-        FPM = np.concatenate((np.concatenate((FPM_qp[::-1,::-1], FPM_qp[:,::-1]),axis=0),
-                              np.concatenate((FPM_qp[::-1,:], FPM_qp),axis=0)), axis=1)
-        
-        LS_qp = np.loadtxt(self.fileorg['LS fname'])
-        LS = np.concatenate((np.concatenate((LS_qp[::-1,::-1], LS_qp[:,::-1]),axis=0),
-                             np.concatenate((LS_qp[::-1,:], LS_qp),axis=0)), axis=1)
-        
+        TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
-        A_qp = A_col.reshape(TelAp_qp.shape)
-        A = np.concatenate((np.concatenate((A_qp[::-1,::-1], A_qp[:,::-1]),axis=0),
-                            np.concatenate((A_qp[::-1,:], A_qp),axis=0)), axis=1)
+        FPM_p = np.loadtxt(self.fileorg['FPM fname'])
+        LS_p = np.loadtxt(self.fileorg['LS fname'])
+        A_p = A_col.reshape(TelAp_p.shape)
+        if isinstance(self, QuarterplaneAPLC):
+            TelAp = np.concatenate((np.concatenate((TelAp_p[::-1,::-1], TelAp_p[:,::-1]),axis=0),
+                                    np.concatenate((TelAp_p[::-1,:], TelAp_p),axis=0)), axis=1)
+            A = np.concatenate((np.concatenate((A_p[::-1,::-1], A_p[:,::-1]),axis=0),
+                                np.concatenate((A_p[::-1,:], A_p),axis=0)), axis=1)
+            FPM = np.concatenate((np.concatenate((FPM_p[::-1,::-1], FPM_p[:,::-1]),axis=0),
+                                  np.concatenate((FPM_p[::-1,:], FPM_p),axis=0)), axis=1)
+            LS = np.concatenate((np.concatenate((LS_p[::-1,::-1], LS_p[:,::-1]),axis=0),
+                                 np.concatenate((LS_p[::-1,:], LS_p),axis=0)), axis=1)
+        elif isinstance(self, HalfplaneAPLC):
+            TelAp = np.concatenate((TelAp_p[:,::-1], TelAp_p), axis=1)
+            A = np.concatenate((A_p[:,::-1], A_p), axis=1)
+            FPM = np.concatenate((FPM_p[:,::-1], FPM_p), axis=1)
+            LS = np.concatenate((LS_p[:,::-1], LS_p), axis=1)
+        else:
+            TelAp = TelAp_p
+            A = A_p
+            FPM = FPM_p
+            LS = LS_p
 
         D = 1.
         N = self.design['Pupil']['N']
@@ -1857,6 +1883,68 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                 radial_intens_polychrom[wi, si] = np.mean(np.ravel(intens_polychrom[wi,:,:])[meas_ann_ind])
 
         return intens_polychrom, seps, radial_intens_polychrom
+
+    def get_metrics(self, fp2res=16, verbose=True): # for APLC class
+        TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
+        A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
+        LS_p = np.loadtxt(self.fileorg['LS fname'])
+        A_p = A_col.reshape(TelAp_p.shape)
+        if isinstance(self, QuarterplaneAPLC):
+            TelAp = np.concatenate((np.concatenate((TelAp_p[::-1,::-1], TelAp_p[:,::-1]),axis=0),
+                                    np.concatenate((TelAp_p[::-1,:], TelAp_p),axis=0)), axis=1)
+            A = np.concatenate((np.concatenate((A_p[::-1,::-1], A_p[:,::-1]),axis=0),
+                                np.concatenate((A_p[::-1,:], A_p),axis=0)), axis=1)
+            LS = np.concatenate((np.concatenate((LS_p[::-1,::-1], LS_p[:,::-1]),axis=0),
+                                 np.concatenate((LS_p[::-1,:], LS_p),axis=0)), axis=1)
+        elif isinstance(self, HalfplaneAPLC):
+            TelAp = np.concatenate((TelAp_p[:,::-1], TelAp_p), axis=1)
+            A = np.concatenate((A_p[:,::-1], A_p), axis=1)
+            LS = np.concatenate((LS_p[:,::-1], LS_p), axis=1)
+        else:
+            TelAp = TelAp_p
+            A = A_p
+            LS = LS_p
+
+        self.eval_metrics['apod nb res ratio'] = np.sum(np.abs(A - np.round(A)))/np.sum(TelAp)
+        D = 1.
+        N = self.design['Pupil']['N']
+        dx = (D/2)/N
+        dy = dx
+        xs = np.matrix(np.linspace(-N+0.5, N-0.5, 2*N)*dx)
+        ys = xs.copy()
+        rho1 = 3.
+        M_fp2 = int(np.ceil(rho1*fp2res))
+        dxi = 1./fp2res
+        xis = np.matrix(np.linspace(-M_fp2+0.5, M_fp2-0.5, 2*M_fp2)*dxi)
+        etas = xis.copy()
+        wrs = np.linspace(1.-self.design['Image']['bw']/2, 1.+self.design['Image']['bw']/2, self.design['Image']['Nlam'])
+        airy_thrupt_polychrom = []
+        rel_airy_thrupt_polychrom = []
+        fwhm_area_polychrom = []
+        for wr in wrs:
+            Psi_D_0 = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), TelAp*A*LS),
+                                             np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
+            Intens_D_0 = np.power(np.absolute(Psi_D_0), 2)
+            Intens_D_0_peak = (np.sum(TelAp*A*LS)*dx*dy/wr)**2
+            fwhm_ind_APLC = np.greater_equal(Intens_D_0, Intens_D_0_peak/2)
+            Psi_TelAp = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), TelAp),
+                                               np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
+            Intens_TelAp = np.power(np.absolute(Psi_TelAp), 2)
+            Intens_TelAp_peak = (np.sum(TelAp)*dx*dy/wr)**2
+            fwhm_ind_TelAp = np.greater_equal(Intens_TelAp, Intens_TelAp_peak/2)
+            fwhm_sum_TelAp = np.sum(Intens_TelAp[fwhm_ind_TelAp])*dxi*dxi
+            fwhm_sum_APLC = np.sum(Intens_D_0[fwhm_ind_APLC])*dxi*dxi
+            fwhm_area_polychrom.append(np.sum(fwhm_ind_APLC)*dxi*dxi)
+            airy_thrupt_polychrom.append(fwhm_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx))
+            rel_airy_thrupt_polychrom.append(fwhm_sum_APLC/fwhm_sum_TelAp)
+        self.eval_metrics['airy thrupt'] = np.mean(airy_thrupt_polychrom)
+        self.eval_metrics['rel airy thrupt'] = np.mean(rel_airy_thrupt_polychrom)
+        self.eval_metrics['fwhm area'] = np.mean(fwhm_area_polychrom)
+        if verbose:
+            print("Non-binary residuals, as a percentage of clear telescope aperture area: {:.2f}%".format(100*self.eval_metrics['apod nb res ratio']))
+            print("Band-averaged Airy throughput: {:.2f}%".format(100*self.eval_metrics['airy thrupt']))
+            print("Band-averaged relative Airy throughput: {:.2f}%".format(100*self.eval_metrics['rel airy thrupt']))
+            print("Band-averaged FWHM PSF area / (lambda0/D)^2: {:.2f}".format(self.eval_metrics['fwhm area']))
     
     def read_solution(self):
         logging.info("Reading in the apodizer solution and parse the optimizer log")
@@ -1969,7 +2057,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         load amplgsl.dll;
         """.format(getpass.getuser(), os.path.basename(__file__), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
 
-        if True:
+        if True: # no Lyot plane tolerancing constraints implemented yet
             params = """
             #---------------------
  
@@ -2012,7 +2100,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         #---------------------
         # coordinate vectors in each plane
         set Xs := setof {i in 0.5..N-0.5 by 1} i*dx;
-        set Ys := setof {j in 0.5..N-0.5 by 1} j*dy;
+        set Ys := setof {j in -N+0.5..N-0.5 by 1} j*dy;
         
         set MXs := setof {i in 0.5..M-0.5 by 1} i*dmx;
         set MYs := setof {j in 0.5..M-0.5 by 1} j*dmy;
@@ -2110,102 +2198,54 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
 
         field_propagation = """
         #---------------------
-        var EBm_cx {x in Xs, my in MYs, lam in Ls} := 0.0;
-        var EBm_real {mx in MXs, my in MYs, lam in Ls} := 0.0;
-        var EBm_imag {mx in MXs, my in MYs, lam in Ls} := 0.0;
-        
-        subject to st_EBm_cx {x in Xs, my in MYs, lam in Ls}: EBm_cx[x,my,lam] = 2.*sum {y in Ys: (x,y) in Pupil} A[x,y]*PupilFile[round(x/dx+0.5+N),round(y/dy+0.5)]*cos(2*pi*y*my*(lam0/lam))*dy;
-        subject to st_EBm_real {(mx,my) in Mask, lam in Ls}: EBm_real[mx,my,lam] = (lam0/lam)*sum {x in Xs} EBm_cx[x,my,lam]*cos(2*pi*x*mx*(lam0/lam))*dx;
-        subject to st_EBm_imag {(mx,my) in Mask, lam in Ls}: EBm_imag[mx,my,lam] = (lam0/lam)*sum {x in Xs} -EBm_cx[x,my,lam]*sin(2*pi*x*mx*(lam0/lam))*dx;
-        
-        #---------------------
-        var ECm1_Bmreal_cx {mx in MXs, y in Ys, lam in Ls} := 0.0;
-        var ECm1_real {x in Xs, y in Ys, lam in Ls} := 0.0;
-        var ECm1_imag {x in Xs, y in Ys, lam in Ls} := 0.0;
-        
-        subject to st_ECm1_Bmreal_cx {mx in MXs, y in Ys, lam in Ls}: ECm1_Bmreal_cx[mx,y,lam] = 2.*sum {my in MYs: (mx,my) in Mask} EBm_real[mx,my,lam]*cos(2*pi*y*my*(lam0/lam))*dmy;
-        subject to st_ECm1_real {(x,y) in Lyot, lam in Ls}: ECm1_real[x,y,lam] = (lam0/lam)*sum {mx in MXs} ECm1_Bmreal_cx[mx,y,lam]*cos(2*pi*x*mx*(lam0/lam))*dmx;
-        subject to st_ECm1_imag {(x,y) in Lyot, lam in Ls}: ECm1_imag[x,y,lam] = (lam0/lam)*sum {mx in MXs} ECm1_Bmreal_cx[mx,y,lam]*sin(2*pi*x*mx*(lam0/lam))*dmx;
-        
-        
-        var ECm2_Bmimag_cx {mx in MXs, y in Ys, lam in Ls} := 0.0;
-        var ECm2_real {x in Xs, y in Ys, lam in Ls} := 0.0;
-        var ECm2_imag {x in Xs, y in Ys, lam in Ls} := 0.0;
-        
-        subject to st_ECm2_Bmimag_cx {mx in MXs, y in Ys, lam in Ls}: ECm2_Bmimag_cx[mx,y,lam] = 2.*sum {my in MYs: (mx,my) in Mask} EBm_imag[mx,my,lam]*cos(2*pi*y*my*(lam0/lam))*dmy;
-        subject to st_ECm2_real {(x,y) in Lyot, lam in Ls}: ECm2_real[x,y,lam] = (lam0/lam)*sum {mx in MYs} ECm2_Bmimag_cx[mx,y,lam]*cos(2*pi*x*mx*(lam0/lam))*dmx;
-        subject to st_ECm2_imag {(x,y) in Lyot, lam in Ls}: ECm2_imag[x,y,lam] = (lam0/lam)*sum {mx in MYs} ECm2_Bmimag_cx[mx,y,lam]*sin(2*pi*x*mx*(lam0/lam))*dmx;
-        
-        
-        var ECm_real {x in Xs, y in Ys, lam in Ls} := 0.0;
-        var ECm_imag {x in Xs, y in Ys, lam in Ls} := 0.0;
-        subject to st_ECm_real {x in Xs, y in Ys, lam in Ls}: ECm_real[x,y,lam] = ECm1_real[x,y,lam]-ECm2_imag[x,y,lam];
-        subject to st_ECm_imag {x in Xs, y in Ys, lam in Ls}: ECm_imag[x,y,lam] = ECm1_imag[x,y,lam]+ECm2_real[x,y,lam];
+        var EBm_part {mx in MXs, y in Ys, lam in Ls};
+        var EBm_real {mx in MXs, my in MYs, lam in Ls};
+        var EBm_imag {mx in MXs, my in MYs, lam in Ls};
+
+        subject to st_EBm_part {mx in MXs, y in Ys, lam in Ls}:
+            EBm_part[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
+        subject to st_EBm_real {(mx,my) in Mask, lam in Ls}:
+            EBm_real[mx,my,lam] = 1/lam*sum {y in Ys} EBm_part[mx,y,lam]*cos(2*pi*y*my/lam)*dy;
+        subject to st_EBm_imag {(mx,my) in Mask, lam in Ls}:
+            EBm_imag[mx,my,lam] = 1/lam*sum {y in Ys} EBm_part[mx,y,lam]*sin(2*pi*y*my/lam)*dy;
         
         #---------------------
-        var ED1_ECmreal_cx {x in Xs, eta in Etas, lam in Ls} := 0.0;
-        var ED1_real {xi in Xis, eta in Etas, lam in Ls} := 0.0;
-        var ED1_imag {xi in Xis, eta in Etas, lam in Ls} := 0.0;
+        var EC_part_real {x in Xs, my in MYs, lam in Ls};
+        var EC_part_imag {x in Xs, my in MYs, lam in Ls};
+        var EC {x in Xs, y in Ys, lam in Ls};
         
-        subject to st_ED1_ECmreal_cx {x in Xs, eta in Etas, lam in Ls}: ED1_ECmreal_cx[x,eta,lam] = 2.*sum {y in Ys: (x,y) in Lyot} (A[x,y]*PupilFile[round(x/dx+0.5+N),round(y/dy+0.5)]-ECm_real[x,y,lam])*cos(2*pi*y*eta*(lam0/lam))*dy;
+        subject to st_EC_part_real {x in Xs, my in MYs, lam in Ls}:
+            EC_part_real[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} EBm_real[mx,my,lam]*cos(2*pi*x*mx/lam)*dmx;
+        subject to st_EC_part_imag {x in Xs, my in MYs, lam in Ls}:
+            EC_part_imag[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} EBm_imag[mx,my,lam]*cos(2*pi*x*mx/lam)*dmx;
+        subject to st_EC {(x,y) in Lyot, lam in Ls}:
+            EC[x,y,lam] = TelAp[x,-y]*A[x,-y] - 2/lam*sum{my in MYs: (mx,my) in Mask} ( EC_part_real[x,my,lam]*cos(2*pi*my*y/lam) + EC_part_imag[x,my,lam]*sin(2*pi*my*y/lam) )*dmy
         
-        #subject to st_ED1_real {xi in Xis, eta in Etas, lam in Ls}: ED1_real[xi,eta,lam] = (lam0/lam)*sum {x in Xs} ED1_ECmreal_cx[x,eta,lam]*cos(2*pi*x*xi*(lam0/lam))*dx;
-        #subject to st_ED1_imag {xi in Xis, eta in Etas, lam in Ls}: ED1_imag[xi,eta,lam] = (lam0/lam)*sum {x in Xs} -ED1_ECmreal_cx[x,eta,lam]*sin(2*pi*x*xi*(lam0/lam))*dx;
+        #---------------------
+        var ED_part {x in Xs, eta in Etas, lam in Ls};
+        var ED_real {xi in Xis, eta in Etas, lam in Ls};
+        var ED_imag {xi in Xis, eta in Etas, lam in Ls};
         
-        subject to st_ED1_real {(xi, eta) in InsideArea, lam in Ls}: ED1_real[xi,eta,lam] = (lam0/lam)*sum {x in Xs} ED1_ECmreal_cx[x,eta,lam]*cos(2*pi*x*xi*(lam0/lam))*dx;
-        subject to st_ED1_imag {(xi, eta) in InsideArea, lam in Ls}: ED1_imag[xi,eta,lam] = (lam0/lam)*sum {x in Xs} -ED1_ECmreal_cx[x,eta,lam]*sin(2*pi*x*xi*(lam0/lam))*dx;
-        
-        
-        var ED2_ECmimag_cx {x in Xs, eta in Etas, lam in Ls} := 0.0;
-        var ED2_real {xi in Xis, eta in Etas, lam in Ls} := 0.0;
-        var ED2_imag {xi in Xis, eta in Etas, lam in Ls} := 0.0;
-        
-        subject to st_ED2_ECmimag_cx {x in Xs, eta in Etas, lam in Ls}: ED2_ECmimag_cx[x,eta,lam] = 2.*sum {y in Ys: (x,y) in Lyot} (-ECm_imag[x,y,lam])*cos(2*pi*y*eta*(lam0/lam))*dy;
-        
-        #subject to st_ED2_real {xi in Xis, eta in Etas, lam in Ls}: ED2_real[xi,eta,lam] = (lam0/lam)*sum {x in Xs} ED2_ECmimag_cx[x,eta,lam]*cos(2*pi*x*xi*(lam0/lam))*dx;
-        #subject to st_ED2_imag {xi in Xis, eta in Etas, lam in Ls}: ED2_imag[xi,eta,lam] = (lam0/lam)*sum {x in Xs} -ED2_ECmimag_cx[x,eta,lam]*sin(2*pi*x*xi*(lam0/lam))*dx;
-        
-        subject to st_ED2_real {(xi, eta) in InsideArea, lam in Ls}: ED2_real[xi,eta,lam] = (lam0/lam)*sum {x in Xs} ED2_ECmimag_cx[x,eta,lam]*cos(2*pi*x*xi*(lam0/lam))*dx;
-        subject to st_ED2_imag {(xi, eta) in InsideArea, lam in Ls}: ED2_imag[xi,eta,lam] = (lam0/lam)*sum {x in Xs} -ED2_ECmimag_cx[x,eta,lam]*sin(2*pi*x*xi*(lam0/lam))*dx;
-        
-        
-        var ED_real {xi in Xis, eta in Etas, lam in Ls} := 0.0;
-        var ED_imag {xi in Xis, eta in Etas, lam in Ls} := 0.0;
-        #subject to st_ED_real {xi in Xis, eta in Etas, lam in Ls}: ED_real[xi,eta,lam] = ED1_real[xi,eta,lam]-ED2_imag[xi,eta,lam];
-        #subject to st_ED_imag {xi in Xis, eta in Etas, lam in Ls}: ED_imag[xi,eta,lam] = ED1_imag[xi,eta,lam]+ED2_real[xi,eta,lam];
-        
-        subject to st_ED_real {(xi, eta) in InsideArea, lam in Ls}: ED_real[xi,eta,lam] = ED1_real[xi,eta,lam]-ED2_imag[xi,eta,lam];
-        subject to st_ED_imag {(xi, eta) in InsideArea, lam in Ls}: ED_imag[xi,eta,lam] = ED1_imag[xi,eta,lam]+ED2_real[xi,eta,lam];
-        
+        subject to st_ED_part {x in Xs, eta in Etas, lam in Ls}:
+            ED_part[xi,y,lam] = 2*sum {x in Xs: (x,y) in Lyot} EC[x,y,lam]*cos(2*pi*y*eta/lam)*dx;
+        subject to st_ED_real {xi in Xis, eta in Etas, lam in Ls}:
+            ED_real[xi,eta,lam] = 1/lam*sum {y in Ys} ED_part[xi,y,lam]*cos(2*pi*y*eta/lam)*dy;
+        subject to st_ED_imag {xi in Xis, eta in Etas, lam in Ls}:
+            ED_imag[xi,eta,lam] = 1/lam*sum {y in Ys} ED_part[xi,y,lam]*sin(2*pi*y*eta/lam)*dy;
         
         #---------------------
         var ED00_real := 0.0;
-        subject to st_ED00_real: ED00_real = 2.*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*PupilFile[round(x/dx+0.5+N),round(y/dy+0.5)])*dx*dy;
+        subject to st_ED00_real: ED00_real = 2*sum {x in Xs, y in Ys: (x,y) in Lyot} (TelAp[x,y]*A[x,y])*dx*dy;
         """
 
         constraints = """
         #---------------------
         maximize throughput: sum{(x,y) in Pupil} A[x,y]*dx*dy/TR;
-        
-        #subject to sidelobe {(xi,eta) in DarkHole, lam in Ls}: (lam/lam0)^4*(ED_real[xi,eta,lam]^2+ED_imag[xi,eta,lam]^2) <= 10^(-c)*Normterm*I00;
-        
-        subject to sidelobe_zero_real_pos {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real/sqrt(2.);
-        subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/sqrt(2.);
-        subject to sidelobe_zero_imag_pos {(xi,eta) in DarkHole, lam in Ls}: ED_imag[xi,eta,lam] <= 10^(-c/2)*ED00_real/sqrt(2.);
-        subject to sidelobe_zero_imag_neg {(xi,eta) in DarkHole, lam in Ls}: ED_imag[xi,eta,lam] >= -10^(-c/2)*ED00_real/sqrt(2.);
-        
-        subject to sidelobe_zero_real_pos_core {(xi,eta) in PSFCore, lam in Ls}: ED_real[xi,eta,lam] <= 10^((-c+2)/2)*ED00_real/sqrt(2.);
-        subject to sidelobe_zero_real_neg_core {(xi,eta) in PSFCore, lam in Ls}: ED_real[xi,eta,lam] >= -10^((-c+2)/2)*ED00_real/sqrt(2.);
-        subject to sidelobe_zero_imag_pos_core {(xi,eta) in PSFCore, lam in Ls}: ED_imag[xi,eta,lam] <= 10^((-c+2)/2)*ED00_real/sqrt(2.);
-        subject to sidelobe_zero_imag_neg_core {(xi,eta) in PSFCore, lam in Ls}: ED_imag[xi,eta,lam] >= -10^((-c+2)/2)*ED00_real/sqrt(2.);
-        """
-        
-        solver = """
-        option solver gurobi;
-        """
 
-        solver_options = """
-        option gurobi_options "outlev=1 lpmethod=2 crossover=0";
+        subject to sidelobe_real_pos {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real/lam/sqrt(2.);
+        subject to sidelobe_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/lam/sqrt(2.);
+        subject to sidelobe_imag_pos {(xi,eta) in DarkHole, lam in Ls}: ED_imag[xi,eta,lam] <= 10^(-c/2)*ED00_real/lam/sqrt(2.);
+        subject to sidelobe_imag_neg {(xi,eta) in DarkHole, lam in Ls}: ED_imag[xi,eta,lam] >= -10^(-c/2)*ED00_real/lam/sqrt(2.);
         """
 
         misc_options = """
@@ -2213,35 +2253,165 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         option gentimes 1;
         option show_stats 1;
         """
- 
+        
+        solver = """
+        option solver gurobi;
+        """
+
+        gurobi_opt_str = "outlev=1"
+        if self.solver['presolve'] is False:
+            gurobi_opt_str += " presolve=0"
+        if self.solver['method'] is 'bar' or self.solver['method'] is 'barhom':
+            gurobi_opt_str += " lpmethod=2 crossover=0"
+            if self.solver['convtol'] is not None:
+                gurobi_opt_str += " barconvtol={0:.1e}".format(np.power(10,-self.solver['convtol']))
+            if self.solver['method'] is 'barhom':
+                gurobi_opt_str += " barhomogeneous=1"
+        else: # assume dual simplex
+            gurobi_opt_str += " lpmethod=1"
+
+        solver_options = """
+        option gurobi_options "{0:s}";
+        """.format(gurobi_opt_str)
+
         execute = """
         solve;
-
+ 
         display solve_result_num, solve_result;
         display ED00_real; 
         """
-
+ 
         store_results = """
         #---------------------
 
-        printf {{x in Xs, y in Ys}}: "%15g %15g %15g \\n", x, y, A[x,y] > "{0:s};"
+        param A_fin {{y in Ys, x in Xs}};
+        let {{y in Ys, x in Xs}} A_fin[x,y] := 0;
+        let {{(x,y) in Pupil}} A_fin[x,y] := A[x,y];
+ 
+        printf {{y in Ys, x in Xs}}: "%15g %15g %15g \\n", x, y, A_fin[x,y] > "{0:s}";
         """.format(self.fileorg['sol fname'])
-
+ 
         mod_fobj.write( textwrap.dedent(header) )
-        mod_fobj.write( textwrap.dedent(load_masks) )
+        mod_fobj.write( textwrap.dedent(params) )
         mod_fobj.write( textwrap.dedent(define_coords) )
+        mod_fobj.write( textwrap.dedent(load_masks) )
+        mod_fobj.write( textwrap.dedent(define_wavelengths) )
         mod_fobj.write( textwrap.dedent(sets_and_arrays) )
         mod_fobj.write( textwrap.dedent(field_propagation) )
         mod_fobj.write( textwrap.dedent(constraints) )
+        #mod_fobj.write( textwrap.dedent(misc_options) )
         mod_fobj.write( textwrap.dedent(solver) )
         mod_fobj.write( textwrap.dedent(solver_options) )
-        mod_fobj.write( textwrap.dedent(misc_options) )
         mod_fobj.write( textwrap.dedent(execute) )
         mod_fobj.write( textwrap.dedent(store_results) )
-
+ 
         mod_fobj.close()
         if verbose:
             logging.info("Wrote %s"%self.fileorg['ampl src fname'])
+        return 0
+
+    def write_slurm_script(self, queue_spec='auto', account='s1649', email=None, arch=None, overwrite=False, verbose=True):
+        if os.path.exists(self.fileorg['slurm fname']):
+            if overwrite == True:
+                if verbose:
+                    logging.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['slurm fname']))
+            else:
+                if verbose:
+                    logging.warning("Error: {0} already exists and overwrite switch is off, so write_slurm_script() will now abort".format(self.fileorg['slurm fname']))
+                return 1
+        elif not os.path.exists(self.fileorg['slurm dir']):
+            os.mkdir(self.fileorg['slurm dir'])
+            if verbose:
+                logging.info("Created new slurm script directory, {0:s}".format(self.fileorg['slurm dir']))
+
+        bash_fobj = open(self.fileorg['slurm fname'], "w") 
+
+        if email is not None: 
+            header = """\
+            #!/bin/bash
+
+            #PBS -V
+            #PBS -m e -M {0:s}
+            """.format(email)
+        else:
+            header = """\
+            #! /bin/bash
+
+            """
+
+        set_job = """\
+        #SBATCH --job-name={0:s}
+        #SBATCH -o {1:s}
+        #SBATCH --account={2:s}
+        """.format(self.fileorg['job name'], self.fileorg['log fname'], account)
+       
+        if arch is not None: # can be 'hasw' for Haswell only 
+            set_node = """\
+            #SBATCH --constraint={0:s}
+            #SBATCH --ntasks=1 --nodes=1
+            """.format(arch)
+        else:
+            set_node = """\
+            #SBATCH --ntasks=1 --nodes=1
+            """.format(arch)
+
+        if queue_spec is 'auto':
+            if self.design['LS']['aligntol'] is None:
+                time_est_hrs = int(np.ceil(1*(self.design['Pupil']['N']/125.)**2*(self.design['Image']['Nlam']/3.)**3))
+            else:
+                time_est_hrs = int(np.ceil(3*(self.design['Pupil']['N']/125.)**2*(self.design['Image']['Nlam']/3.)**3))
+            if time_est_hrs > 12:
+                set_queue = """
+                #SBATCH --qos=long
+                #SBATCH --time={0:02d}:00:00
+                """.format(np.min([24, time_est_hrs]))
+            else:
+                set_queue = """
+                #SBATCH --qos=allnccs
+                #SBATCH --time={0:02d}:00:00
+                """.format(time_est_hrs)
+        elif queue_spec is '24h':
+            set_queue = """
+            #SBATCH --qos=long
+            #SBATCH --time=24:00:00
+            """
+        elif queue_spec is '12h':
+            set_queue = """
+            #SBATCH --qos=allnccs
+            #SBATCH --time=12:00:00
+            """
+
+        intel_module = """
+        . /usr/share/modules/init/bash
+        module purge
+        module load comp/intel-10.1.017
+        ulimit -s unlimited
+        """
+
+        monitor_mem = """
+        #Optional: monitor the memory usage...
+        mkdir -p ${NOBACKUP}/policeme
+        /usr/local/other/policeme/policeme.exe -d ${NOBACKUP}/policeme
+        """
+
+        call_ampl = """
+        ampl {0:s}
+        
+        exit 0
+        """.format(self.fileorg['ampl src fname'])
+
+        bash_fobj.write( textwrap.dedent(header) )
+        bash_fobj.write( textwrap.dedent(set_job) )
+        bash_fobj.write( textwrap.dedent(set_node) )
+        bash_fobj.write( textwrap.dedent(set_queue) )
+        bash_fobj.write( textwrap.dedent(intel_module) )
+        bash_fobj.write( textwrap.dedent(monitor_mem) )
+        bash_fobj.write( textwrap.dedent(call_ampl) )
+
+        bash_fobj.close()
+        if verbose:
+            logging.info("Wrote %s"%self.fileorg['slurm fname'])
+        return 0
 
 class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plane symmetry case
     def __init__(self, **kwargs):
@@ -2751,43 +2921,3 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         if verbose:
             logging.info("Wrote %s"%self.fileorg['slurm fname'])
         return 0
-
-    def get_metrics(self, fp2res=16, verbose=True):
-        TelAp = np.loadtxt(self.fileorg['TelAp fname'])
-        FPM = np.loadtxt(self.fileorg['FPM fname'])
-        LS = np.loadtxt(self.fileorg['LS fname'])
-        N = TelAp.shape[1]
-        A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
-        A = A_col.reshape(TelAp.shape)
-        self.eval_metrics['apod nb res ratio'] = np.sum(np.abs(A - np.round(A)))/np.sum(TelAp)
-        dx = (1./2)/N
-        dy = dx
-        xs = np.matrix(np.linspace(0.5,N-0.5,N)*dx)
-        ys = xs.copy()
-        rho1 = 3.
-        M_fp2 = int(np.ceil(rho1*fp2res))
-        dxi = 1./fp2res
-        xis = np.matrix(np.linspace(0.5,M_fp2-0.5,M_fp2)*dxi)
-        etas = xis.copy()
-        wrs = np.linspace(1.-self.design['Image']['bw']/2, 1.+self.design['Image']['bw']/2, self.design['Image']['Nlam'])
-        airy_thrupt_polychrom = []
-        fwhm_area_polychrom = []
-        for wr in wrs:
-            Psi_D_0 = 4*dx*dy/wr*np.dot(np.cos(2*np.pi/wr*np.dot(etas.T, ys)), A*TelAp*LS).dot(np.cos(2*np.pi/wr*np.dot(xs.T, xis)))
-            Intens_D_0 = np.power(np.absolute(Psi_D_0), 2)
-            Intens_D_0_peak = (4*np.sum(TelAp*A*LS)*dx*dy/wr)**2
-            fwhm_ind_APLC = np.greater_equal(Intens_D_0, Intens_D_0_peak/2)
-            Psi_TelAp = 4*dx*dy/wr*np.dot(np.cos(2*np.pi/wr*np.dot(etas.T, ys)), TelAp).dot(np.cos(2*np.pi/wr*np.dot(xs.T, xis)))
-            Intens_TelAp = np.power(np.absolute(Psi_TelAp), 2)
-            Intens_TelAp_peak = (4*np.sum(TelAp)*dx*dy/wr)**2
-            fwhm_ind_TelAp = np.greater_equal(Intens_TelAp, Intens_TelAp_peak/2)
-            fwhm_sum_TelAp = np.sum(Intens_TelAp[fwhm_ind_TelAp])
-            fwhm_sum_APLC = np.sum(Intens_D_0[fwhm_ind_APLC])
-            fwhm_area_polychrom.append(4.*np.sum(fwhm_ind_APLC)/(fp2res**2))
-            airy_thrupt_polychrom.append(fwhm_sum_APLC/fwhm_sum_TelAp)
-        self.eval_metrics['airy thrupt'] = np.mean(airy_thrupt_polychrom)
-        self.eval_metrics['fwhm area'] = np.mean(fwhm_area_polychrom)
-        if verbose:
-            print("Non-binary residuals, as a percentage of clear telescope aperture area: {:.2f}%".format(100*self.eval_metrics['apod nb res ratio']))
-            print("Band-averaged Airy throughput: {:.2f}%".format(100*self.eval_metrics['airy thrupt']))
-            print("Band-averaged FWHM PSF area / (lambda0/D)^2: {:.2f}".format(self.eval_metrics['fwhm area']))
