@@ -2284,8 +2284,8 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         store_results = """
         #---------------------
 
-        param A_fin {{y in Ys, x in Xs}};
-        let {{y in Ys, x in Xs}} A_fin[x,y] := 0;
+        param A_fin {{x in Xs, y in Ys}};
+        let {{x in Xs, y in Ys}} A_fin[x,y] := 0;
         let {{(x,y) in Pupil}} A_fin[x,y] := A[x,y];
  
         printf {{y in Ys, x in Xs}}: "%15g %15g %15g \\n", x, y, A_fin[x,y] > "{0:s}";
