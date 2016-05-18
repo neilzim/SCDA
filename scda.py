@@ -873,7 +873,8 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         elif isinstance(self, HalfplaneSPLC):
             TelAp = np.concatenate((TelAp_p[:,::-1], TelAp_p), axis=1)
             A = np.concatenate((A_p[:,::-1], A_p), axis=1)
-            FPM = np.concatenate((FPM_p[:,::-1], FPM_p), axis=1)
+            FPM = np.concatenate((np.concatenate((FPM_p[::-1,::-1], FPM_p[:,::-1]),axis=0),
+                                  np.concatenate((FPM_p[::-1,:], FPM_p),axis=0)), axis=1)
             LS = np.concatenate((LS_p[:,::-1], LS_p), axis=1)
         else:
             TelAp = TelAp_p
@@ -886,7 +887,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         N_L = self.design['LS']['N']
         bw = self.design['Image']['bw']
         fpmres = self.design['FPM']['fpmres']
-        M_fp1 = FPM_qp.shape[0]
+        M_fp1 = FPM_p.shape[0]
         if rho_out is None:
             rho_out = self.design['FPM']['R1'] + 1.
         if Nlam is None:
@@ -960,7 +961,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             for wi, wr in enumerate(wrs):
                 radial_intens_polychrom[wi, si] = np.mean(np.ravel(intens_polychrom[wi,:,:])[meas_ann_ind])
 
-        pdb.set_trace()
+        #pdb.set_trace()
 
         return intens_polychrom, seps, radial_intens_polychrom, theta_mask
 
