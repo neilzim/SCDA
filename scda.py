@@ -1814,7 +1814,8 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         elif isinstance(self, HalfplaneAPLC):
             TelAp = np.concatenate((TelAp_p[:,::-1], TelAp_p), axis=1)
             A = np.concatenate((A_p[:,::-1], A_p), axis=1)
-            FPM = np.concatenate((FPM_p[:,::-1], FPM_p), axis=1)
+            FPM = np.concatenate((np.concatenate((FPM_p[::-1,::-1], FPM_p[:,::-1]),axis=0),
+                                  np.concatenate((FPM_p[::-1,:], FPM_p),axis=0)), axis=1)
             LS = np.concatenate((LS_p[:,::-1], LS_p), axis=1)
         else:
             TelAp = TelAp_p
