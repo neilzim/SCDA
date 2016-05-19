@@ -687,7 +687,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                                    ( 'FPM', OrderedDict([('R0',(float, 4.)), ('R1',(float, 10.)), ('openang',(int, 180)),
                                                          ('orient',(str, 'H')), ('fpmres',(int, 10))]) ),
                                    ( 'LS', OrderedDict([('N',(int, 125)), ('shape',(str, 'ann')), ('id',(int, 25)), ('od',(int, 75)),
-                                                        ('obscure',(int, 0)), ('spad',(int, 0)), ('ppad',(int, 0)),
+                                                        ('obscure',(int, 0)), ('pad',(int, 0)),
                                                         ('aligntol',(int, None)), ('aligntolcon',(float, 3.))]) ),
                                    ( 'Image', OrderedDict([('c',(float, 10.)), ('bw',(float, 0.10)), ('Nlam',(int, 5)),
                                                            ('dR',(float, -0.5)), ('fpres',(int,2))]) ) ])
@@ -753,12 +753,12 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         self.amplname_fpm = "FPM{0:02d}R{1:03d}{2:s}{3:03d}res{4:02d}".format(int(round(10*self.design['FPM']['R0'])), int(round(10*self.design['FPM']['R1'])),
                                                                               self.design['FPM']['orient'], self.design['FPM']['openang'], self.design['FPM']['fpmres'])
         if self.design['LS']['obscure'] == 2: # LS includes primary and secondary aperture features
-            self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}Pad{4:02d}{5:s}{6:s}cobs{7:d}Pad{8:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], \
-                               self.design['LS']['od'], self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
-                               int(self.design['Pupil']['centobs']), self.design['LS']['spad'])
+            self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}{4:s}{5:s}cobs{6:d}Pad{7:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], \
+                               self.design['LS']['od'], self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
+                               int(self.design['Pupil']['centobs']), self.design['LS']['pad'])
         elif self.design['LS']['obscure'] == 1: # LS includes secondary aperture features
             self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}{4:s}cobs{5:d}Pad{6:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'], \
-                               self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['spad'])
+                               self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['pad'])
         else: # LS aperture is unobscured
             self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}clear".format(self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'])
         if self.design['LS']['aligntol'] is not None:
@@ -815,17 +815,17 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
                 if self.design['LS']['obscure'] == 2:
                     self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_full_" + \
-                                                             "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}cobs{7:d}Pad{8:02d}_N{9:04d}.dat".format(
+                                                             "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}{5:s}cobs{6:d}Pad{7:02d}_N{8:04d}.dat".format(
                                                              self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                             self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'],
-                                                             self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['spad'],
+                                                             self.design['Pupil']['prim'], self.design['Pupil']['secobs'],
+                                                             self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['pad'],
                                                              self.design['LS']['N'])) )
                 elif self.design['LS']['obscure'] == 1:
                     self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_full_" + \
                                                              "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}cobs{5:d}Pad{6:02d}_N{7:04d}.dat".format(
                                                              self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
                                                              self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
-                                                             self.design['LS']['spad'], self.design['LS']['N'])) )
+                                                             self.design['LS']['pad'], self.design['LS']['N'])) )
                 else:
                     self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_full_" + \
                                                              "{0:s}{1:02d}D{2:02d}_clear_N{3:04d}.dat".format(self.design['LS']['shape'],
@@ -834,17 +834,17 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             if self.design['LS']['aligntol'] is not None and ('LDZ fname' not in self.fileorg or self.fileorg['LDZ fname'] is None):
                 if self.design['LS']['obscure'] == 2:
                     self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_full_" + \
-                                                             "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}c{7:d}Pad{8:02d}_Tol{9:02d}_N{10:04d}.dat".format(
+                                                             "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}{5:s}cobs{6:d}Pad{7:02d}_Tol{8:02d}_N{9:04d}.dat".format(
                                                              self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                             self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'],
-                                                             self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['spad'],
+                                                             self.design['Pupil']['prim'], self.design['Pupil']['secobs'],
+                                                             self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['pad'],
                                                              self.design['LS']['aligntol'], self.design['LS']['N'])) )
                 elif self.design['LS']['obscure'] == 1:
                     self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_full_" + \
-                                                             "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}c{5:d}Pad{6:02d}_Tol{7:02d}_N{8:04d}.dat".format(
+                                                             "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}cobs{5:d}Pad{6:02d}_Tol{7:02d}_N{8:04d}.dat".format(
                                                              self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
                                                              self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
-                                                             self.design['LS']['spad'], self.design['LS']['aligntol'], self.design['LS']['N'])) )
+                                                             self.design['LS']['pad'], self.design['LS']['aligntol'], self.design['LS']['N'])) )
                 else:
                     self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_full_" + \
                                                              "{0:s}{1:02d}D{2:02d}_clear_Tol{3:02d}_N{4:04d}.dat".format(
@@ -1091,17 +1091,17 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
         if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
             if self.design['LS']['obscure'] == 2:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
-                                                         "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}cobs{7:d}Pad{8:02d}_N{9:04d}.dat".format(
+                                                         "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}{5:s}cobs{6:d}Pad{7:02d}_N{8:04d}.dat".format(
                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                         self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'],
-                                                         self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['spad'],
+                                                         self.design['Pupil']['prim'], self.design['Pupil']['secobs'],
+                                                         self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['pad'],
                                                          self.design['LS']['N'])) )
             elif self.design['LS']['obscure'] == 1:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
                                                          "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}cobs{5:d}Pad{6:02d}_N{7:04d}.dat".format(
                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
                                                          self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
-                                                         self.design['LS']['spad'], self.design['LS']['N'])) )
+                                                         self.design['LS']['pad'], self.design['LS']['N'])) )
             else:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
                                                          "{0:s}{1:02d}D{2:02d}_clear_N{3:04d}.dat".format(self.design['LS']['shape'],
@@ -1110,22 +1110,22 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
         if self.design['LS']['aligntol'] is not None and ('LDZ fname' not in self.fileorg or self.fileorg['LDZ fname'] is None):
             if self.design['LS']['obscure'] == 2:
                 self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_quart_" + \
-                                                         "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}c{7:d}Pad{8:02d}_Tol{9:02d}_N{10:04d}.dat".format(
-                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                         self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'],
-                                                         self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['spad'],
-                                                         self.design['LS']['aligntol'], self.design['LS']['N'])) )
+                                                          "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}{5:s}c{6:d}Pad{7:02d}_Tol{8:02d}_N{9:04d}.dat".format(
+                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                          self.design['Pupil']['prim'], self.design['Pupil']['secobs'],
+                                                          self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['pad'],
+                                                          self.design['LS']['aligntol'], self.design['LS']['N'])) )
             elif self.design['LS']['obscure'] == 1:
                 self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_quart_" + \
-                                                         "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}c{5:d}Pad{6:02d}_Tol{7:02d}_N{8:04d}.dat".format(
-                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                         self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
-                                                         self.design['LS']['spad'], self.design['LS']['aligntol'], self.design['LS']['N'])) )
+                                                          "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}c{5:d}Pad{6:02d}_Tol{7:02d}_N{8:04d}.dat".format(
+                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                          self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
+                                                          self.design['LS']['pad'], self.design['LS']['aligntol'], self.design['LS']['N'])) )
             else:
                 self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_quart_" + \
-                                                         "{0:s}{1:02d}D{2:02d}_clear_Tol{3:02d}_N{4:04d}.dat".format(
-                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                         self.design['LS']['aligntol'], self.design['LS']['N'])) )
+                                                          "{0:s}{1:02d}D{2:02d}_clear_Tol{3:02d}_N{4:04d}.dat".format(
+                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                          self.design['LS']['aligntol'], self.design['LS']['N'])) )
         self.check_ampl_input_files()
     def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None, verbose=True):
         if self.ampl_infile_status is False and not override_infile_status:
@@ -1640,7 +1640,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                                                            ('thick',(str, '025')), ('centobs',(bool, True))]) ),
                                    ( 'FPM', OrderedDict([('rad',(float, 4.)), ('M',(int, 60))]) ),
                                    ( 'LS', OrderedDict([('shape',(str, 'ann')), ('id',(int, 20)), ('od',(int, 90)), ('obscure',(int, 0)),
-                                                        ('spad',(int, 0)), ('ppad',(int, 0)), ('aligntol',(int, None)), ('aligntolcon',(float, 3.))]) ),
+                                                        ('pad',(int, 0)), ('aligntol',(int, None)), ('aligntolcon',(float, 3.))]) ),
                                    ( 'Image', OrderedDict([('c',(float, 10.)), ('ida',(float, -0.5)), ('oda',(float, 10.)),
                                                            ('bw',(float, 0.10)), ('Nlam',(int, 1)), ('fpres',(int,2)),
                                                            ('wingang',(float, None)), ('incon',(float, None)), ('wingcon',(float, None))]) ) ])
@@ -1702,12 +1702,12 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
 
         self.amplname_fpm = "FPM{:02}M{:03}".format(int(round(100*self.design['FPM']['rad'])), self.design['FPM']['M'])
         if self.design['LS']['obscure'] == 2: # LS includes primary and secondary aperture features
-            self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}Pad{4:02d}{5:s}{6:s}cobs{7:d}Pad{8:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], \
-                               self.design['LS']['od'], self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
-                               int(self.design['Pupil']['centobs']), self.design['LS']['spad'])
+            self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}{4:s}{5:s}cobs{6:d}Pad{7:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], \
+                               self.design['LS']['od'], self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
+                               int(self.design['Pupil']['centobs']), self.design['LS']['pad'])
         elif self.design['LS']['obscure'] == 1: # LS includes secondary aperture features
             self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}{4:s}cobs{5:d}Pad{6:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'], \
-                               self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['spad'])
+                               self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['pad'])
         else: # LS aperture is unobscured
             self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}clear".format(self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'])
         if self.design['LS']['aligntol'] is not None:
@@ -1756,17 +1756,17 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
                 if self.design['LS']['obscure'] == 2:
                     self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_full_" + \
-                                                             "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}cobs{7:d}Pad{8:02d}_N{9:04d}.dat".format(
+                                                             "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}{5:s}cobs{6:d}Pad{7:02d}_N{8:04d}.dat".format(
                                                              self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                             self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'],
-                                                             self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['spad'],
+                                                             self.design['Pupil']['prim'], self.design['Pupil']['secobs'],
+                                                             self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['pad'],
                                                              self.design['Pupil']['N'])) )
                 elif self.design['LS']['obscure'] == 1:
                     self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_full_" + \
                                                              "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}cobs{5:d}Pad{6:02d}_N{7:04d}.dat".format(
                                                              self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
                                                              self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
-                                                             self.design['LS']['spad'], self.design['Pupil']['N'])) )
+                                                             self.design['LS']['pad'], self.design['Pupil']['N'])) )
                 else:
                     self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_full_" + \
                                                              "{0:s}{1:02d}D{2:02d}_clear_N{3:04d}.dat".format(self.design['LS']['shape'],
@@ -1775,22 +1775,22 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             if self.design['LS']['aligntol'] is not None and ('LDZ fname' not in self.fileorg or self.fileorg['LDZ fname'] is None):
                 if self.design['LS']['obscure'] == 2:
                     self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_full_" + \
-                                                             "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}c{7:d}Pad{8:02d}_Tol{9:02d}_N{10:04d}.dat".format(
-                                                             self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                             self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'],
-                                                             self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['spad'],
-                                                             self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
+                                                              "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}{5:s}cobs{6:d}Pad{7:02d}_Tol{8:02d}_N{9:04d}.dat".format(
+                                                              self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                              self.design['Pupil']['prim'], self.design['Pupil']['secobs'],
+                                                              self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['pad'],
+                                                              self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
                 elif self.design['LS']['obscure'] == 1:
                     self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_full_" + \
-                                                             "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}c{5:d}Pad{6:02d}_Tol{7:02d}_N{8:04d}.dat".format(
-                                                             self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                             self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
-                                                             self.design['LS']['spad'], self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
+                                                              "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}cobs{5:d}Pad{6:02d}_Tol{7:02d}_N{8:04d}.dat".format(
+                                                              self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                              self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
+                                                              self.design['LS']['pad'], self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
                 else:
                     self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_full_" + \
-                                                             "{0:s}{1:02d}D{2:02d}_clear_Tol{3:02d}_N{4:04d}.dat".format(
-                                                             self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                             self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
+                                                              "{0:s}{1:02d}D{2:02d}_clear_Tol{3:02d}_N{4:04d}.dat".format(
+                                                              self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                              self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
 
             self.check_ampl_input_files()
                                                               
@@ -1988,17 +1988,17 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
             if self.design['LS']['obscure'] == 2:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + \
-                                                         "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}cobs{7:d}Pad{8:02d}_N{9:04d}.dat".format(
+                                                         "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}{5:s}cobs{6:d}Pad{7:02d}_N{8:04d}.dat".format(
                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                         self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'],
-                                                         self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['spad'],
+                                                         self.design['Pupil']['prim'], self.design['Pupil']['secobs'],
+                                                         self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['pad'],
                                                          self.design['Pupil']['N'])) )
             elif self.design['LS']['obscure'] == 1:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + \
                                                          "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}cobs{5:d}Pad{6:02d}_N{7:04d}.dat".format(
                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
                                                          self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
-                                                         self.design['LS']['spad'], self.design['Pupil']['N'])) )
+                                                         self.design['LS']['pad'], self.design['Pupil']['N'])) )
             else:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + \
                                                          "{0:s}{1:02d}D{2:02d}_clear_N{3:04d}.dat".format(self.design['LS']['shape'],
@@ -2007,22 +2007,22 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         if self.design['LS']['aligntol'] is not None and ('LDZ fname' not in self.fileorg or self.fileorg['LDZ fname'] is None):
             if self.design['LS']['obscure'] == 2:
                 self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_half_" + \
-                                                         "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}c{7:d}Pad{8:02d}_Tol{9:02d}_N{10:04d}.dat".format(
-                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                         self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'],
-                                                         self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['spad'],
-                                                         self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
+                                                          "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}{5:s}cobs{6:d}Pad{7:02d}_Tol{8:02d}_N{9:04d}.dat".format(
+                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                          self.design['Pupil']['prim'], self.design['Pupil']['secobs'],
+                                                          self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['pad'],
+                                                          self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
             elif self.design['LS']['obscure'] == 1:
                 self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_half_" + \
-                                                         "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}c{5:d}Pad{6:02d}_Tol{7:02d}_N{8:04d}.dat".format(
-                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                         self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
-                                                         self.design['LS']['spad'], self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
+                                                          "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}c{5:d}Pad{6:02d}_Tol{7:02d}_N{8:04d}.dat".format(
+                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                          self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
+                                                          self.design['LS']['pad'], self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
             else:
                 self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_half_" + \
-                                                         "{0:s}{1:02d}D{2:02d}_clear_Tol{3:02d}_N{4:04d}.dat".format(
-                                                         self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                         self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
+                                                          "{0:s}{1:02d}D{2:02d}_clear_Tol{3:02d}_N{4:04d}.dat".format(
+                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
+                                                          self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
 
         self.check_ampl_input_files()
 
@@ -2448,17 +2448,17 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         if 'LS fname' not in self.fileorg or self.fileorg['LS fname'] is None:
             if self.design['LS']['obscure'] == 2:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
-                                                         "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}cobs{7:d}Pad{8:02d}_N{9:04d}.dat".format(
+                                                         "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}{5:s}cobs{6:d}Pad{7:02d}_N{8:04d}.dat".format(
                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                         self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'],
-                                                         self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['spad'],
+                                                         self.design['Pupil']['prim'], self.design['Pupil']['secobs'],
+                                                         self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['pad'],
                                                          self.design['Pupil']['N'])) )
             elif self.design['LS']['obscure'] == 1:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
                                                          "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}cobs{5:d}Pad{6:02d}_N{7:04d}.dat".format(
                                                          self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
                                                          self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
-                                                         self.design['LS']['spad'], self.design['Pupil']['N'])) )
+                                                         self.design['LS']['pad'], self.design['Pupil']['N'])) )
             else:
                 self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_quart_" + \
                                                          "{0:s}{1:02d}D{2:02d}_clear_N{3:04d}.dat".format(self.design['LS']['shape'],
@@ -2467,17 +2467,17 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         if self.design['LS']['aligntol'] is not None and ('LDZ fname' not in self.fileorg or self.fileorg['LDZ fname'] is None):
             if self.design['LS']['obscure'] == 2:
                 self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_quart_" + \
-                                                          "{0:s}{1:02d}D{2:02d}_{3:s}Pad{4:02d}{5:s}{6:s}cobs{7:d}Pad{8:02d}_Tol{9:02d}_N{10:04d}.dat".format(
+                                                          "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}{5:s}cobs{6:d}Pad{7:02d}_Tol{8:02d}_N{9:04d}.dat".format(
                                                           self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                          self.design['Pupil']['prim'], self.design['LS']['ppad'], self.design['Pupil']['secobs'],
-                                                          self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['spad'],
+                                                          self.design['Pupil']['prim'], self.design['Pupil']['secobs'],
+                                                          self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['pad'],
                                                           self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
             elif self.design['LS']['obscure'] == 1:
                 self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_quart_" + \
                                                           "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}cobs{5:d}Pad{6:02d}_Tol{7:02d}_N{8:04d}.dat".format(
                                                           self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
                                                           self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
-                                                          self.design['LS']['spad'], self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
+                                                          self.design['LS']['pad'], self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
             else:
                 self.fileorg['LDZ fname'] = os.path.join( self.fileorg['LS dir'], ("LDZ_quart_" + \
                                                           "{0:s}{1:02d}D{2:02d}_clear_Tol{3:02d}_N{4:04d}.dat".format(
