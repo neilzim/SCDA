@@ -547,7 +547,8 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
     _aperture_menu = { 'prim': ['hex1', 'hex2', 'hex3', 'key24', 'pie12', 'pie08', 'irisao', 'atlast'],
                        'secobs': ['Y60d','Yoff60d','X','Cross','T','Y90d'],
                        'thick': ['025','100'],
-                       'centobs': [True, False] }
+                       'centobs': [True, False],
+                       'edge': ['gray', 'round', 'floor'] }
 
     def __init__(self, verbose=False, **kwargs):
         # Only set fileorg and solver attributes in this constructor,
@@ -1637,7 +1638,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
 
 class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 250)), ('prim',(str, 'hex3')), ('secobs',(str, 'X')), 
-                                                           ('thick',(str, '025')), ('centobs',(bool, True))]) ),
+                                                           ('thick',(str, '025')), ('centobs',(bool, True)), ('edge',(str, 'gray'))]) ),
                                    ( 'FPM', OrderedDict([('rad',(float, 4.)), ('M',(int, 60))]) ),
                                    ( 'LS', OrderedDict([('shape',(str, 'ann')), ('id',(int, 20)), ('od',(int, 90)), ('obscure',(int, 0)),
                                                         ('pad',(int, 0)), ('aligntol',(int, None)), ('aligntolcon',(float, 3.))]) ),
