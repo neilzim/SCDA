@@ -1801,7 +1801,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
         FPM_p = np.loadtxt(self.fileorg['FPM fname'])
-        LS_p = np.loadtxt(self.fileorg['LS fname'])
+        LS_p = np.round(np.loadtxt(self.fileorg['LS fname'])) # if LS is gray, round to binary
         A_p = A_col.reshape(TelAp_p.shape)
         if isinstance(self, QuarterplaneAPLC):
             TelAp = np.concatenate((np.concatenate((TelAp_p[::-1,::-1], TelAp_p[:,::-1]),axis=0),
@@ -2172,7 +2172,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
 
             set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
             set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
-            set Lyot := setof {x in Xs, y in Ys: LS[x,y] > 0} (x,y);
+            set Lyot := setof {x in Xs, y in Ys: LS[x,y] >= 0.5} (x,y);
             set LyotDarkZone := setof {x in Xs, y in Ys: LDZ[x,y] > 0} (x,y);
 
             param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
@@ -2188,7 +2188,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
 
             set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
             set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
-            set Lyot := setof {x in Xs, y in Ys: LS[x,y] > 0} (x,y);
+            set Lyot := setof {x in Xs, y in Ys: LS[x,y] >= 0.5} (x,y);
 
             param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
             
@@ -2659,7 +2659,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
 
             set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
             set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
-            set Lyot := setof {x in Xs, y in Ys: LS[x,y] > 0} (x,y);
+            set Lyot := setof {x in Xs, y in Ys: LS[x,y] >= 0.5} (x,y);
             set LyotDarkZone := setof {x in Xs, y in Ys: LDZ[x,y] > 0} (x,y);
 
             param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
@@ -2675,7 +2675,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
 
             set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
             set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
-            set Lyot := setof {x in Xs, y in Ys: LS[x,y] > 0} (x,y);
+            set Lyot := setof {x in Xs, y in Ys: LS[x,y] >= 0.5} (x,y);
 
             param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
             
@@ -2698,7 +2698,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             var ECm_real_X {x in Xs, my in MYs, lam in Ls};
             var EC_real {x in Xs, y in Ys, lam in Ls};
             
-            subject to st_ECm_real_X {x in Xs, my in MYs, lam in Ls}: ECm_real_X[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} EBm_real[mx,my,lam]*cos(2*pi*x*mx/lam)*dmx;
+            subject to st_ECm_real_X {x in Xs, my in MYs, lam in Ls}: ECm_real_X[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} FPM[mx,my]*EBm_real[mx,my,lam]*cos(2*pi*x*mx/lam)*dmx;
             subject to st_EC_real {(x,y) in Lyot union LyotDarkZone, lam in Ls}: EC_real[x,y,lam] = TelAp[x,y]*A[x,y] - 2/lam*sum {my in MYs} ECm_real_X[x,my,lam]*cos(2*pi*y*my/lam)*dmy;
             
             #---------------------
@@ -2725,7 +2725,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             var ECm_real_X {x in Xs, my in MYs, lam in Ls};
             var ECm_real {x in Xs, y in Ys, lam in Ls};
             
-            subject to st_ECm_real_X {x in Xs, my in MYs, lam in Ls}: ECm_real_X[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} EBm_real[mx,my,lam]*cos(2*pi*x*mx/lam)*dmx;
+            subject to st_ECm_real_X {x in Xs, my in MYs, lam in Ls}: ECm_real_X[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} FPM[mx,my]*EBm_real[mx,my,lam]*cos(2*pi*x*mx/lam)*dmx;
             subject to st_ECm_real {(x,y) in Lyot, lam in Ls}: ECm_real[x,y,lam] = 2/lam*sum {my in MYs} ECm_real_X[x,my,lam]*cos(2*pi*y*my/lam)*dmy;
             
             #---------------------
