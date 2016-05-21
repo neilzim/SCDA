@@ -1800,10 +1800,15 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         logging.info("Writing the AMPL program")
 
     def get_onax_psf(self, fp2res=8, rho_inc=0.25, rho_out=None, Nlam=None): # for APLC class
-        TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
+        if self.design['Pupil']['edge'] is 'floor': # floor to binary
+            TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
+        elif self.design['Pupil']['edge'] is 'round': # round to binary
+            TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
+        else:
+            TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
         FPM_p = np.loadtxt(self.fileorg['FPM fname'])
-        LS_p = np.round(np.loadtxt(self.fileorg['LS fname'])) # if LS is gray, round to binary
+        LS_p = np.loadtxt(self.fileorg['LS fname'])
         A_p = A_col.reshape(TelAp_p.shape)
         if isinstance(self, QuarterplaneAPLC):
             TelAp = np.concatenate((np.concatenate((TelAp_p[::-1,::-1], TelAp_p[:,::-1]),axis=0),
@@ -1889,7 +1894,12 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         return intens_polychrom, seps, radial_intens_polychrom
 
     def get_metrics(self, fp2res=16, verbose=True): # for APLC class
-        TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
+        if self.design['Pupil']['edge'] is 'floor': # floor to binary
+            TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
+        elif self.design['Pupil']['edge'] is 'round': # round to binary
+            TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
+        else:
+            TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
         LS_p = np.loadtxt(self.fileorg['LS fname'])
         A_p = A_col.reshape(TelAp_p.shape)
@@ -2668,7 +2678,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             define_pupil_and_telap = """
             #---------------------
 
-            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] >= 0.5} (x,y);
+            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0.5} (x,y);
             param TelApProp {x in Xs, y in Ys};
             let {x in Xs, y in Ys} TelApProp[x,y] := 0;
             let {(x,y) in Pupil} TelApProp[x,y] := 1;
