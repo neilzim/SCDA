@@ -544,7 +544,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                      'method': ['bar', 'barhom', 'dualsimp'],
                      'presolve': [True, False], 'threads': [None]+range(1,33) }
 
-    _aperture_menu = { 'prim': ['hex1', 'hex2', 'hex3', 'key24', 'pie12', 'pie08', 'irisao', 'atlast'],
+    _aperture_menu = { 'prim': ['hex1', 'hex2', 'hex3', 'hex4', 'key24', 'pie12', 'pie08', 'irisao', 'atlast'],
                        'secobs': ['Y60d','Yoff60d','X','Cross','T','Y90d'],
                        'thick': ['025','100'],
                        'centobs': [True, False],
@@ -684,7 +684,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
 
 class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diaphragm FPM 
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 125)), ('prim',(str, 'hex3')), ('secobs',(str, 'X')), 
-                                                           ('thick',(str, '025')), ('centobs',(bool, True))]) ),
+                                                           ('thick',(str, '025')), ('centobs',(bool, True)), ('edge',(str, 'gray'))]) ),
                                    ( 'FPM', OrderedDict([('R0',(float, 4.)), ('R1',(float, 10.)), ('openang',(int, 180)),
                                                          ('orient',(str, 'H')), ('fpmres',(int, 10))]) ),
                                    ( 'LS', OrderedDict([('N',(int, 125)), ('shape',(str, 'ann')), ('id',(int, 25)), ('od',(int, 75)),
@@ -748,8 +748,8 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             logging.info("File organization parameters: {}".format(self.fileorg))
      
         self.amplname_coron = "SPLC_full"
-        self.amplname_pupil = "{0:s}{1:s}{2:s}cobs{3:d}N{4:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
-                                                                         int(self.design['Pupil']['centobs']), self.design['Pupil']['N'])
+        self.amplname_pupil = "{0:s}{1:s}{2:s}cobs{3:d}N{4:04d}{5:s}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
+                                                                             int(self.design['Pupil']['centobs']), self.design['Pupil']['N'], self.design['Pupil']['edge'][0])
 
         self.amplname_fpm = "FPM{0:02d}R{1:03d}{2:s}{3:03d}res{4:02d}".format(int(round(10*self.design['FPM']['R0'])), int(round(10*self.design['FPM']['R1'])),
                                                                               self.design['FPM']['orient'], self.design['FPM']['openang'], self.design['FPM']['fpmres'])
@@ -1698,8 +1698,9 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             logging.info("File organization parameters: {}".format(self.fileorg))
      
         self.amplname_coron = "APLC_full"
-        self.amplname_pupil = "{0:s}{1:s}{2:s}cobs{3:d}_N{4:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
-                                                                         int(self.design['Pupil']['centobs']), self.design['Pupil']['N'])
+        self.telap_descrip = "{0:s}{1:s}{2:s}cobs{3:d}_N{4:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
+                                                                        int(self.design['Pupil']['centobs']), self.design['Pupil']['N'])
+        self.amplname_pupil = "{0:s}{1:s}".format(self.telap_descrip, self.design['Pupil']['edge'][0])
 
         self.amplname_fpm = "FPM{:02}M{:03}".format(int(round(100*self.design['FPM']['rad'])), self.design['FPM']['M'])
         if self.design['LS']['obscure'] == 2: # LS includes primary and secondary aperture features
@@ -1749,7 +1750,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                 self.fileorg['sol fname'] = os.path.join(self.fileorg['sol dir'], sol_fname_tail)
 
             if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
-                self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_full_" + self.amplname_pupil + ".dat") )
+                self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_full_" + self.telap_descrip + ".dat") )
 
             if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
                 self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_full_occspot_M{:03}.dat".format(self.design['FPM']['M']) )
@@ -1981,7 +1982,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             self.fileorg['log fname'] = os.path.join(self.fileorg['log dir'], log_fname_tail)
  
         if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
-            self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_half_" + self.amplname_pupil + ".dat") )
+            self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_half_" + self.telap_descrip + ".dat") )
 
         if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
             self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_quart_occspot_M{:03}.dat".format(self.design['FPM']['M']) )
@@ -2441,7 +2442,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             self.fileorg['log fname'] = os.path.join(self.fileorg['log dir'], log_fname_tail)
  
         if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
-            self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_quart_" + self.amplname_pupil + ".dat") )
+            self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_quart_" + self.telap_descrip + ".dat") )
  
         if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
             self.fileorg['FPM fname'] = os.path.join( self.fileorg['FPM dir'], "FPM_quart_occspot_M{:03}.dat".format(self.design['FPM']['M']) )
@@ -2654,16 +2655,41 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             set Ls := setof {l in 1..1} 1;
             """
 
-        if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
-            sets_and_arrays = """
+        if self.design['Pupil']['edge'] is 'floor': # floor to binary
+            define_pupil_and_telap = """
+            #---------------------
+
+            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] == 1} (x,y);
+            param TelApProp {x in Xs, y in Ys};
+            let {x in Xs, y in Ys} TelApProp[x,y] := 0;
+            let {(x,y) in Pupil} TelApProp[x,y] := 1;
+            """
+        elif self.design['Pupil']['edge'] is 'round': # round to binary
+            define_pupil_and_telap = """
+            #---------------------
+
+            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] >= 0.5} (x,y);
+            param TelApProp {x in Xs, y in Ys};
+            let {x in Xs, y in Ys} TelApProp[x,y] := 0;
+            let {(x,y) in Pupil} TelApProp[x,y] := 1;
+            """
+        else: # gray, default
+            define_pupil_and_telap = """
             #---------------------
 
             set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
+            param TelApProp {x in Xs, y in Ys};
+            let {x in Xs, y in Ys} TelApProp[x,y] := 0;
+            let {(x,y) in Pupil} TelApProp[x,y] := TelAp[x,y];
+            """
+
+        if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
+            sets_and_arrays = """
             set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
-            set Lyot := setof {x in Xs, y in Ys: LS[x,y] >= 0.5} (x,y);
+            set Lyot := setof {x in Xs, y in Ys: LS[x,y] > 0} (x,y);
             set LyotDarkZone := setof {x in Xs, y in Ys: LDZ[x,y] > 0} (x,y);
 
-            param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
+            param TR := sum {(x,y) in Pupil} TelApProp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
             
             var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
             
@@ -2672,13 +2698,10 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             """
         else:
             sets_and_arrays = """
-            #---------------------
-
-            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
             set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
-            set Lyot := setof {x in Xs, y in Ys: LS[x,y] >= 0.5} (x,y);
+            set Lyot := setof {x in Xs, y in Ys: LS[x,y] > 0} (x,y);
 
-            param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
+            param TR := sum {(x,y) in Pupil} TelApProp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
             
             var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
             
@@ -2692,7 +2715,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             var EBm_real_X {mx in MXs, y in Ys, lam in Ls};
             var EBm_real {mx in MXs, my in MYs, lam in Ls};
             
-            subject to st_EBm_real_X {mx in MXs, y in Ys, lam in Ls}: EBm_real_X[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
+            subject to st_EBm_real_X {mx in MXs, y in Ys, lam in Ls}: EBm_real_X[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelApProp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
             subject to st_EBm_real {(mx, my) in Mask, lam in Ls}: EBm_real[mx,my,lam] = 2/lam*sum {y in Ys} EBm_real_X[mx,y,lam]*cos(2*pi*y*my/lam)*dy;
             
             #---------------------
@@ -2700,7 +2723,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             var EC_real {x in Xs, y in Ys, lam in Ls};
             
             subject to st_ECm_real_X {x in Xs, my in MYs, lam in Ls}: ECm_real_X[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} FPM[mx,my]*EBm_real[mx,my,lam]*cos(2*pi*x*mx/lam)*dmx;
-            subject to st_EC_real {(x,y) in Lyot union LyotDarkZone, lam in Ls}: EC_real[x,y,lam] = TelAp[x,y]*A[x,y] - 2/lam*sum {my in MYs} ECm_real_X[x,my,lam]*cos(2*pi*y*my/lam)*dmy;
+            subject to st_EC_real {(x,y) in Lyot union LyotDarkZone, lam in Ls}: EC_real[x,y,lam] = TelApProp[x,y]*A[x,y] - 2/lam*sum {my in MYs} ECm_real_X[x,my,lam]*cos(2*pi*y*my/lam)*dmy;
             
             #---------------------
             var ED_real_X {xi in Xis, y in Ys, lam in Ls};
@@ -2711,7 +2734,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             
             #---------------------
             var ED00_real := 0.0;
-            subject to st_ED00_real: ED00_real = 4.*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*TelAp[x,y])*dx*dy;
+            subject to st_ED00_real: ED00_real = 4*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*TelApProp[x,y])*dx*dy;
             """
         else:
             field_propagation = """
@@ -2719,7 +2742,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             var EBm_real_X {mx in MXs, y in Ys, lam in Ls};
             var EBm_real {mx in MXs, my in MYs, lam in Ls};
             
-            subject to st_EBm_real_X {mx in MXs, y in Ys, lam in Ls}: EBm_real_X[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
+            subject to st_EBm_real_X {mx in MXs, y in Ys, lam in Ls}: EBm_real_X[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelApProp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
             subject to st_EBm_real {(mx, my) in Mask, lam in Ls}: EBm_real[mx,my,lam] = 2/lam*sum {y in Ys} EBm_real_X[mx,y,lam]*cos(2*pi*y*my/lam)*dy;
             
             #---------------------
@@ -2733,12 +2756,12 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             var ED_real_X {xi in Xis, y in Ys, lam in Ls};
             var ED_real {xi in Xis, eta in Etas, lam in Ls};
             
-            subject to st_ED_real_X {xi in Xis, y in Ys, lam in Ls}: ED_real_X[xi,y,lam] = 2*sum {x in Xs: (x,y) in Lyot} (TelAp[x,y]*A[x,y]-ECm_real[x,y,lam])*cos(2*pi*x*xi/lam)*dx;
+            subject to st_ED_real_X {xi in Xis, y in Ys, lam in Ls}: ED_real_X[xi,y,lam] = 2*sum {x in Xs: (x,y) in Lyot} (TelApProp[x,y]*A[x,y]-ECm_real[x,y,lam])*cos(2*pi*x*xi/lam)*dx;
             subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] = 2/lam*sum {y in Ys} ED_real_X[xi,y,lam]*cos(2*pi*y*eta/lam)*dy;
             
             #---------------------
             var ED00_real := 0.0;
-            subject to st_ED00_real: ED00_real = 4*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*TelAp[x,y])*dx*dy;
+            subject to st_ED00_real: ED00_real = 4*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*TelApProp[x,y])*dx*dy;
             """
 
         if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None:
@@ -2796,8 +2819,8 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         store_results = """
         #---------------------
 
-        param A_fin {{y in Ys, x in Xs}};
-        let {{y in Ys, x in Xs}} A_fin[x,y] := 0;
+        param A_fin {{x in Xs, y in Ys}};
+        let {{x in Xs, y in Ys}} A_fin[x,y] := 0;
         let {{(x,y) in Pupil}} A_fin[x,y] := A[x,y];
  
         printf {{y in Ys, x in Xs}}: "%15g %15g %15g \\n", x, y, A_fin[x,y] > "{0:s}";
@@ -2808,6 +2831,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         mod_fobj.write( textwrap.dedent(define_coords) )
         mod_fobj.write( textwrap.dedent(load_masks) )
         mod_fobj.write( textwrap.dedent(define_wavelengths) )
+        mod_fobj.write( textwrap.dedent(define_pupil_and_telap) )
         mod_fobj.write( textwrap.dedent(sets_and_arrays) )
         mod_fobj.write( textwrap.dedent(field_propagation) )
         mod_fobj.write( textwrap.dedent(constraints) )
