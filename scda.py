@@ -1638,7 +1638,8 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
 
 class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 250)), ('prim',(str, 'hex3')), ('secobs',(str, 'X')), 
-                                                           ('thick',(str, '025')), ('centobs',(bool, True)), ('edge',(str, 'gray'))]) ),
+                                                           ('thick',(str, '025')), ('centobs',(bool, True)),
+                                                           ('gap',(int, 1)), ('edge',(str, 'gray'))]) ),
                                    ( 'FPM', OrderedDict([('rad',(float, 4.)), ('M',(int, 60))]) ),
                                    ( 'LS', OrderedDict([('shape',(str, 'ann')), ('id',(int, 20)), ('od',(int, 90)), ('obscure',(int, 0)),
                                                         ('pad',(int, 0)), ('aligntol',(int, None)), ('aligntolcon',(float, 3.))]) ),
@@ -1698,8 +1699,8 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             logging.info("File organization parameters: {}".format(self.fileorg))
      
         self.amplname_coron = "APLC_full"
-        self.telap_descrip = "{0:s}{1:s}{2:s}cobs{3:d}_N{4:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
-                                                                        int(self.design['Pupil']['centobs']), self.design['Pupil']['N'])
+        self.telap_descrip = "{0:s}{1:s}{2:s}cobs{3:d}gap{4:d}_N{5:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
+                                                                                int(self.design['Pupil']['centobs']), self.design['Pupil']['gap'], self.design['Pupil']['N'])
         self.amplname_pupil = "{0:s}{1:s}".format(self.telap_descrip, self.design['Pupil']['edge'][0])
 
         self.amplname_fpm = "FPM{:02}M{:03}".format(int(round(100*self.design['FPM']['rad'])), self.design['FPM']['M'])
