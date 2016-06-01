@@ -1593,15 +1593,20 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
                 #SBATCH --qos=allnccs
                 #SBATCH --time={0:02d}:00:00
                 """.format(time_est_hrs)
-        elif queue_spec is '24h':
+        elif queue_spec is '1h':
             set_queue = """
-            #SBATCH --qos=long
-            #SBATCH --time=24:00:00
+            #SBATCH --qos=debug
+            #SBATCH --time=1:00:00
             """
         elif queue_spec is '12h':
             set_queue = """
             #SBATCH --qos=allnccs
             #SBATCH --time=12:00:00
+            """
+        else:
+            set_queue = """
+            #SBATCH --qos=long
+            #SBATCH --time=24:00:00
             """
 
         intel_module = """
@@ -2385,15 +2390,20 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
                 #SBATCH --qos=allnccs
                 #SBATCH --time={0:02d}:00:00
                 """.format(time_est_hrs)
-        elif queue_spec is '24h':
+        elif queue_spec is '1h':
             set_queue = """
-            #SBATCH --qos=long
-            #SBATCH --time=24:00:00
+            #SBATCH --qos=debug
+            #SBATCH --time=1:00:00
             """
         elif queue_spec is '12h':
             set_queue = """
             #SBATCH --qos=allnccs
             #SBATCH --time=12:00:00
+            """
+        else:
+            set_queue = """
+            #SBATCH --qos=long
+            #SBATCH --time=24:00:00
             """
 
         intel_module = """
@@ -2917,15 +2927,20 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
                 #SBATCH --qos=allnccs
                 #SBATCH --time={0:02d}:00:00
                 """.format(time_est_hrs)
-        elif queue_spec is '24h':
+        elif queue_spec is '1h':
             set_queue = """
-            #SBATCH --qos=long
-            #SBATCH --time=24:00:00
+            #SBATCH --qos=debug
+            #SBATCH --time=1:00:00
             """
         elif queue_spec is '12h':
             set_queue = """
             #SBATCH --qos=allnccs
             #SBATCH --time=12:00:00
+            """
+        else:
+            set_queue = """
+            #SBATCH --qos=long
+            #SBATCH --time=24:00:00
             """
 
         intel_module = """
