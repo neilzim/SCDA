@@ -684,7 +684,8 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
 
 class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diaphragm FPM 
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 125)), ('prim',(str, 'hex3')), ('secobs',(str, 'X')), 
-                                                           ('thick',(str, '025')), ('centobs',(bool, True)), ('edge',(str, 'gray'))]) ),
+                                                           ('thick',(str, '025')), ('centobs',(bool, True)),
+                                                           ('gap',(int, 1)), ('edge',(str, 'gray'))]) ),
                                    ( 'FPM', OrderedDict([('R0',(float, 4.)), ('R1',(float, 10.)), ('openang',(int, 180)),
                                                          ('orient',(str, 'H')), ('fpmres',(int, 10))]) ),
                                    ( 'LS', OrderedDict([('N',(int, 125)), ('shape',(str, 'ann')), ('id',(int, 25)), ('od',(int, 75)),
@@ -748,8 +749,9 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             logging.info("File organization parameters: {}".format(self.fileorg))
      
         self.amplname_coron = "SPLC_full"
-        self.amplname_pupil = "{0:s}{1:s}{2:s}cobs{3:d}N{4:04d}{5:s}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
-                                                                             int(self.design['Pupil']['centobs']), self.design['Pupil']['N'], self.design['Pupil']['edge'][0])
+        self.telap_descrip = "{0:s}{1:s}{2:s}cobs{3:d}gap{4:d}N{5:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
+                                                                                int(self.design['Pupil']['centobs']), self.design['Pupil']['gap'], self.design['Pupil']['N'])
+        self.amplname_pupil = "{0:s}{1:s}".format(self.telap_descrip, self.design['Pupil']['edge'][0])
 
         self.amplname_fpm = "FPM{0:02d}R{1:03d}{2:s}{3:03d}res{4:02d}".format(int(round(10*self.design['FPM']['R0'])), int(round(10*self.design['FPM']['R1'])),
                                                                               self.design['FPM']['orient'], self.design['FPM']['openang'], self.design['FPM']['fpmres'])
