@@ -857,7 +857,12 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         logging.info("Writing the AMPL program") # Not yet written for full-plane SPLC
 
     def get_onax_psf(self, fp2res=8, rho_inc=0.25, rho_out=None, Nlam=None): # for SPLC
-        TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
+        if self.design['Pupil']['edge'] is 'floor': # floor to binary
+            TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
+        elif self.design['Pupil']['edge'] is 'round': # round to binary
+            TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
+        else: # keey it gray
+            TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
         FPM_p = np.loadtxt(self.fileorg['FPM fname'])
         LS_p = np.loadtxt(self.fileorg['LS fname'])
@@ -1306,16 +1311,44 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             set Ls := setof {l in 1..1} 1;
             """
 
+        if self.design['Pupil']['edge'] is 'floor': # floor to binary
+            define_pupil_and_telap = """
+            #---------------------
+
+            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] == 1} (x,y);
+            param TelApProp {x in Xs, y in Ys};
+            let {x in Xs, y in Ys} TelApProp[x,y] := 0;
+            let {(x,y) in Pupil} TelApProp[x,y] := 1;
+            """
+        elif self.design['Pupil']['edge'] is 'round': # round to binary
+            define_pupil_and_telap = """
+            #---------------------
+
+            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0.5} (x,y);
+            param TelApProp {x in Xs, y in Ys};
+            let {x in Xs, y in Ys} TelApProp[x,y] := 0;
+            let {(x,y) in Pupil} TelApProp[x,y] := 1;
+            """
+        else: # gray, default
+            define_pupil_and_telap = """
+            #---------------------
+
+            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
+            param TelApProp {x in Xs, y in Ys};
+            let {x in Xs, y in Ys} TelApProp[x,y] := 0;
+            let {(x,y) in Pupil} TelApProp[x,y] := TelAp[x,y];
+            """
+
         if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
             sets_and_arrays_part1 = """
             #---------------------
 
-            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
-            set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
+            set FPMtrans := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
+            set FPMall := setof {mx in MXs, my in MYs: FPM[mx,my] >= 0} (mx,my);
             set Lyot := setof {u in Us, v in Vs: LS[u,v] > 0} (u,v);
             set LyotDarkZone := setof {u in Us, v in Vs: LDZ[u,v] > 0} (u,v);
 
-            param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
+            param TR := sum {(x,y) in Pupil} TelApProp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
             
             var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
             """
@@ -1323,12 +1356,11 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             sets_and_arrays_part1 = """
             #---------------------
 
-            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
             set FPMtrans := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
             set FPMall := setof {mx in MXs, my in MYs: FPM[mx,my] >= 0} (mx,my);
             set Lyot := setof {u in Us, v in Vs: LS[u,v] > 0} (u,v);
 
-            param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
+            param TR := sum {(x,y) in Pupil} TelApProp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
             
             var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
             """
@@ -1357,7 +1389,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             var EB_real {mx in MXs, my in MYs, lam in Ls};
             
             subject to st_EB_real_X {mx in MXs, y in Ys, lam in Ls}:
-                EB_real_X[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
+                EB_real_X[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelApProp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
             subject to st_EB_real {(mx, my) in FPMtrans, lam in Ls}:
                 EB_real[mx,my,lam] = 2/lam*sum {y in Ys} EB_real_X[mx,y,lam]*cos(2*pi*y*my/lam)*dy;
             
@@ -1387,7 +1419,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             var ED00_real := 0.0;
 
             subject to st_EB00_real_X {mx in MXs, y in Ys}:
-                EB00_real_X[mx,y] = 2*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2*pi*x*mx)*dx;
+                EB00_real_X[mx,y] = 2*sum {x in Xs: (x,y) in Pupil} TelApProp[x,y]*A[x,y]*cos(2*pi*x*mx)*dx;
             subject to st_EB00_real {(mx, my) in FPMall}: 
                 EB00_real[mx,my] = 2*sum {y in Ys} EB00_real_X[mx,y]*cos(2*pi*y*my)*dy;
             subject to st_EC00_real_X {u in Us, my in MYs}:
@@ -1404,7 +1436,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             var EB_real {mx in MXs, my in MYs, lam in Ls};
             
             subject to st_EB_real_X {mx in MXs, y in Ys, lam in Ls}:
-                EB_real_X[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
+                EB_real_X[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelApProp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
             subject to st_EB_real {(mx, my) in FPMtrans, lam in Ls}:
                 EB_real[mx,my,lam] = 2/lam*sum {y in Ys} EB_real_X[mx,y,lam]*cos(2*pi*y*my/lam)*dy;
             
@@ -1434,7 +1466,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             var ED00_real := 0.0;
 
             subject to st_EB00_real_X {mx in MXs, y in Ys}:
-                EB00_real_X[mx,y] = 2*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2*pi*x*mx)*dx;
+                EB00_real_X[mx,y] = 2*sum {x in Xs: (x,y) in Pupil} TelApProp[x,y]*A[x,y]*cos(2*pi*x*mx)*dx;
             subject to st_EB00_real {(mx, my) in FPMall}: 
                 EB00_real[mx,my] = 2*sum {y in Ys} EB00_real_X[mx,y]*cos(2*pi*y*my)*dy;
             subject to st_EC00_real_X {u in Us, my in MYs}:
@@ -1810,7 +1842,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
         elif self.design['Pupil']['edge'] is 'round': # round to binary
             TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
-        else:
+        else: # keey it gray
             TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
         FPM_p = np.loadtxt(self.fileorg['FPM fname'])
