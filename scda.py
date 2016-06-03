@@ -749,7 +749,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             logging.info("File organization parameters: {}".format(self.fileorg))
      
         self.amplname_coron = "SPLC_full"
-        self.telap_descrip = "{0:s}{1:s}{2:s}cobs{3:d}gap{4:d}N{5:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
+        self.telap_descrip = "{0:s}{1:s}{2:s}cobs{3:d}gap{4:d}_N{5:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
                                                                                 int(self.design['Pupil']['centobs']), self.design['Pupil']['gap'], self.design['Pupil']['N'])
         self.amplname_pupil = "{0:s}{1:s}".format(self.telap_descrip, self.design['Pupil']['edge'][0])
 
@@ -802,11 +802,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                 self.fileorg['log fname'] = os.path.join(self.fileorg['log dir'], log_fname_tail)
 
             if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
-                self.fileorg['TelAp fname'] = \
-                  os.path.join( self.fileorg['TelAp dir'], "TelAp_full_{0:s}{1:s}{2:s}cobs{3:d}_N{4:04d}.dat".format( \
-                                                            self.design['Pupil']['prim'], self.design['Pupil']['secobs'],
-                                                            self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
-                                                            self.design['Pupil']['N']) )
+                self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_full_" + self.telap_descrip + ".dat") )
 
             if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
                 self.fileorg['FPM fname'] = \
@@ -1083,11 +1079,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             self.fileorg['log fname'] = os.path.join(self.fileorg['log dir'], log_fname_tail)
 
         if 'TelAp fname' not in self.fileorg or self.fileorg['TelAp fname'] is None:
-            self.fileorg['TelAp fname'] = \
-              os.path.join( self.fileorg['TelAp dir'], "TelAp_quart_{0:s}{1:s}{2:s}cobs{3:d}_N{4:04d}.dat".format(
-                                                        self.design['Pupil']['prim'], self.design['Pupil']['secobs'],
-                                                        self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']),
-                                                        self.design['Pupil']['N']) )
+            self.fileorg['TelAp fname'] = os.path.join( self.fileorg['TelAp dir'], ("TelAp_quart_" + self.telap_descrip + ".dat") )
 
         if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
             self.fileorg['FPM fname'] = \
@@ -1552,6 +1544,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
         mod_fobj.write( textwrap.dedent(define_coords) )
         mod_fobj.write( textwrap.dedent(load_masks) )
         mod_fobj.write( textwrap.dedent(define_wavelengths) )
+        mod_fobj.write( textwrap.dedent(define_pupil_and_telap) )
         mod_fobj.write( textwrap.dedent(sets_and_arrays_part1) )
         mod_fobj.write( textwrap.dedent(sets_and_arrays_part2) )
         mod_fobj.write( textwrap.dedent(field_propagation) )
