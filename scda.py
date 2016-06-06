@@ -58,9 +58,12 @@ def make_ampl_bundle(coron_list, bundled_dir, queue_spec='auto', email=None, arc
     os.chdir(bundled_dir)
     bundled_fileorg = {'work dir': "."}
     
-    bash_fname = "run_" + os.path.basename(os.path.normpath(bundled_dir)) + ".sh"
-    bash_fobj = open(bash_fname, "w")
-    bash_fobj.write("#! /bin/bash -x\n")
+    serial_bash_fname = "run_" + os.path.basename(os.path.normpath(bundled_dir)) + "_serial.sh"
+    serial_bash_fobj = open(serial_bash_fname, "w")
+    serial_bash_fobj.write("#! /bin/bash -x\n")
+    sbatch_bash_fname = "run_" + os.path.basename(os.path.normpath(bundled_dir)) + "_sbatch.sh"
+    sbatch_bash_fobj = open(sbatch_bash_fname, "w")
+    sbatch_bash_fobj.write("#! /bin/bash -x\n")
     
     for coron in coron_list:
         shutil.copy2(coron.fileorg['TelAp fname'], ".")
@@ -83,9 +86,12 @@ def make_ampl_bundle(coron_list, bundled_dir, queue_spec='auto', email=None, arc
         else:
             scda.logging.warning("Input file configuration check failed; AMPL source file not written")
             scda.logging.warning("Bundled file organization: {0}".format(bundled_coron.fileorg))
-        bash_fobj.write("ampl {0:s}\n".format(bundled_coron.fileorg['ampl src fname']))
-    bash_fobj.close()
-    os.chmod(bash_fname, 0775)
+        serial_bash_fobj.write("ampl {0:s}\n".format(bundled_coron.fileorg['ampl src fname']))
+        sbatch_bash_fobj.write("sbatch {0:s}\n".format(bundled_coron.fileorg['slurm fname']))
+    serial_bash_fobj.close()
+    sbatch_bash_fobj.close()
+    os.chmod(serial_bash_fname, 0775)
+    os.chmod(sbatch_bash_fname, 0775)
     os.chdir(cwd)
     return bundled_coron_list
     
@@ -941,7 +947,8 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             Psi_D_0_peak = np.sum(Psi_C_0_stop)*du*dv/wr
             intens_polychrom[wi,:,:] = np.power(np.absolute(Psi_D)/np.absolute(Psi_D_0_peak), 2)
              
-        seps = np.arange(self.design['FPM']['R0']+self.design['Image']['dR'], rho_out, rho_inc)
+        #seps = np.arange(self.design['FPM']['R0']+self.design['Image']['dR'], rho_out, rho_inc)
+        seps = np.arange(0, rho_out, rho_inc)
         radial_intens_polychrom = np.zeros((len(wrs), len(seps)))
         XXs = np.asarray(np.dot(np.matrix(np.ones(xis.shape)).T, xis))
         YYs = np.asarray(np.dot(etas.T, np.matrix(np.ones(etas.shape))))
