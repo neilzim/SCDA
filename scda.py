@@ -736,7 +736,8 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                                                         self._design_fields[keycat][param][1] is not None):
                     self.design[keycat][param] = self._design_fields[keycat][param][1]
         self.design['FPM']['M'] = int(np.ceil(self.design['FPM']['fpmres']*self.design['FPM']['R1']))
-        if self.design['Image']['dR'] < 0: # expand optimization bandpass according to the focal plane stellar diam./pointing tolerance parameter, 'dR'
+        # NOTE: temporarily removing bandpass augmentation in favor of direct image constraints down to R0+dR
+        if False and self.design['Image']['dR'] < 0: # expand optimization bandpass according to the focal plane stellar diam./pointing tolerance parameter, 'dR'
             self.design['Image']['bw+'] = self.design['Image']['bw']*self.design['FPM']['R0']/(self.design['FPM']['R0'] + self.design['Image']['dR'])
         else:
             self.design['Image']['bw+'] = self.design['Image']['bw']
@@ -1180,21 +1181,24 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             #---------------------
             param rho0 := {2:0.2f};
             param rho1 := {3:0.2f};
-            param ang := {4:d};
+            param rho2 := {4:0.2f};
+            param ang := {5:d};
             
             #---------------------
-            param N_A := {5:d};				# discretization parameter (apodizer)
-            param M := {6:d};				# discretization parameter (FPM)
-            param N_L := {7:d};				# discretization parameter (Lyot plane)
-            param Nimg := {8:d};           # discretization parameter (image)
+            param N_A := {6:d};				# discretization parameter (apodizer)
+            param M := {7:d};				# discretization parameter (FPM)
+            param fpmres := {8:d};			# discretization parameter (FPM)
+            param N_L := {9:d};				# discretization parameter (Lyot plane)
+            param Nimg := {10:d};           # discretization parameter (image)
                                   
             #---------------------
-            param bw := {9:0.2f};
-            param Nlam := {10:d};
+            param bw := {11:0.2f};
+            param Nlam := {12:d};
             
             #---------------------
-            """.format(self.design['Image']['c'], self.design['LS']['s'], self.design['FPM']['R0'], self.design['FPM']['R1'],
-                       self.design['FPM']['openang'], self.design['Pupil']['N'], self.design['FPM']['M'], self.design['LS']['N'],
+            """.format(self.design['Image']['c'], self.design['LS']['s'], self.design['FPM']['R0']+self.design['Image']['dR'],
+                       self.design['FPM']['R0'], self.design['FPM']['R1'], self.design['FPM']['openang'],
+                       self.design['Pupil']['N'], self.design['FPM']['M'], self.design['FPM']['fpmres'], self.design['LS']['N'],
                        self.design['Image']['Nimg'], self.design['Image']['bw+'], self.design['Image']['Nlam'])
         else:
             params = """
@@ -1208,23 +1212,25 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             #---------------------
             param rho0 := {1:0.2f};
             param rho1 := {2:0.2f};
-            param ang := {3:d};
+            param rho2 := {3:0.2f};
+            param ang := {4:d};
             
             #---------------------
-            param N_A := {4:d};				# discretization parameter (apodizer)
-            param M := {5:d};				# discretization parameter (FPM)
-            param N_L := {6:d};				# discretization parameter (Lyot plane)
-            param Nimg := {7:d};           # discretization parameter (image)
-            param fpmres := {8:d};         # points per center wavlength resolution element in FPM
+            param N_A := {5:d};				# discretization parameter (apodizer)
+            param M := {6:d};				# discretization parameter (FPM)
+            param fpmres := {7:d};			# discretization parameter (FPM)
+            param N_L := {8:d};				# discretization parameter (Lyot plane)
+            param Nimg := {9:d};           # discretization parameter (image)
                                   
             #---------------------
-            param bw := {9:0.2f};
-            param Nlam := {10:d};
+            param bw := {10:0.2f};
+            param Nlam := {11:d};
             
             #---------------------
-            """.format(self.design['Image']['c'], self.design['FPM']['R0'], self.design['FPM']['R1'], self.design['FPM']['openang'],
-                       self.design['Pupil']['N'], self.design['FPM']['M'], self.design['LS']['N'], self.design['Image']['Nimg'],
-                       self.design['FPM']['fpmres'], self.design['Image']['bw+'], self.design['Image']['Nlam'])
+            """.format(self.design['Image']['c'], self.design['FPM']['R0']+self.design['Image']['dR'], self.design['FPM']['R0'],
+                       self.design['FPM']['R1'], self.design['FPM']['openang'],
+                       self.design['Pupil']['N'], self.design['FPM']['M'], self.design['FPM']['fpmres'],
+                       self.design['LS']['N'], self.design['Image']['Nimg'], self.design['Image']['bw+'], self.design['Image']['Nlam'])
 
         define_coords = """
         #---------------------
@@ -1238,7 +1244,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
         param du := 1/(2*N_L);
         param dv := du;
         
-        param dxi := rho1/Nimg;
+        param dxi := rho2/Nimg;
         param deta := dxi;
  
         #---------------------
@@ -1266,7 +1272,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             
             # Load FPM
             param FPM {{mx in MXs, my in MYs}};
-            read {{my in MYs, mx in MXs}} FPM[mx,my] < "{2:s}"; 
+            read {{my in MYs, mx in MXs}} FPM[mx,my] < "{2:s}";
             close "{3:s}";
             
             # Load Lyot stop
@@ -1371,7 +1377,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             #---------------------
             set DarkHole := setof {xi in Xis, eta in Etas:
                 sqrt(xi^2+eta^2) >= rho0 && 
-                sqrt(xi^2+eta^2) <= rho1 &&
+                sqrt(xi^2+eta^2) <= rho2 &&
                 eta <= xi*tan(ang/2*pi/180)} (xi,eta);
             """
         else: # Vertical bowtie FoV
@@ -1379,7 +1385,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             #---------------------
             set DarkHole := setof {xi in Xis, eta in Etas:
                 sqrt(xi^2+eta^2) >= rho0 && 
-                sqrt(xi^2+eta^2) <= rho1 &&
+                sqrt(xi^2+eta^2) <= rho2 &&
                 eta >= xi*tan(ang/2*pi/180)} (xi,eta);
             """
  
