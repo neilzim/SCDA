@@ -72,7 +72,7 @@ def make_ampl_bundle(coron_list, bundled_dir, queue_spec='auto', email=None, arc
         if 'LDZ fname' in coron.fileorg and coron.fileorg['LDZ fname'] is not None:
             shutil.copy2(coron.fileorg['LDZ fname'], ".")
         design_params = coron.design.copy()
-        design_params['FPM'].pop('M',None)
+        #design_params['FPM'].pop('M',None)
         design_params['LS'].pop('s',None)
         design_params['Image'].pop('Nimg',None)
         design_params['Image'].pop('bw+',None)
@@ -84,8 +84,8 @@ def make_ampl_bundle(coron_list, bundled_dir, queue_spec='auto', email=None, arc
             bundled_coron.write_slurm_script(queue_spec=queue_spec, email=email, arch=arch, 
                                             overwrite=True, verbose=False)
         else:
-            scda.logging.warning("Input file configuration check failed; AMPL source file not written")
-            scda.logging.warning("Bundled file organization: {0}".format(bundled_coron.fileorg))
+            logging.warning("Input file configuration check failed; AMPL source file not written")
+            logging.warning("Bundled file organization: {0}".format(bundled_coron.fileorg))
         serial_bash_fobj.write("ampl {0:s}\n".format(bundled_coron.fileorg['ampl src fname']))
         sbatch_bash_fobj.write("sbatch {0:s}\n".format(bundled_coron.fileorg['slurm fname']))
     serial_bash_fobj.close()
@@ -244,6 +244,7 @@ class DesignParamSurvey(object):
         if 'method' not in self.solver or self.solver['method'] is None: self.solver['method'] = 'bar'
         if 'presolve' not in self.solver or self.solver['presolve'] is None: self.solver['presolve'] = True
         if 'threads' not in self.solver or self.solver['threads'] is None: self.solver['threads'] = None
+        if 'crossover' not in self.solver: self.solver['crossover'] = None
          
         setattr(self, 'coron_list', [])
         design = {}
@@ -544,11 +545,11 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                                  'sol dir', 'log dir', 'eval dir', 'slurm dir',
                                  'ampl src fname', 'slurm fname', 'log fname', 'job name', 
                                  'TelAp fname', 'FPM fname', 'LS fname', 'LDZ fname', 'sol fname'],
-                     'solver': ['constr', 'method', 'presolve', 'threads', 'solver'] }
+                     'solver': ['constr', 'method', 'presolve', 'threads', 'solver', 'crossover'] }
 
     _solver_menu = { 'constr': ['lin', 'quad'], 'solver': ['LOQO', 'gurobi', 'gurobix'], 
                      'method': ['bar', 'barhom', 'dualsimp'],
-                     'presolve': [True, False], 'threads': [None]+range(1,33) }
+                     'presolve': [True, False], 'threads': [None]+range(1,33), 'crossover': [None]+[True, False] }
 
     _aperture_menu = { 'prim': ['hex1', 'hex2', 'hex3', 'hex4', 'key24', 'pie12', 'pie08', 'irisao', 'atlast'],
                        'secobs': ['Y60d','Yoff60d','X','Cross','T','Y90d'],
@@ -662,6 +663,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         if 'convtol' not in self.solver: self.solver['convtol'] = None
         if 'threads' not in self.solver: self.solver['threads'] = None
         if 'presolve' not in self.solver or self.solver['presolve'] is None: self.solver['presolve'] = True
+        if 'crossover' not in self.solver: self.solver['crossover'] = None
 
         setattr(self, 'ampl_infile_status', None)
         if not issubclass(self.__class__, LyotCoronagraph):
@@ -737,7 +739,8 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                     self.design[keycat][param] = self._design_fields[keycat][param][1]
         self.design['FPM']['M'] = int(np.ceil(self.design['FPM']['fpmres']*self.design['FPM']['R1']))
         # NOTE: temporarily removing bandpass augmentation in favor of direct image constraints down to R0+dR
-        if False and self.design['Image']['dR'] < 0: # expand optimization bandpass according to the focal plane stellar diam./pointing tolerance parameter, 'dR'
+        #if False and self.design['Image']['dR'] < 0: # expand optimization bandpass according to the focal plane stellar diam./pointing tolerance parameter, 'dR'
+        if self.design['Image']['dR'] < 0: # expand optimization bandpass according to the focal plane stellar diam./pointing tolerance parameter, 'dR'
             self.design['Image']['bw+'] = self.design['Image']['bw']*self.design['FPM']['R0']/(self.design['FPM']['R0'] + self.design['Image']['dR'])
         else:
             self.design['Image']['bw+'] = self.design['Image']['bw']
@@ -747,8 +750,8 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         # Set a private attribute for the number of image plane samples between the center and the outer constraint angle
         self.design['Image']['Nimg'] = int( np.ceil( self.design['Image']['fpres']*self.design['FPM']['R1']/(1. - self.design['Image']['bw+']/2) ) )
         if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon']:
-            # The Lyot dark zone field suppression factor decreases with the square of pupil array size. The units of input parameter are arbitrarily normalized to N=125.
-            self.design['LS']['s'] = self.design['LS']['aligntolcon'] - 2*np.log10(self.design['Pupil']['N']/125.)
+            # The Lyot dark zone field suppression factor decreases with the square of pupil array size. The units of input parameter are arbitrarily normalized to N=250.
+            self.design['LS']['s'] = self.design['LS']['aligntolcon'] - 2*np.log10(self.design['Pupil']['N']/250.)
 
         if verbose: # Print summary of the set parameters
             logging.info("Design parameters: {}".format(self.design))
@@ -784,6 +787,8 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             self.amplname_solver = "{}{}pre0".format(self.solver['constr'], self.solver['method'])
         if self.solver['convtol'] is not None:
             self.amplname_solver += "convtol{0:2d}".format(int(round(10*self.solver['convtol'])))
+        if self.solver['crossover'] is not None:
+            self.amplname_solver += "cross"
         if self.solver['threads'] is not None:
             self.amplname_solver += "thr{:02d}".format(self.solver['threads'])
 
@@ -956,6 +961,9 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         RRs = np.sqrt(XXs**2 + YYs**2)
         theta_quad = np.rad2deg(np.arctan2(YYs[M_fp2:,M_fp2:], XXs[M_fp2:,M_fp2:]))
         #ang_mask = np.ones((2*M_fp2, 2*M_fp2))
+        rad_mask_1d = np.logical_and(np.greater_equal(RRs, self.design['FPM']['R0']).ravel(),
+                                     np.less_equal(RRs, self.design['FPM']['R1']).ravel())
+        rad_mask = rad_mask_1d.reshape(RRs.shape)
         if self.design['FPM']['openang'] < 180:
             if self.design['FPM']['orient'] == 'V':
                 theta_quad_mask = np.greater_equal(theta_quad, self.design['FPM']['openang']/2)
@@ -963,6 +971,9 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                 theta_quad_mask = np.less_equal(theta_quad, self.design['FPM']['openang']/2)
             theta_rhs_mask = np.concatenate((theta_quad_mask[::-1,:], theta_quad_mask), axis=0)
             theta_mask = np.concatenate((theta_rhs_mask[:,::-1], theta_rhs_mask), axis=1)
+            FoV_mask = theta_mask*rad_mask
+        else:
+            FoV_mask = rad_mask
 
         for si, sep in enumerate(seps):
             r_in = np.max([seps[0], sep-0.5])
@@ -975,7 +986,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
 
         #pdb.set_trace()
 
-        return intens_polychrom, seps, radial_intens_polychrom, theta_mask
+        return intens_polychrom, seps, radial_intens_polychrom, FoV_mask
 
     def get_metrics(self, fp1res=8, fp2res=16, rho_out=3., verbose=True): # for SPLC class
         TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
@@ -1523,11 +1534,15 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
         if self.solver['presolve'] is False:
             gurobi_opt_str += " presolve=0"
         if self.solver['method'] is 'bar' or self.solver['method'] is 'barhom':
-            gurobi_opt_str += " lpmethod=2 crossover=0"
+            gurobi_opt_str += " lpmethod=2"
             if self.solver['convtol'] is not None:
                 gurobi_opt_str += " barconvtol={0:.1e}".format(np.power(10,-self.solver['convtol']))
             if self.solver['method'] is 'barhom':
                 gurobi_opt_str += " barhomogeneous=1"
+            if self.solver['crossover'] is True:
+                gurobi_opt_str += " crossoverbasis=1"
+            else:
+                gurobi_opt_str += " crossover=0"
         else: # assume dual simplex
             gurobi_opt_str += " lpmethod=1"
 
@@ -1781,6 +1796,8 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             self.amplname_solver = "{}{}pre0".format(self.solver['constr'], self.solver['method'])
         if self.solver['convtol'] is not None:
             self.amplname_solver += "convtol{0:2d}".format(int(round(10*self.solver['convtol'])))
+        if self.solver['crossover'] is not None:
+            self.amplname_solver += "cross"
         if self.solver['threads'] is not None:
             self.amplname_solver += "thr{:02d}".format(self.solver['threads'])
 
@@ -2322,11 +2339,15 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         if self.solver['presolve'] is False:
             gurobi_opt_str += " presolve=0"
         if self.solver['method'] is 'bar' or self.solver['method'] is 'barhom':
-            gurobi_opt_str += " lpmethod=2 crossover=0"
+            gurobi_opt_str += " lpmethod=2"
             if self.solver['convtol'] is not None:
                 gurobi_opt_str += " barconvtol={0:.1e}".format(np.power(10,-self.solver['convtol']))
             if self.solver['method'] is 'barhom':
                 gurobi_opt_str += " barhomogeneous=1"
+            if self.solver['crossover'] is True:
+                gurobi_opt_str += " crossoverbasis=1"
+            else:
+                gurobi_opt_str += " crossover=0"
         else: # assume dual simplex
             gurobi_opt_str += " lpmethod=1"
 
@@ -2858,11 +2879,15 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         if self.solver['presolve'] is False:
             gurobi_opt_str += " presolve=0"
         if self.solver['method'] is 'bar' or self.solver['method'] is 'barhom':
-            gurobi_opt_str += " lpmethod=2 crossover=0"
+            gurobi_opt_str += " lpmethod=2"
             if self.solver['convtol'] is not None:
                 gurobi_opt_str += " barconvtol={0:.1e}".format(np.power(10,-self.solver['convtol']))
             if self.solver['method'] is 'barhom':
                 gurobi_opt_str += " barhomogeneous=1"
+            if self.solver['crossover'] is True:
+                gurobi_opt_str += " crossoverbasis=1"
+            else:
+                gurobi_opt_str += " crossover=0"
         else: # assume dual simplex
             gurobi_opt_str += " lpmethod=1"
 
