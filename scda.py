@@ -2769,7 +2769,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             sets_and_arrays = """
             set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
             set Lyot := setof {x in Xs, y in Ys: LS[x,y] > 0} (x,y);
-            set LyotDarkZone := setof {x in Xs, y in Ys: LDZ[x,y] == 1 & TelApProp[x,y] > 0} (x,y);
+            set LyotDarkZone := setof {x in Xs, y in Ys: LDZ[x,y] == 1 && TelApProp[x,y] > 0} (x,y);
 
             param TR := sum {(x,y) in Pupil} TelApProp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
             
