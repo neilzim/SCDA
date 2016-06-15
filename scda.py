@@ -2573,7 +2573,6 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
                                                           self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
         self.check_ampl_input_files()
     def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None, verbose=True):
-        pdb.set_trace()
         if self.ampl_infile_status is False and not override_infile_status:
             if verbose:
                 logging.warning("Error: the most recent input file check for this design configuration failed.")
