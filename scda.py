@@ -65,6 +65,10 @@ def make_ampl_bundle(coron_list, bundled_dir, queue_spec='auto', email=None, arc
     sbatch_bash_fobj.write("#! /bin/bash -x\n")
     
     for coron in coron_list:
+        bundled_fileorg = {'work dir': ".", 'ampl src fname': os.path.basename(coron.fileorg['ampl src fname']),
+                           'TelAp fname': os.path.basename(coron.fileorg['TelAp fname']), 
+                           'FPM fname': os.path.basename(coron.fileorg['FPM fname']), 
+                           'LS fname': os.path.basename(coron.fileorg['LS fname'])} 
         if not os.path.exists(os.path.basename(coron.fileorg['TelAp fname'])):
             shutil.copy2(coron.fileorg['TelAp fname'], ".")
         if not os.path.exists(os.path.basename(coron.fileorg['FPM fname'])):
@@ -74,12 +78,12 @@ def make_ampl_bundle(coron_list, bundled_dir, queue_spec='auto', email=None, arc
         if 'LDZ fname' in coron.fileorg and coron.fileorg['LDZ fname'] is not None:
             if not os.path.exists(os.path.basename(coron.fileorg['LDZ fname'])):
                 shutil.copy2(coron.fileorg['LDZ fname'], ".")
+            bundled_fileorg['LDZ fname'] = os.path.basename(coron.fileorg['LDZ fname'])
         design_params = coron.design.copy()
         #design_params['FPM'].pop('M',None)
         design_params['LS'].pop('s',None)
         design_params['Image'].pop('Nimg',None)
         design_params['Image'].pop('bw+',None)
-        bundled_fileorg = {'work dir': ".", 'ampl src fname': os.path.basename(coron.fileorg['ampl src fname'])}
         bundled_coron = coron.__class__(design=coron.design, fileorg=bundled_fileorg,
                                         solver=coron.solver)
         bundled_coron_list.append(bundled_coron)
