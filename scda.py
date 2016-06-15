@@ -66,11 +66,15 @@ def make_ampl_bundle(coron_list, bundled_dir, queue_spec='auto', email=None, arc
     sbatch_bash_fobj.write("#! /bin/bash -x\n")
     
     for coron in coron_list:
-        shutil.copy2(coron.fileorg['TelAp fname'], ".")
-        shutil.copy2(coron.fileorg['FPM fname'], ".")
-        shutil.copy2(coron.fileorg['LS fname'], ".")
+        if not os.path.exists(os.path.basename(coron.fileorg['TelAp fname'])):
+            shutil.copy2(coron.fileorg['TelAp fname'], ".")
+        if not os.path.exists(os.path.basename(coron.fileorg['FPM fname'])):
+            shutil.copy2(coron.fileorg['FPM fname'], ".")
+        if not os.path.exists(os.path.basename(coron.fileorg['LS fname'])):
+            shutil.copy2(coron.fileorg['LS fname'], ".")
         if 'LDZ fname' in coron.fileorg and coron.fileorg['LDZ fname'] is not None:
-            shutil.copy2(coron.fileorg['LDZ fname'], ".")
+            if not os.path.exists(os.path.basename(coron.fileorg['LDZ fname'])):
+                shutil.copy2(coron.fileorg['LDZ fname'], ".")
         design_params = coron.design.copy()
         #design_params['FPM'].pop('M',None)
         design_params['LS'].pop('s',None)
@@ -2569,6 +2573,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
                                                           self.design['LS']['aligntol'], self.design['Pupil']['N'])) )
         self.check_ampl_input_files()
     def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None, verbose=True):
+        pdb.set_trace()
         if self.ampl_infile_status is False and not override_infile_status:
             if verbose:
                 logging.warning("Error: the most recent input file check for this design configuration failed.")
