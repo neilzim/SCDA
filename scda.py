@@ -56,7 +56,6 @@ def make_ampl_bundle(coron_list, bundled_dir, queue_spec='auto', email=None, arc
         
     cwd = os.getcwd()
     os.chdir(bundled_dir)
-    bundled_fileorg = {'work dir': "."}
     
     serial_bash_fname = "run_" + os.path.basename(os.path.normpath(bundled_dir)) + "_serial.sh"
     serial_bash_fobj = open(serial_bash_fname, "w")
@@ -80,6 +79,7 @@ def make_ampl_bundle(coron_list, bundled_dir, queue_spec='auto', email=None, arc
         design_params['LS'].pop('s',None)
         design_params['Image'].pop('Nimg',None)
         design_params['Image'].pop('bw+',None)
+        bundled_fileorg = {'work dir': ".", 'ampl src fname': os.path.basename(coron.fileorg['ampl src fname'])}
         bundled_coron = coron.__class__(design=coron.design, fileorg=bundled_fileorg,
                                         solver=coron.solver)
         bundled_coron_list.append(bundled_coron)
