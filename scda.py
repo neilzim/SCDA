@@ -1818,22 +1818,21 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         rel_p7ap_thrupt_polychrom = []
         fwhm_area_polychrom = []
         for wr in wrs:
-            Psi_D_0 = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), TelAp*A*LS),
-                                             np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
+            Psi_D_0 = 4*dx*dy/wr*np.dot(np.cos(2*np.pi/wr*np.dot(etas.T, ys)), A*TelAp*LS).dot(np.cos(2*np.pi/wr*np.dot(xs.T, xis)))
             Intens_D_0 = np.power(np.absolute(Psi_D_0), 2)
-            Intens_D_0_peak = (np.sum(TelAp*A*LS)*dx*dy/wr)**2
-            fwhm_ind_APLC = np.greater_equal(Intens_D_0, Intens_D_0_peak/2)
-            Psi_TelAp = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), TelAp),
-                                               np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
+            Intens_D_0_peak = (4*np.sum(TelAp*A*LS)*dx*dy/wr)**2
+            Psi_TelAp = 4*dx*dy/wr*np.dot(np.cos(2*np.pi/wr*np.dot(etas.T, ys)), TelAp).dot(np.cos(2*np.pi/wr*np.dot(xs.T, xis)))
             Intens_TelAp = np.power(np.absolute(Psi_TelAp), 2)
-            Intens_TelAp_peak = (np.sum(TelAp)*dx*dy/wr)**2
+            Intens_TelAp_peak = (4*np.sum(TelAp)*dx*dy/wr)**2
+
+            fwhm_ind_APLC = np.greater_equal(Intens_D_0, Intens_D_0_peak/2)
             fwhm_ind_TelAp = np.greater_equal(Intens_TelAp, Intens_TelAp_peak/2)
-            fwhm_sum_TelAp = 4*np.sum(Intens_TelAp[fwhm_ind_TelAp])*dxi*dxi
-            fwhm_sum_APLC = 4*np.sum(Intens_D_0[fwhm_ind_APLC])*dxi*dxi
-            p7ap_sum_TelAp = 4*np.sum(Intens_TelAp[p7ap_ind])*dxi*dxi
-            p7ap_sum_APLC = 4*np.sum(Intens_D_0[p7ap_ind])*dxi*dxi
-            fwhm_area_polychrom.append(np.sum(fwhm_ind_APLC)*dxi*dxi)
-            tot_thrupt_polychrom.append(np.sum(Intens_D_0)*dxi*dxi/np.sum(np.power(TelAp,2)*dx*dx))
+            fwhm_area_polychrom.append(4*np.sum(fwhm_ind_APLC)*dxi*dxi) 
+            fwhm_sum_TelAp = np.sum(Intens_TelAp[fwhm_ind_TelAp])*dxi*dxi
+            fwhm_sum_APLC = np.sum(Intens_D_0[fwhm_ind_APLC])*dxi*dxi
+            p7ap_sum_TelAp = np.sum(Intens_TelAp[p7ap_ind])*dxi*dxi
+            p7ap_sum_APLC = np.sum(Intens_D_0[p7ap_ind])*dxi*dxi
+            tot_thrupt_polychrom.append(np.sum(Intens_D_0*dxi*dxi)/np.sum(np.power(TelAp,2)*dx*dx))
             fwhm_thrupt_polychrom.append(fwhm_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx))
             p7ap_thrupt_polychrom.append(p7ap_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx))
             rel_fwhm_thrupt_polychrom.append(fwhm_sum_APLC/fwhm_sum_TelAp)
