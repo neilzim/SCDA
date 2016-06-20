@@ -1828,10 +1828,10 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             Intens_TelAp = np.power(np.absolute(Psi_TelAp), 2)
             Intens_TelAp_peak = (np.sum(TelAp)*dx*dy/wr)**2
             fwhm_ind_TelAp = np.greater_equal(Intens_TelAp, Intens_TelAp_peak/2)
-            fwhm_sum_TelAp = np.sum(Intens_TelAp[fwhm_ind_TelAp])*dxi*dxi
-            fwhm_sum_APLC = np.sum(Intens_D_0[fwhm_ind_APLC])*dxi*dxi
-            p7ap_sum_TelAp = np.sum(Intens_TelAp[p7ap_ind])*dxi*dxi
-            p7ap_sum_APLC = np.sum(Intens_D_0[p7ap_ind])*dxi*dxi
+            fwhm_sum_TelAp = 4*np.sum(Intens_TelAp[fwhm_ind_TelAp])*dxi*dxi
+            fwhm_sum_APLC = 4*np.sum(Intens_D_0[fwhm_ind_APLC])*dxi*dxi
+            p7ap_sum_TelAp = 4*np.sum(Intens_TelAp[p7ap_ind])*dxi*dxi
+            p7ap_sum_APLC = 4*np.sum(Intens_D_0[p7ap_ind])*dxi*dxi
             fwhm_area_polychrom.append(np.sum(fwhm_ind_APLC)*dxi*dxi)
             tot_thrupt_polychrom.append(np.sum(Intens_D_0)*dxi*dxi/np.sum(np.power(TelAp,2)*dx*dx))
             fwhm_thrupt_polychrom.append(fwhm_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx))
