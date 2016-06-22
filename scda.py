@@ -115,6 +115,7 @@ class DesignParamSurvey(object):
         setattr(self, 'coron_class', coron_class)
         self._param_menu = coron_class._design_fields.copy()
         self._file_fields = coron_class._file_fields.copy()
+        self._solver_menu = coron_class._solver_menu.copy()
         self._file_fields['fileorg'].append('survey fname')
         setattr(self, 'survey_config', {})
         for keycat, param_dict in survey_config.items():
