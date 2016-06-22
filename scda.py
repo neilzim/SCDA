@@ -770,7 +770,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             self.design['Image']['bw+'] = self.design['Image']['bw']
         # Unless Nlam is explicitly specified, set the number of wavelength samples according to the bandwidth
         if self.design['Image']['Nlam'] == 1 and self.design['Image']['bw+'] > 0:
-            self.design['Image']['Nlam'] = int(np.round(self.design['Image']['bw+']/(0.10/3)))
+            self.design['Image']['Nlam'] = int(np.ceil(self.design['Image']['bw+']/(0.10/3)))
         # Set a private attribute for the number of image plane samples between the center and the outer constraint angle
         self.design['Image']['Nimg'] = int( np.ceil( self.design['Image']['fpres']*self.design['FPM']['R1']/(1. - self.design['Image']['bw+']/2) ) )
         if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon']:
