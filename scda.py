@@ -507,7 +507,8 @@ class DesignParamSurvey(object):
                     catrow.append(cat)
                     paramrow.append(name)
                 catrow.extend(['', 'AMPL program', '', '', '', 'Solution', '', 'Evaluation metrics', '', ''])
-                paramrow.extend(['', 'filename', 'exists?', 'input files?', 'submitted?', 'filename', 'exists?', 'Thrupt', 'PSF area'])
+                paramrow.extend(['', 'filename', 'exists?', 'input files?', 'submitted?', 'filename', 'exists?',
+                                 'Tot thrupt', 'half-max thrupt', 'r=0.7 thrupt', 'rel. half-max thrupt', 'rel. r=0.7 thrupt', 'PSF area'])
                 surveywriter.writerow(catrow)
                 surveywriter.writerow(paramrow)
                 for ii, param_combo in enumerate(self.varied_param_combos):
@@ -531,12 +532,24 @@ class DesignParamSurvey(object):
                         param_combo_row.append('Y')
                     else:
                         param_combo_row.append('N')
-                    if self.coron_list[ii].eval_metrics['airy thrupt'] is not None:
-                        param_combo_row.append(self.coron_list[ii].eval_metrics['airy thrupt'])
+                    if self.coron_list[ii].eval_metrics['tot thrupt'] is not None:
+                        param_combo_row.append(self.coron_list[ii].eval_metrics['tot thrupt'])
                     else:
                         param_combo_row.append('')
-                    if self.coron_list[ii].eval_metrics['rel airy thrupt'] is not None:
-                        param_combo_row.append(self.coron_list[ii].eval_metrics['rel airy thrupt'])
+                    if self.coron_list[ii].eval_metrics['fwhm thrupt'] is not None:
+                        param_combo_row.append(self.coron_list[ii].eval_metrics['fwhm thrupt'])
+                    else:
+                        param_combo_row.append('')
+                    if self.coron_list[ii].eval_metrics['p7ap thrupt'] is not None:
+                        param_combo_row.append(self.coron_list[ii].eval_metrics['p7ap thrupt'])
+                    else:
+                        param_combo_row.append('')
+                    if self.coron_list[ii].eval_metrics['rel fwhm thrupt'] is not None:
+                        param_combo_row.append(self.coron_list[ii].eval_metrics['rel fwhm thrupt'])
+                    else:
+                        param_combo_row.append('')
+                    if self.coron_list[ii].eval_metrics['rel p7ap thrupt'] is not None:
+                        param_combo_row.append(self.coron_list[ii].eval_metrics['rel p7ap thrupt'])
                     else:
                         param_combo_row.append('')
                     if self.coron_list[ii].eval_metrics['fwhm area'] is not None:
@@ -1045,8 +1058,15 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         etas = xis.copy()
         # Compute unocculted PSF
         wrs = np.linspace(1.-self.design['Image']['bw']/2, 1.+self.design['Image']['bw']/2, self.design['Image']['Nlam'])
-        airy_thrupt_polychrom = []
-        rel_airy_thrupt_polychrom = []
+        XXs = np.asarray(np.dot(np.matrix(np.ones(xis.shape)).T, xis))
+        YYs = np.asarray(np.dot(etas.T, np.matrix(np.ones(etas.shape))))
+        RRs = np.sqrt(XXs**2 + YYs**2)
+        p7ap_ind = np.less_equal(RRs, 0.7)
+        tot_thrupt_polychrom = []
+        p7ap_thrupt_polychrom = []
+        fwhm_thrupt_polychrom = []
+        rel_fwhm_thrupt_polychrom = []
+        rel_p7ap_thrupt_polychrom = []
         fwhm_area_polychrom = []
         for wr in wrs:
             Psi_B_0 = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, xs)), TelAp*A),
@@ -1060,25 +1080,38 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
 
             Intens_D_0 = np.power(np.absolute(Psi_D_0), 2)
             Intens_D_0_peak = np.power(np.absolute(Psi_D_0_peak), 2)
-            fwhm_ind_SPLC = np.greater_equal(Intens_D_0, Intens_D_0_peak/2)
             Psi_TelAp = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), TelAp),
                                                np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
             Intens_TelAp = np.power(np.absolute(Psi_TelAp), 2)
             Intens_TelAp_peak = (np.sum(TelAp)*dx*dy/wr)**2
+
+            fwhm_ind_SPLC = np.greater_equal(Intens_D_0, Intens_D_0_peak/2)
             fwhm_ind_TelAp = np.greater_equal(Intens_TelAp, Intens_TelAp_peak/2)
+            fwhm_area_polychrom.append(np.sum(fwhm_ind_SPLC)*dxi*dxi)
+
             fwhm_sum_TelAp = np.sum(Intens_TelAp[fwhm_ind_TelAp])*dxi*dxi
             fwhm_sum_SPLC = np.sum(Intens_D_0[fwhm_ind_SPLC])*dxi*dxi
-            fwhm_area_polychrom.append(np.sum(fwhm_ind_SPLC)*dxi*dxi)
-            airy_thrupt_polychrom.append(fwhm_sum_SPLC/np.sum(np.power(TelAp,2)*dx*dx))
-            rel_airy_thrupt_polychrom.append(fwhm_sum_SPLC/fwhm_sum_TelAp)
-            #pdb.set_trace()
-        self.eval_metrics['airy thrupt'] = np.mean(airy_thrupt_polychrom)
-        self.eval_metrics['rel airy thrupt'] = np.mean(rel_airy_thrupt_polychrom)
+            p7ap_sum_TelAp = np.sum(Intens_TelAp[p7ap_ind])*dxi*dxi
+            p7ap_sum_APLC = np.sum(Intens_D_0[p7ap_ind])*dxi*dxi
+
+            tot_thrupt_polychrom.append(np.sum(Intens_D_0*dxi*dxi)/np.sum(np.power(TelAp,2)*dx*dx))
+            fwhm_thrupt_polychrom.append(fwhm_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx))
+            p7ap_thrupt_polychrom.append(p7ap_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx))
+            rel_fwhm_thrupt_polychrom.append(fwhm_sum_APLC/fwhm_sum_TelAp)
+            rel_p7ap_thrupt_polychrom.append(p7ap_sum_APLC/p7ap_sum_TelAp)
+        self.eval_metrics['tot thrupt'] = np.mean(tot_thrupt_polychrom)
+        self.eval_metrics['fwhm thrupt'] = np.mean(fwhm_thrupt_polychrom)
+        self.eval_metrics['p7ap thrupt'] = np.mean(p7ap_thrupt_polychrom)
+        self.eval_metrics['rel fwhm thrupt'] = np.mean(rel_fwhm_thrupt_polychrom)
+        self.eval_metrics['rel p7ap thrupt'] = np.mean(rel_p7ap_thrupt_polychrom)
         self.eval_metrics['fwhm area'] = np.mean(fwhm_area_polychrom)
         if verbose:
             print("Non-binary residuals, as a percentage of clear telescope aperture area: {:.2f}%".format(100*self.eval_metrics['apod nb res ratio']))
-            print("Band-averaged Airy throughput: {:.2f}%".format(100*self.eval_metrics['airy thrupt']))
-            print("Band-averaged relative Airy throughput: {:.2f}%".format(100*self.eval_metrics['rel airy thrupt']))
+            print("Band-averaged total throughput: {:.2f}%".format(100*self.eval_metrics['tot thrupt']))
+            print("Band-averaged half-max throughput: {:.2f}%".format(100*self.eval_metrics['fwhm thrupt']))
+            print("Band-averaged r=.7 lam/D throughput: {:.2f}%".format(100*self.eval_metrics['p7ap thrupt']))
+            print("Band-averaged relative half-max throughput: {:.2f}%".format(100*self.eval_metrics['rel fwhm thrupt']))
+            print("Band-averaged relative r=0.7 lam/D throughput: {:.2f}%".format(100*self.eval_metrics['rel p7ap thrupt']))
             print("Band-averaged FWHM PSF area / (lambda0/D)^2: {:.2f}".format(self.eval_metrics['fwhm area']))
 
 class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane symmetry case
@@ -2003,8 +2036,15 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         xis = np.matrix(np.linspace(-M_fp2+0.5, M_fp2-0.5, 2*M_fp2)*dxi)
         etas = xis.copy()
         wrs = np.linspace(1.-self.design['Image']['bw']/2, 1.+self.design['Image']['bw']/2, self.design['Image']['Nlam'])
-        airy_thrupt_polychrom = []
-        rel_airy_thrupt_polychrom = []
+        XXs = np.asarray(np.dot(np.matrix(np.ones(xis.shape)).T, xis))
+        YYs = np.asarray(np.dot(etas.T, np.matrix(np.ones(etas.shape))))
+        RRs = np.sqrt(XXs**2 + YYs**2)
+        p7ap_ind = np.less_equal(RRs, 0.7)
+        tot_thrupt_polychrom = []
+        p7ap_thrupt_polychrom = []
+        fwhm_thrupt_polychrom = []
+        rel_fwhm_thrupt_polychrom = []
+        rel_p7ap_thrupt_polychrom = []
         fwhm_area_polychrom = []
         for wr in wrs:
             Psi_D_0 = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), TelAp*A*LS),
@@ -2016,19 +2056,34 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                                                np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
             Intens_TelAp = np.power(np.absolute(Psi_TelAp), 2)
             Intens_TelAp_peak = (np.sum(TelAp)*dx*dy/wr)**2
+
+            fwhm_ind_APLC = np.greater_equal(Intens_D_0, Intens_D_0_peak/2)
             fwhm_ind_TelAp = np.greater_equal(Intens_TelAp, Intens_TelAp_peak/2)
+            fwhm_area_polychrom.append(np.sum(fwhm_ind_APLC)*dxi*dxi)
+
             fwhm_sum_TelAp = np.sum(Intens_TelAp[fwhm_ind_TelAp])*dxi*dxi
             fwhm_sum_APLC = np.sum(Intens_D_0[fwhm_ind_APLC])*dxi*dxi
-            fwhm_area_polychrom.append(np.sum(fwhm_ind_APLC)*dxi*dxi)
-            airy_thrupt_polychrom.append(fwhm_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx))
-            rel_airy_thrupt_polychrom.append(fwhm_sum_APLC/fwhm_sum_TelAp)
-        self.eval_metrics['airy thrupt'] = np.mean(airy_thrupt_polychrom)
-        self.eval_metrics['rel airy thrupt'] = np.mean(rel_airy_thrupt_polychrom)
+            p7ap_sum_TelAp = np.sum(Intens_TelAp[p7ap_ind])*dxi*dxi
+            p7ap_sum_APLC = np.sum(Intens_D_0[p7ap_ind])*dxi*dxi
+
+            tot_thrupt_polychrom.append(np.sum(Intens_D_0*dxi*dxi)/np.sum(np.power(TelAp,2)*dx*dx))
+            fwhm_thrupt_polychrom.append(fwhm_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx))
+            p7ap_thrupt_polychrom.append(p7ap_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx))
+            rel_fwhm_thrupt_polychrom.append(fwhm_sum_APLC/fwhm_sum_TelAp)
+            rel_p7ap_thrupt_polychrom.append(p7ap_sum_APLC/p7ap_sum_TelAp)
+        self.eval_metrics['tot thrupt'] = np.mean(tot_thrupt_polychrom)
+        self.eval_metrics['fwhm thrupt'] = np.mean(fwhm_thrupt_polychrom)
+        self.eval_metrics['p7ap thrupt'] = np.mean(p7ap_thrupt_polychrom)
+        self.eval_metrics['rel fwhm thrupt'] = np.mean(rel_fwhm_thrupt_polychrom)
+        self.eval_metrics['rel p7ap thrupt'] = np.mean(rel_p7ap_thrupt_polychrom)
         self.eval_metrics['fwhm area'] = np.mean(fwhm_area_polychrom)
         if verbose:
             print("Non-binary residuals, as a percentage of clear telescope aperture area: {:.2f}%".format(100*self.eval_metrics['apod nb res ratio']))
-            print("Band-averaged Airy throughput: {:.2f}%".format(100*self.eval_metrics['airy thrupt']))
-            print("Band-averaged relative Airy throughput: {:.2f}%".format(100*self.eval_metrics['rel airy thrupt']))
+            print("Band-averaged total throughput: {:.2f}%".format(100*self.eval_metrics['tot thrupt']))
+            print("Band-averaged half-max throughput: {:.2f}%".format(100*self.eval_metrics['fwhm thrupt']))
+            print("Band-averaged r=.7 lam/D throughput: {:.2f}%".format(100*self.eval_metrics['p7ap thrupt']))
+            print("Band-averaged relative half-max throughput: {:.2f}%".format(100*self.eval_metrics['rel fwhm thrupt']))
+            print("Band-averaged relative r=0.7 lam/D throughput: {:.2f}%".format(100*self.eval_metrics['rel p7ap thrupt']))
             print("Band-averaged FWHM PSF area / (lambda0/D)^2: {:.2f}".format(self.eval_metrics['fwhm area']))
     
     def read_solution(self):
