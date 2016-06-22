@@ -340,8 +340,7 @@ class DesignParamSurvey(object):
     def check_eval_status(self):
         status = True
         for coron in self.coron_list: # Update all individual statuses
-            if coron.eval_metrics['airy thrupt'] is None or coron.eval_metrics['rel airy thrupt'] is None \
-               or coron.eval_metrics['fwhm area'] is None or coron.eval_metrics['apod nb res ratio'] is None:
+            if coron.eval_metrics['fwhm area'] is None or coron.eval_metrics['apod nb res ratio'] is None:
                 status = False
                 break
         self.eval_status = status
@@ -349,9 +348,9 @@ class DesignParamSurvey(object):
 
     def get_metrics(self, fp2res=16, verbose=False):
         for coron in self.coron_list:
-            if os.path.exists(coron.fileorg['sol fname']) and (coron.eval_metrics['airy thrupt'] is None \
-               or coron.eval_metrics['rel airy thrupt'] is None or coron.eval_metrics['fwhm area'] is None \
-               or coron.eval_metrics['apod nb res ratio'] is None):
+            if os.path.exists(coron.fileorg['sol fname']) and 
+                (coron.eval_metrics['fwhm area'] is None \
+                 or coron.eval_metrics['apod nb res ratio'] is None):
                 coron.get_metrics()
                 coron.eval_status = True
 
@@ -694,9 +693,11 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         setattr(self, 'ampl_submission_status', None) # Only changed by the queue filler program
 
         setattr(self, 'eval_metrics', {})
-        self.eval_metrics['airy thrupt'] = None
-        self.eval_metrics['rel airy thrupt'] = None
-        self.eval_metrics['fwhm area'] = None
+        self.eval_metrics['tot thrupt'] = None
+        self.eval_metrics['fwhm thrupt'] = None
+        self.eval_metrics['p7ap thrupt'] = None
+        self.eval_metrics['rel fwhm thrupt'] = None
+        self.eval_metrics['rel p7ap thrupt'] = None
         self.eval_metrics['apod nb res ratio'] = None
 
     def check_ampl_input_files(self):
