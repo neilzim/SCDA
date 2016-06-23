@@ -1109,7 +1109,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         p7ap_sum_TelAp = np.sum(intens_TelAp[p7ap_ind])*dxi*dxi
         p7ap_sum_SPLC = np.sum(intens_D_0[p7ap_ind])*dxi*dxi
 
-        self.eval_metrics['tot thrupt'] = np.sum(intens_D_0*dxi*dxi)/np.sum(np.power(TelAp,2)*dx*dx)) 
+        self.eval_metrics['tot thrupt'] = np.sum(intens_D_0*dxi*dxi)/np.sum(np.power(TelAp,2)*dx*dx)
         self.eval_metrics['fwhm thrupt'] = fwhm_sum_SPLC/np.sum(np.power(TelAp,2)*dx*dx)
         self.eval_metrics['p7ap thrupt'] = p7ap_sum_SPLC/np.sum(np.power(TelAp,2)*dx*dx)
         self.eval_metrics['rel fwhm thrupt'] = fwhm_sum_SPLC/fwhm_sum_TelAp
