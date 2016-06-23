@@ -2004,7 +2004,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         TelAp_basename = os.path.basename(self.fileorg['TelAp fname'])
         gapstr_beg = TelAp_basename.find('gap')
         TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
-        Telap_nopad_fname = os.path.join( os.path.dirname(self.fileorg['TelAp fname']), TelAp_nopad_basename )
+        TelAp_nopad_fname = os.path.join( os.path.dirname(self.fileorg['TelAp fname']), TelAp_nopad_basename )
         #if self.design['Pupil']['edge'] is 'floor': # floor to binary
         #    TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
         #elif self.design['Pupil']['edge'] is 'round': # round to binary
@@ -2054,6 +2054,11 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         rel_fwhm_thrupt_polychrom = []
         rel_p7ap_thrupt_polychrom = []
         fwhm_area_polychrom = []
+
+        intens_D_0_polychrom = np.zeros((Nlam, 2*M_fp2, 2*M_fp2))
+        intens_D_0_peak_polychrom = np.zeros((Nlam, 1))
+        intens_TelAp_polychrom = np.zeros((Nlam, 2*M_fp2, 2*M_fp2))
+        intens_TelAp_peak_polychrom = np.zeros((Nlam, 1))
         for wr in wrs:
             Psi_D_0 = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), TelAp*A*LS),
                                              np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
