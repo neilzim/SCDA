@@ -1012,8 +1012,12 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
 
         return intens_polychrom, seps, radial_intens_polychrom, FoV_mask
 
-    def get_metrics(self, fp1res=8, fp2res=16, rho_out=3., verbose=True): # for SPLC class
-        TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
+    def get_metrics(self, fp1res=8, fp2res=16, rho_out=None, Nlam=None, verbose=True): # for SPLC class
+        TelAp_basename = os.path.basename(self.fileorg['TelAp fname'])
+        gapstr_beg = TelAp_basename.find('gap')
+        TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
+        TelAp_nopad_fname = os.path.join( os.path.dirname(self.fileorg['TelAp fname']), TelAp_nopad_basename )
+        TelAp_p = np.loadtxt(TelAp_nopad_fname)
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
         LS_p = np.loadtxt(self.fileorg['LS fname'])
         A_p = A_col.reshape(TelAp_p.shape)
@@ -1037,6 +1041,10 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         N_A = self.design['Pupil']['N']
         N_L = self.design['LS']['N']
         self.eval_metrics['apod nb res ratio'] = np.sum(np.abs(A - np.round(A)))/np.sum(TelAp)
+        if Nlam is None:
+            Nlam = self.design['Image']['Nlam']
+        if rho_out is None:
+            rho_out = self.design['Image']['oda']
 
         # Pupil plane
         dx = (D/2)/N_A
@@ -1060,18 +1068,17 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         xis = np.matrix(np.linspace(-M_fp2+0.5,M_fp2-0.5,2*M_fp2)*dxi)
         etas = xis.copy()
         # Compute unocculted PSF
-        wrs = np.linspace(1.-self.design['Image']['bw']/2, 1.+self.design['Image']['bw']/2, self.design['Image']['Nlam'])
+        wrs = np.linspace(1.-self.design['Image']['bw']/2, 1.+self.design['Image']['bw']/2, Nlam)
         XXs = np.asarray(np.dot(np.matrix(np.ones(xis.shape)).T, xis))
         YYs = np.asarray(np.dot(etas.T, np.matrix(np.ones(etas.shape))))
         RRs = np.sqrt(XXs**2 + YYs**2)
         p7ap_ind = np.less_equal(RRs, 0.7)
-        tot_thrupt_polychrom = []
-        p7ap_thrupt_polychrom = []
-        fwhm_thrupt_polychrom = []
-        rel_fwhm_thrupt_polychrom = []
-        rel_p7ap_thrupt_polychrom = []
-        fwhm_area_polychrom = []
-        for wr in wrs:
+
+        intens_D_0_polychrom = np.zeros((Nlam, 2*M_fp2, 2*M_fp2))
+        intens_D_0_peak_polychrom = np.zeros((Nlam, 1))
+        intens_TelAp_polychrom = np.zeros((Nlam, 2*M_fp2, 2*M_fp2))
+        intens_TelAp_peak_polychrom = np.zeros((Nlam, 1))
+        for wi, wr in enumerate(wrs):
             Psi_B_0 = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, xs)), TelAp*A),
                                              np.exp(-1j*2*np.pi/wr*np.dot(xs.T, mxs)))
             Psi_C_0 = dmx*dmy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(us.T, mxs)), Psi_B_0),
@@ -1081,34 +1088,36 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                                              np.exp(-1j*2*np.pi/wr*np.dot(us.T, xis)))
             Psi_D_0_peak = du*dv/wr*np.sum(Psi_C_0_stop)
 
-            Intens_D_0 = np.power(np.absolute(Psi_D_0), 2)
-            Intens_D_0_peak = np.power(np.absolute(Psi_D_0_peak), 2)
+            intens_D_0_polychrom[wi] = np.power(np.absolute(Psi_D_0), 2)
+            intens_D_0_peak_polychrom[wi] = np.power(np.absolute(Psi_D_0_peak), 2)
             Psi_TelAp = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), TelAp),
                                                np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
-            Intens_TelAp = np.power(np.absolute(Psi_TelAp), 2)
-            Intens_TelAp_peak = (np.sum(TelAp)*dx*dy/wr)**2
+            intens_TelAp_polychrom[wi] = np.power(np.absolute(Psi_TelAp), 2)
+            intens_TelAp_peak_polychrom[wi] = (np.sum(TelAp)*dx*dy/wr)**2
 
-            fwhm_ind_SPLC = np.greater_equal(Intens_D_0, Intens_D_0_peak/2)
-            fwhm_ind_TelAp = np.greater_equal(Intens_TelAp, Intens_TelAp_peak/2)
-            fwhm_area_polychrom.append(np.sum(fwhm_ind_SPLC)*dxi*dxi)
+        intens_D_0 = np.mean(intens_D_0_polychrom, axis=0)
+        intens_D_0_peak = np.mean(intens_D_0_peak_polychrom)
+        intens_TelAp = np.mean(intens_TelAp_polychrom, axis=0)
+        intens_TelAp_peak = np.mean(intens_TelAp_peak_polychrom)
 
-            fwhm_sum_TelAp = np.sum(Intens_TelAp[fwhm_ind_TelAp])*dxi*dxi
-            fwhm_sum_SPLC = np.sum(Intens_D_0[fwhm_ind_SPLC])*dxi*dxi
-            p7ap_sum_TelAp = np.sum(Intens_TelAp[p7ap_ind])*dxi*dxi
-            p7ap_sum_APLC = np.sum(Intens_D_0[p7ap_ind])*dxi*dxi
+        fwhm_ind_SPLC = np.greater_equal(intens_D_0, intens_D_0_peak/2)
+        fwhm_ind_TelAp = np.greater_equal(intens_TelAp, intens_TelAp_peak/2)
+        fwhm_area_polychrom.append(np.sum(fwhm_ind_SPLC)*dxi*dxi)
 
-            tot_thrupt_polychrom.append(np.sum(Intens_D_0*dxi*dxi)/np.sum(np.power(TelAp,2)*dx*dx))
-            fwhm_thrupt_polychrom.append(fwhm_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx))
-            p7ap_thrupt_polychrom.append(p7ap_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx))
-            rel_fwhm_thrupt_polychrom.append(fwhm_sum_APLC/fwhm_sum_TelAp)
-            rel_p7ap_thrupt_polychrom.append(p7ap_sum_APLC/p7ap_sum_TelAp)
-        self.eval_metrics['tot thrupt'] = np.mean(tot_thrupt_polychrom)
-        self.eval_metrics['fwhm thrupt'] = np.mean(fwhm_thrupt_polychrom)
-        self.eval_metrics['p7ap thrupt'] = np.mean(p7ap_thrupt_polychrom)
-        self.eval_metrics['rel fwhm thrupt'] = np.mean(rel_fwhm_thrupt_polychrom)
-        self.eval_metrics['rel p7ap thrupt'] = np.mean(rel_p7ap_thrupt_polychrom)
-        self.eval_metrics['fwhm area'] = np.mean(fwhm_area_polychrom)
+        fwhm_sum_TelAp = np.sum(intens_TelAp[fwhm_ind_TelAp])*dxi*dxi
+        fwhm_sum_SPLC = np.sum(intens_D_0[fwhm_ind_SPLC])*dxi*dxi
+        p7ap_sum_TelAp = np.sum(intens_TelAp[p7ap_ind])*dxi*dxi
+        p7ap_sum_SPLC = np.sum(intens_D_0[p7ap_ind])*dxi*dxi
+
+        self.eval_metrics['tot thrupt'] = np.sum(intens_D_0*dxi*dxi)/np.sum(np.power(TelAp,2)*dx*dx)) 
+        self.eval_metrics['fwhm thrupt'] = fwhm_sum_SPLC/np.sum(np.power(TelAp,2)*dx*dx)
+        self.eval_metrics['p7ap thrupt'] = p7ap_sum_SPLC/np.sum(np.power(TelAp,2)*dx*dx)
+        self.eval_metrics['rel fwhm thrupt'] = fwhm_sum_SPLC/fwhm_sum_TelAp
+        self.eval_metrics['rel p7ap thrupt'] = p7ap_sum_SPLC/p7ap_sum_TelAp
+        self.eval_metrics['fwhm area'] = np.sum(fwhm_ind_SPLC)*dxi*dxi
         if verbose:
+            print("////////////////////////////////////////////////////////")
+            print("{:s}".format(self.fileorg['job name']))
             print("Non-binary residuals, as a percentage of clear telescope aperture area: {:.2f}%".format(100*self.eval_metrics['apod nb res ratio']))
             print("Band-averaged total throughput: {:.2f}%".format(100*self.eval_metrics['tot thrupt']))
             print("Band-averaged half-max throughput: {:.2f}%".format(100*self.eval_metrics['fwhm thrupt']))
@@ -2051,12 +2060,6 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         YYs = np.asarray(np.dot(etas.T, np.matrix(np.ones(etas.shape))))
         RRs = np.sqrt(XXs**2 + YYs**2)
         p7ap_ind = np.less_equal(RRs, 0.7)
-        tot_thrupt_polychrom = []
-        p7ap_thrupt_polychrom = []
-        fwhm_thrupt_polychrom = []
-        rel_fwhm_thrupt_polychrom = []
-        rel_p7ap_thrupt_polychrom = []
-        fwhm_area_polychrom = []
 
         intens_D_0_polychrom = np.zeros((Nlam, 2*M_fp2, 2*M_fp2))
         intens_D_0_peak_polychrom = np.zeros((Nlam, 1))
