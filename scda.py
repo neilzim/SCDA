@@ -2000,7 +2000,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
 
         return intens_polychrom, seps, radial_intens_polychrom
 
-    def get_metrics(self, fp2res=16, verbose=True): # for APLC class
+    def get_metrics(self, fp2res=16, rho_out=None, Nlam=None, verbose=True): # for APLC class
         TelAp_basename = os.path.basename(self.fileorg['TelAp fname'])
         gapstr_beg = TelAp_basename.find('gap')
         TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
@@ -2034,16 +2034,19 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         self.eval_metrics['apod nb res ratio'] = np.sum(np.abs(A - np.round(A)))/np.sum(TelAp)
         D = 1.
         N = self.design['Pupil']['N']
+        if Nlam is None:
+            Nlam = self.design['Image']['Nlam']
+        if rho_out is None:
+            rho_out = self.design['Image']['oda']
         dx = (D/2)/N
         dy = dx
         xs = np.matrix(np.linspace(-N+0.5, N-0.5, 2*N)*dx)
         ys = xs.copy()
-        rho1 = 3.
-        M_fp2 = int(np.ceil(rho1*fp2res))
+        M_fp2 = int(np.ceil(rho_out*fp2res))
         dxi = 1./fp2res
         xis = np.matrix(np.linspace(-M_fp2+0.5, M_fp2-0.5, 2*M_fp2)*dxi)
         etas = xis.copy()
-        wrs = np.linspace(1.-self.design['Image']['bw']/2, 1.+self.design['Image']['bw']/2, self.design['Image']['Nlam'])
+        wrs = np.linspace(1.-self.design['Image']['bw']/2, 1.+self.design['Image']['bw']/2, Nlam)
         XXs = np.asarray(np.dot(np.matrix(np.ones(xis.shape)).T, xis))
         YYs = np.asarray(np.dot(etas.T, np.matrix(np.ones(etas.shape))))
         RRs = np.sqrt(XXs**2 + YYs**2)
@@ -2059,38 +2062,38 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         intens_D_0_peak_polychrom = np.zeros((Nlam, 1))
         intens_TelAp_polychrom = np.zeros((Nlam, 2*M_fp2, 2*M_fp2))
         intens_TelAp_peak_polychrom = np.zeros((Nlam, 1))
-        for wr in wrs:
+        for wi, wr in enumerate(wrs):
             Psi_D_0 = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), TelAp*A*LS),
                                              np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
-            Intens_D_0 = np.power(np.absolute(Psi_D_0), 2)
-            Intens_D_0_peak = (np.sum(TelAp*A*LS)*dx*dy/wr)**2
-            fwhm_ind_APLC = np.greater_equal(Intens_D_0, Intens_D_0_peak/2)
+            intens_D_0_polychrom[wi] = np.power(np.absolute(Psi_D_0), 2)
+            intens_D_0_peak_polychrom[wi] = (np.sum(TelAp*A*LS)*dx*dy/wr)**2
             Psi_TelAp = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), TelAp),
                                                np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
-            Intens_TelAp = np.power(np.absolute(Psi_TelAp), 2)
-            Intens_TelAp_peak = (np.sum(TelAp)*dx*dy/wr)**2
+            intens_TelAp_polychrom[wi] = np.power(np.absolute(Psi_TelAp), 2)
+            intens_TelAp_peak_polychrom[wi] = (np.sum(TelAp)*dx*dy/wr)**2
 
-            fwhm_ind_APLC = np.greater_equal(Intens_D_0, Intens_D_0_peak/2)
-            fwhm_ind_TelAp = np.greater_equal(Intens_TelAp, Intens_TelAp_peak/2)
-            fwhm_area_polychrom.append(np.sum(fwhm_ind_APLC)*dxi*dxi)
+        intens_D_0 = np.mean(intens_D_0_polychrom, axis=0)
+        intens_D_0_peak = np.mean(intens_D_0_peak_polychrom)
+        intens_TelAp = np.mean(intens_TelAp_polychrom, axis=0)
+        intens_TelAp_peak = np.mean(intens_TelAp_peak_polychrom)
 
-            fwhm_sum_TelAp = np.sum(Intens_TelAp[fwhm_ind_TelAp])*dxi*dxi
-            fwhm_sum_APLC = np.sum(Intens_D_0[fwhm_ind_APLC])*dxi*dxi
-            p7ap_sum_TelAp = np.sum(Intens_TelAp[p7ap_ind])*dxi*dxi
-            p7ap_sum_APLC = np.sum(Intens_D_0[p7ap_ind])*dxi*dxi
+        fwhm_ind_APLC = np.greater_equal(intens_D_0, intens_D_0_peak/2)
+        fwhm_ind_TelAp = np.greater_equal(intens_TelAp, intens_TelAp_peak/2)
 
-            tot_thrupt_polychrom.append(np.sum(Intens_D_0*dxi*dxi)/np.sum(np.power(TelAp,2)*dx*dx))
-            fwhm_thrupt_polychrom.append(fwhm_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx))
-            p7ap_thrupt_polychrom.append(p7ap_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx))
-            rel_fwhm_thrupt_polychrom.append(fwhm_sum_APLC/fwhm_sum_TelAp)
-            rel_p7ap_thrupt_polychrom.append(p7ap_sum_APLC/p7ap_sum_TelAp)
-        self.eval_metrics['tot thrupt'] = np.mean(tot_thrupt_polychrom)
-        self.eval_metrics['fwhm thrupt'] = np.mean(fwhm_thrupt_polychrom)
-        self.eval_metrics['p7ap thrupt'] = np.mean(p7ap_thrupt_polychrom)
-        self.eval_metrics['rel fwhm thrupt'] = np.mean(rel_fwhm_thrupt_polychrom)
-        self.eval_metrics['rel p7ap thrupt'] = np.mean(rel_p7ap_thrupt_polychrom)
-        self.eval_metrics['fwhm area'] = np.mean(fwhm_area_polychrom)
+        fwhm_sum_TelAp = np.sum(intens_TelAp[fwhm_ind_TelAp])*dxi*dxi
+        fwhm_sum_APLC = np.sum(intens_D_0[fwhm_ind_APLC])*dxi*dxi
+        p7ap_sum_TelAp = np.sum(intens_TelAp[p7ap_ind])*dxi*dxi
+        p7ap_sum_APLC = np.sum(intens_D_0[p7ap_ind])*dxi*dxi
+
+        self.eval_metrics['tot thrupt'] = np.sum(intens_D_0*dxi*dxi)/np.sum(np.power(TelAp,2)*dx*dx)
+        self.eval_metrics['fwhm thrupt'] = fwhm_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx)
+        self.eval_metrics['p7ap thrupt'] = p7ap_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx)
+        self.eval_metrics['rel fwhm thrupt'] = fwhm_sum_APLC/fwhm_sum_TelAp
+        self.eval_metrics['rel p7ap thrupt'] = p7ap_sum_APLC/p7ap_sum_TelAp
+        self.eval_metrics['fwhm area'] = np.sum(fwhm_ind_APLC)*dxi*dxi
         if verbose:
+            print("////////////////////////////////////////////////////////")
+            print("{:s}".format(self.fileorg['job name']))
             print("Non-binary residuals, as a percentage of clear telescope aperture area: {:.2f}%".format(100*self.eval_metrics['apod nb res ratio']))
             print("Band-averaged total throughput: {:.2f}%".format(100*self.eval_metrics['tot thrupt']))
             print("Band-averaged half-max throughput: {:.2f}%".format(100*self.eval_metrics['fwhm thrupt']))
