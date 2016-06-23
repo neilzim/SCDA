@@ -2001,12 +2001,17 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         return intens_polychrom, seps, radial_intens_polychrom
 
     def get_metrics(self, fp2res=16, verbose=True): # for APLC class
-        if self.design['Pupil']['edge'] is 'floor': # floor to binary
-            TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
-        elif self.design['Pupil']['edge'] is 'round': # round to binary
-            TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
-        else:
-            TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
+        TelAp_basename = os.path.basename(self.fileorg['TelAp fname'])
+        gapstr_beg = TelAp_basename.find('gap')
+        TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
+        Telap_nopad_fname = os.path.join( os.path.dirname(self.fileorg['TelAp fname']), TelAp_nopad_basename )
+        #if self.design['Pupil']['edge'] is 'floor': # floor to binary
+        #    TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
+        #elif self.design['Pupil']['edge'] is 'round': # round to binary
+        #    TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
+        #else:
+        #    TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
+        TelAp_p = np.loadtxt(TelAp_nopad_fname)
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
         LS_p = np.loadtxt(self.fileorg['LS fname'])
         A_p = A_col.reshape(TelAp_p.shape)
