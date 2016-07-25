@@ -368,6 +368,7 @@ class DesignParamSurvey(object):
         fobj = open(self.fileorg['survey fname'], 'wb')
         pickle.dump(self, fobj)
         fobj.close()
+        os.chmod(self.fileorg['survey fname'], 0644)
         logging.info("Wrote the design parameter survey object to {:s}".format(self.fileorg['survey fname']))
  
     def write_spreadsheet(self, overwrite=False, csv_fname=None):
@@ -559,6 +560,7 @@ class DesignParamSurvey(object):
                     surveywriter.writerow(param_combo_row)
                     
         survey_spreadsheet.close()
+        os.chmod(csv_fname, 0644)
         logging.info("Wrote design survey spreadsheet to {:s}".format(csv_fname))
 
 class LyotCoronagraph(object): # Lyot coronagraph base class
