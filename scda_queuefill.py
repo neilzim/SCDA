@@ -104,8 +104,11 @@ for coron in survey.coron_list:
     if coron.ampl_submission_status is True:
         overall_submission_count += 1
         if os.path.exists(coron.fileorg['sol fname']):
+            os.chmod(coron.fileorg['sol fname'], 0644)
             coron.solution_status = True
             solution_count += 1
+        if os.path.exists(coron.fileorg['log fname']):
+            os.chmod(coron.fileorg['log fname'], 0644)
 
 print("{0:d} out of {1:d} optimization jobs in the survey have been submitted, and {2:d} have solutions.".format(overall_submission_count, survey.N_combos, solution_count))
 
