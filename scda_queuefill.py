@@ -128,6 +128,10 @@ if not os.path.exists(crontab_fname):
     cron_fobj.write("{0:d} * * * *  (. /etc/profile ; . $HOME/.bashrc ; /usr/local/other/SLES11/SIVO-PyD/1.1.2/bin/python $SCDA/{1:s} {2:s} 1>> {3:s} 2>&1)".format(run_minute, os.path.basename(__file__), survey_fname, log_fname))
     cron_fobj.write("\n")
     cron_fobj.close()
+    os.chmod(crontab_fname, 0644)
     print("Wrote crontab file to {0:s}".format(crontab_fname))
 
 print("")
+
+if os.path.exists(log_fname): # queue log
+    os.chmod(log_fname, 0644)
