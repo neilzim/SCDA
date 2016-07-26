@@ -712,6 +712,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         for fname in checklist:
             if not os.path.exists(self.fileorg[fname]):
                 status = False
+                logging.warning("Missing {:s}".format(self.fileorg[fname]))
                 break
         self.ampl_infile_status = status
         return status
