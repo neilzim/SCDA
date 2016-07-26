@@ -40,7 +40,7 @@ This bash profile will need to be modified if the locations of either the SCDA s
 1. Define the survey parameters and create the optimization files
 -----------------------------------------------------------------
 
-On your local worksation, the easiest way to define a survey is to start from the example notebook in the SCDA source tree, **./examples/small_hexap_survey.ipynb** (viewable in a web browser at https://github.com/neilzim/SCDA/blob/master/examples/small_hexap_survey.ipynb).
+On your local worksation, the easiest way to define a survey is to start from the example notebook in the SCDA source tree, **./examples/small_survey_demo.ipynb** (viewable in a web browser at https://github.com/neilzim/SCDA/blob/master/examples/small_survey_demo.ipynb).
 
 Copy the notebook to a location outside of your SCDA source tree. Open the notebook in jupyter via
 
