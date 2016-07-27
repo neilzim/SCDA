@@ -1757,7 +1757,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                                                            ('thick',(str, '025')), ('centobs',(bool, True)),
                                                            ('gap',(int, 1)), ('edge',(str, 'gray'))]) ),
                                    ( 'FPM', OrderedDict([('rad',(float, 4.)), ('M',(int, 60))]) ),
-                                   ( 'LS', OrderedDict([('shape',(str, 'ann')), ('id',(int, 20)), ('od',(int, 90)), ('obscure',(int, 0)),
+                                   ( 'LS', OrderedDict([('shape',(str, 'ann')), ('id',(int, 20)), ('od',(int, None)), ('obscure',(int, 0)),
                                                         ('pad',(int, 0)), ('aligntol',(int, None)), ('aligntolcon',(float, 3.))]) ),
                                    ( 'Image', OrderedDict([('c',(float, 10.)), ('ida',(float, -0.5)), ('oda',(float, 10.)),
                                                            ('bw',(float, 0.10)), ('Nlam',(int, 1)), ('fpres',(int,2)),
@@ -1765,6 +1765,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
     _eval_fields =   { 'Pupil': _design_fields['Pupil'], 'FPM': _design_fields['FPM'], \
                        'LS': _design_fields['LS'], 'Image': _design_fields['Image'], \
                        'Tel': {'TelAp diam':(float, 12.)}, 'Target': {}, 'Aber': {}, 'WFSC': {} }
+    _LS_OD_map = {'hex1':76, 'hex2':82, 'hex3':81, 'hex4':82, 'pie08':99, 'pie12':99, 'key24':99}
 
     def __init__(self, verbose=False, **kwargs):
         super(NdiayeAPLC, self).__init__(**kwargs)
@@ -1809,6 +1810,11 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon']:
             # The Lyot dark zone field suppression factor decreases with the square of pupil array size. The units of input parameter are arbitrarily normalized to N=125.
             self.design['LS']['s'] = self.design['LS']['aligntolcon'] - 2*np.log10(self.design['Pupil']['N']/125.)
+        if self.design['LS']['od'] is None:
+            if self.design['Pupil']['prim'] in self._LS_OD_map:
+                self.design['LS']['od'] = self._LS_OD_map[self.design['Pupil']['prim']]
+            else:
+                self.design['LS']['od'] = 0.80
         if verbose: # Print summary of the set parameters
             logging.info("Design parameters: {}".format(self.design))
             logging.info("Optimization and solver parameters: {}".format(self.solver))
