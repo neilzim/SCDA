@@ -1765,7 +1765,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
     _eval_fields =   { 'Pupil': _design_fields['Pupil'], 'FPM': _design_fields['FPM'], \
                        'LS': _design_fields['LS'], 'Image': _design_fields['Image'], \
                        'Tel': {'TelAp diam':(float, 12.)}, 'Target': {}, 'Aber': {}, 'WFSC': {} }
-    _LS_OD_map = {'hex1':76, 'hex2':82, 'hex3':81, 'hex4':82, 'pie08':99, 'pie12':99, 'key24':99}
+    _LS_OD_map = {'hex1':76, 'hex2':82, 'hex3':81, 'hex4':82, 'pie08':90, 'pie12':90, 'key24':90}
 
     def __init__(self, verbose=False, **kwargs):
         super(NdiayeAPLC, self).__init__(**kwargs)
