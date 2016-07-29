@@ -509,7 +509,7 @@ class DesignParamSurvey(object):
                     paramrow.append(name)
                 catrow.extend(['', 'AMPL program', '', '', '', 'Solution', '', 'Evaluation metrics', '', ''])
                 paramrow.extend(['', 'filename', 'exists?', 'input files?', 'submitted?', 'filename', 'exists?',
-                                 'Tot thrupt', 'half-max thrupt', 'r=0.7 thrupt', 'rel. half-max thrupt', 'rel. r=0.7 thrupt', 'PSF area'])
+                                 'inc. energy', 'apodizer non-binarity', 'Tot thrupt', 'half-max thrupt', 'r=0.7 thrupt', 'rel. half-max thrupt', 'rel. r=0.7 thrupt', 'PSF area'])
                 surveywriter.writerow(catrow)
                 surveywriter.writerow(paramrow)
                 for ii, param_combo in enumerate(self.varied_param_combos):
@@ -533,6 +533,14 @@ class DesignParamSurvey(object):
                         param_combo_row.append('Y')
                     else:
                         param_combo_row.append('N')
+                    if self.coron_list[ii].eval_metrics['inc energy'] is not None:
+                        param_combo_row.append(self.coron_list[ii].eval_metrics['inc energy'])
+                    else:
+                        param_combo_row.append('')
+                    if self.coron_list[ii].eval_metrics['apod nb res ratio'] is not None:
+                        param_combo_row.append(self.coron_list[ii].eval_metrics['apod nb res ratio'])
+                    else:
+                        param_combo_row.append('')
                     if self.coron_list[ii].eval_metrics['tot thrupt'] is not None:
                         param_combo_row.append(self.coron_list[ii].eval_metrics['tot thrupt'])
                     else:
@@ -695,6 +703,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         setattr(self, 'ampl_submission_status', None) # Only changed by the queue filler program
 
         setattr(self, 'eval_metrics', {})
+        self.eval_metrics['inc energy'] = None
         self.eval_metrics['tot thrupt'] = None
         self.eval_metrics['fwhm thrupt'] = None
         self.eval_metrics['p7ap thrupt'] = None
@@ -1112,6 +1121,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         p7ap_sum_TelAp = np.sum(intens_TelAp[p7ap_ind])*dxi*dxi
         p7ap_sum_SPLC = np.sum(intens_D_0[p7ap_ind])*dxi*dxi
 
+        self.eval_metrics['inc energy'] = np.sum(np.power(TelAp,2)*dx*dx)
         self.eval_metrics['tot thrupt'] = np.sum(intens_D_0*dxi*dxi)/np.sum(np.power(TelAp,2)*dx*dx)
         self.eval_metrics['fwhm thrupt'] = fwhm_sum_SPLC/np.sum(np.power(TelAp,2)*dx*dx)
         self.eval_metrics['p7ap thrupt'] = p7ap_sum_SPLC/np.sum(np.power(TelAp,2)*dx*dx)
@@ -1121,6 +1131,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         if verbose:
             print("////////////////////////////////////////////////////////")
             print("{:s}".format(self.fileorg['job name']))
+            print("Incident energy on aperture (dimensionless): {:.3f}".format(self.eval_metrics['inc energy']))
             print("Non-binary residuals, as a percentage of clear telescope aperture area: {:.2f}%".format(100*self.eval_metrics['apod nb res ratio']))
             print("Band-averaged total throughput: {:.2f}%".format(100*self.eval_metrics['tot thrupt']))
             print("Band-averaged half-max throughput: {:.2f}%".format(100*self.eval_metrics['fwhm thrupt']))
@@ -1753,7 +1764,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
         return 0
 
 class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
-    _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 250)), ('prim',(str, 'hex3')), ('secobs',(str, 'X')), 
+    _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 250)), ('prim',(str, 'hex3')), ('secobs',(str, None)), 
                                                            ('thick',(str, '025')), ('centobs',(bool, True)),
                                                            ('gap',(int, 1)), ('edge',(str, 'gray'))]) ),
                                    ( 'FPM', OrderedDict([('rad',(float, 4.)), ('M',(int, 60))]) ),
@@ -1766,6 +1777,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                        'LS': _design_fields['LS'], 'Image': _design_fields['Image'], \
                        'Tel': {'TelAp diam':(float, 12.)}, 'Target': {}, 'Aber': {}, 'WFSC': {} }
     _LS_OD_map = {'hex1':76, 'hex2':82, 'hex3':81, 'hex4':82, 'pie08':90, 'pie12':90, 'key24':90}
+    _prim_secobs_map = {'hex1':'X', 'hex2':'X', 'hex3':'X', 'hex4':'X', 'pie08':'Cross', 'pie12':'Cross', 'key24':'Cross'}
 
     def __init__(self, verbose=False, **kwargs):
         super(NdiayeAPLC, self).__init__(**kwargs)
@@ -1799,6 +1811,9 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                 if param not in self.design[keycat] or (self.design[keycat][param] is None and \
                                                         self._design_fields[keycat][param][1] is not None):
                     self.design[keycat][param] = self._design_fields[keycat][param][1]
+        # If secondary obscuration is not specified, look up default based on primary key
+        if self.design['Pupil']['secobs'] is None:
+            self.design['Pupil']['secobs'] = self._prim_secobs_map[self.design['Pupil']['prim']]
         # Unless Nlam is explicitly specified, set the number of wavelength samples according to the bandwidth
         if self.design['Image']['Nlam'] == 1 and self.design['Image']['bw'] > 0:
             self.design['Image']['Nlam'] = int(np.ceil(self.design['Image']['bw']/(0.10/3)))
@@ -1831,8 +1846,8 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                                self.design['LS']['od'], self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
                                int(self.design['Pupil']['centobs']), self.design['LS']['pad'])
         elif self.design['LS']['obscure'] == 1: # LS includes secondary aperture features
-            self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}{4:s}cobs{5:d}Pad{6:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'], \
-                               self.design['Pupil']['secobs'], self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), self.design['LS']['pad'])
+            self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}{4:s}Pad{5:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'], \
+                               self.design['Pupil']['secobs'], self.design['Pupil']['thick'], self.design['LS']['pad'])
         else: # LS aperture is unobscured
             self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}clear".format(self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'])
         if self.design['LS']['aligntol'] is not None:
@@ -2097,6 +2112,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         p7ap_sum_TelAp = np.sum(intens_TelAp[p7ap_ind])*dxi*dxi
         p7ap_sum_APLC = np.sum(intens_D_0[p7ap_ind])*dxi*dxi
 
+        self.eval_metrics['inc energy'] = np.sum(np.power(TelAp,2)*dx*dx)
         self.eval_metrics['tot thrupt'] = np.sum(intens_D_0*dxi*dxi)/np.sum(np.power(TelAp,2)*dx*dx)
         self.eval_metrics['fwhm thrupt'] = fwhm_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx)
         self.eval_metrics['p7ap thrupt'] = p7ap_sum_APLC/np.sum(np.power(TelAp,2)*dx*dx)
@@ -2106,6 +2122,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         if verbose:
             print("////////////////////////////////////////////////////////")
             print("{:s}".format(self.fileorg['job name']))
+            print("Incident energy on aperture (dimensionless): {:.3f}".format(self.eval_metrics['inc energy']))
             print("Non-binary residuals, as a percentage of clear telescope aperture area: {:.2f}%".format(100*self.eval_metrics['apod nb res ratio']))
             print("Band-averaged total throughput: {:.2f}%".format(100*self.eval_metrics['tot thrupt']))
             print("Band-averaged half-max throughput: {:.2f}%".format(100*self.eval_metrics['fwhm thrupt']))
