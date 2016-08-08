@@ -351,7 +351,7 @@ class DesignParamSurvey(object):
             if os.path.exists(coron.fileorg['sol fname']) and \
                 (coron.eval_metrics['fwhm area'] is None \
                  or coron.eval_metrics['apod nb res ratio'] is None):
-                coron.get_metrics()
+                coron.get_metrics(verbose=verbose)
                 coron.eval_status = True
 
     def write(self, fname=None):
