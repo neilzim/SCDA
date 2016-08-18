@@ -112,8 +112,10 @@ for coron in survey.coron_list:
 
 print("{0:d} out of {1:d} optimization jobs in the survey have been submitted, and {2:d} have solutions.".format(overall_submission_count, survey.N_combos, solution_count))
 
-if solution_count == survey.N_combos:
-    print ("Done!")
+if solution_count == survey.N_combos or (new_submission_count == 0 and qcount == 0):
+    print("Done! Computing metrics...")
+    survey.get_metrics(verbose=False)
+    print("Got the metrics")
 
 # Store updated survey object
 survey.write(survey_fname)
