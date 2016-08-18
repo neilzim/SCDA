@@ -383,7 +383,7 @@ class DesignParamSurvey(object):
                 csv_fname_tail = "{0:s}_{1:s}_{2:s}.csv".format(os.path.basename(os.path.abspath(self.fileorg['work dir'])), getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
                 csv_fname = os.path.join(self.fileorg['work dir'], csv_fname_tail)
             else:
-                csv_fname = self.fileorg['survey fname'][-4:] + ".csv"
+                csv_fname = self.fileorg['survey fname'][:-4] + ".csv"
         with open(csv_fname, 'wb') as survey_spreadsheet:
             self.check_ampl_src_files()
             self.check_ampl_input_files()
