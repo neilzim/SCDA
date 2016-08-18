@@ -1702,7 +1702,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
 
         if queue_spec is 'auto':
             if self.design['LS']['aligntol'] is None:
-                time_est_hrs = int(np.ceil(1*(self.design['Pupil']['N']/125.)**2*(self.design['Image']['Nlam']/3.)**3))
+                time_est_hrs = int(np.ceil(1.5*(self.design['Pupil']['N']/125.)**2*(self.design['Image']['Nlam']/3.)**3))
             else:
                 time_est_hrs = int(np.ceil(3*(self.design['Pupil']['N']/125.)**2*(self.design['Image']['Nlam']/3.)**3))
             if time_est_hrs > 12:
