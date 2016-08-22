@@ -109,6 +109,38 @@ def load_design_param_survey(pkl_fname):
     fobj.close() 
     return survey_obj
 
+def merge_design_param_surveys(survey_list, merged_survey_fname=None):
+    assert len(survey_list) >= 1, "The input list must contain at least one survey."
+    for survey in survey_list:
+        assert isinstance(survey, DesignParamSurvey), "Each element in the input list must be a DesignParamSurvey."
+        assert survey.coron_class == survey_list[0].coron_class, "The coronagraph classes of the input surveys must match."
+        # Until we take the time to write out a more intelligent merge routine,
+        # require the fixed and varied parameter categories to match
+        # This means, if there are parameters that are constant within an individual survey
+        # but change across the surveys, they must be defined as single-element lists so that they
+        # are classified as 'varied' in the input survey objects.
+        assert survey.fixed_param_index == survey_list[0].fixed_param_index, "Fixed parameter categories of each survey must be the same."
+        assert survey.fixed_param_vals == survey_list[0].fixed_param_vals, "Fixed parameter values of each survey must be the same."
+        assert survey.varied_param_index == survey_list[0].varied_param_index, "Varied parameter categories of each survey must be the same."
+ 
+    merged_survey = DesignParamSurvey(coron_class=survey_list[0].coron_class, survey_config=survey_list[0].survey_config,
+                                      fileorg=survey_list[0].fileorg, solver=survey_list[0].solver)
+    varied_param_combos_list_merged = list(merged_survey.varied_param_combos)
+
+    for survey in survey_list[1:]:
+        varied_param_combos_list_B = list(survey.varied_param_combos)
+        for ii, combo in enumerate(varied_param_combos_list_B):
+            if combo not in varied_param_combos_list_merged:
+                varied_param_combos_list_merged.append(combo)
+                merged_survey.coron_list.append(survey.coron_list[ii]) 
+        
+    merged_survey.varied_param_combos = tuple(varied_param_combos_list_merged)
+    merged_survey.N_combos = len(merged_survey.varied_param_combos)
+    if merged_survey_fname is not None: # unless specified, use the same name as the first input survey
+        merged_survey.fileorg['survey fname'] = merged_survey_fname
+    
+    return merged_survey
+
 class DesignParamSurvey(object):
     def __init__(self, coron_class, survey_config, **kwargs):
         #self.logger = logging.getLogger('scda.logger')
