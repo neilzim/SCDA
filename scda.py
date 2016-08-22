@@ -345,6 +345,19 @@ class DesignParamSurvey(object):
     def describe(self):
         print("This survey has {0:d} design parameter combinations.".format(self.N_combos))
         print("{0:d} parameters are varied: {1}".format(len(self.varied_param_index), self.varied_param_index))
+        print("")
+        print("File organization:")
+        pprint.pprint(self.fileorg)
+        print("")
+        print("All input files exist? {}".format(self.check_ampl_input_files()))
+        print("")
+        print("Last coronagraph in survey list:")
+        print("Telescope aperture file {:s}".format(self.coron_list[-1].fileorg['TelAp fname']))
+        print("Focal plane mask file {:s}".format(self.coron_list[-1].fileorg['FPM fname']))
+        print("Lyot stop file {:s}".format(self.coron_list[-1].fileorg['LS fname']))
+        print("Job label {:s}".format(self.coron_list[-1].fileorg['job name']))
+        print("Varied parameter combo tuple:")
+        pprint.pprint(self.varied_param_combos[-1])
 
     def check_ampl_input_files(self):
         survey_status = True
