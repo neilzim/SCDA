@@ -342,6 +342,10 @@ class DesignParamSurvey(object):
         else:
             logging.warning("Wrote {0:d} of {1:d} design survey AMPL programs into {2:s}. {3:d} already existed and were denied overwriting.".format(write_count, self.N_combos, self.fileorg['slurm dir'], overwrite_deny_count))
 
+    def describe(self):
+        print("This survey has {0:d} design parameter combinations.".format(self.N_combos))
+        print("{0:d} parameters are varied: {1}".format(len(self.varied_param_index), self.varied_param_index))
+
     def check_ampl_input_files(self):
         survey_status = True
         for coron in self.coron_list: # Update all individual statuses
