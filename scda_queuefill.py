@@ -50,6 +50,7 @@ Note that it is necessary to specify the full path to the crontab file.
 
 import sys
 import os
+import stat
 import subprocess 
 import getpass
 import datetime
@@ -100,17 +101,33 @@ if new_submission_count < max_submission_count:
 # Tally all submissions to date, check for the existence of solution files, and update the corresponding statuses
 overall_submission_count = 0
 solution_count = 0
+queue_timeout_count = 0
 for coron in survey.coron_list:
     if coron.ampl_submission_status is True:
         overall_submission_count += 1
         if os.path.exists(coron.fileorg['sol fname']):
-            os.chmod(coron.fileorg['sol fname'], 0644)
+            sol_mode = os.stat(coron.fileorg['sol fname']).st_mode
+            if not bool(stat.S_IRGRP & sol_mode):
+                os.chmod(coron.fileorg['sol fname'], 0644)
             coron.solution_status = True
             solution_count += 1
-        if os.path.exists(coron.fileorg['log fname']):
-            os.chmod(coron.fileorg['log fname'], 0644)
 
-print("{0:d} out of {1:d} optimization jobs in the survey have been submitted, and {2:d} have solutions.".format(overall_submission_count, survey.N_combos, solution_count))
+            if os.path.exists(coron.fileorg['log fname']):
+                log_mode = os.stat(coron.fileorg['log fname']).st_mode
+                if not bool(stat.S_IRGRP & log_mode):
+                    os.chmod(coron.fileorg['log fname'], 0644)
+        elif os.path.exists(coron.fileorg['log fname']):
+            if 'TIME LIMIT' in open(coron.fileorg['log fname']).read():
+                print("Queue timeout indicated in log:")
+                print("          {0:s}".format(coron.fileorg['log fname']))
+                sys.stdout.flush()
+                queue_timeout_count += 1
+            log_mode = os.stat(coron.fileorg['log fname']).st_mode
+            if not bool(stat.S_IRGRP & log_mode):
+                os.chmod(coron.fileorg['log fname'], 0644)
+
+print("{0:d} out of {1:d} optimization jobs in the survey have been submitted, {2:d} have solutions, and {3:d} logs indicate a queue timeout.".format(
+       overall_submission_count, survey.N_combos, solution_count, queue_timeout_count))
 
 if solution_count == survey.N_combos or (new_submission_count == 0 and qcount == 0):
     print("Done! Computing metrics...")
@@ -122,12 +139,14 @@ survey.write(survey_fname)
 
 # Write crontab file if it does not exist
 crontab_fname = "crontab_{0:s}".format(os.path.basename(survey_fname)[:-4])
-log_fname = os.path.join(survey_dir, "queuefill.log")
+#queue_log_fname = os.path.join(survey_dir, "queuefill.log")
+queue_log_fname = os.path.join(survey_dir, "queuefill_{:s}.log".format(os.path.basename(survey_fname)[:-4]))
 if not os.path.exists(crontab_fname):
     cron_fobj = open(crontab_fname, "w")
     dt = datetime.datetime.now()
     run_minute = (dt.minute + 5) % 60
-    cron_fobj.write("{0:d} * * * *  (. /etc/profile ; . $HOME/.bashrc ; /usr/local/other/SLES11/SIVO-PyD/1.1.2/bin/python $SCDA/{1:s} {2:s} 1>> {3:s} 2>&1)".format(run_minute, os.path.basename(__file__), survey_fname, log_fname))
+    cron_fobj.write("{0:d} * * * *  (. /etc/profile ; . $HOME/.bashrc ; /usr/local/other/SLES11/SIVO-PyD/1.1.2/bin/python $SCDA/{1:s} {2:s} 1>> {3:s} 2>&1)".format(
+                     run_minute, os.path.basename(__file__), survey_fname, queue_log_fname))
     cron_fobj.write("\n")
     cron_fobj.close()
     os.chmod(crontab_fname, 0644)
@@ -135,5 +154,7 @@ if not os.path.exists(crontab_fname):
 
 print("")
 
-if os.path.exists(log_fname): # queue log
-    os.chmod(log_fname, 0644)
+if os.path.exists(queue_log_fname):
+    queue_log_mode = os.stat(queue_log_fname).st_mode
+    if not bool(stat.S_IRGRP & queue_log_mode):
+        os.chmod(queue_log_fname, 0644)
