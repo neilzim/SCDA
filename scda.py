@@ -631,7 +631,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                      'method': ['bar', 'barhom', 'dualsimp'],
                      'presolve': [True, False], 'threads': [None]+range(1,33), 'crossover': [None]+[True, False] }
 
-    _aperture_menu = { 'prim': ['hex1', 'hex2', 'hex3', 'hex4', 'key24', 'pie12', 'pie08', 'irisao', 'atlast'],
+    _aperture_menu = { 'prim': ['hex1', 'hex2', 'hex3', 'hex4', 'key24', 'pie12', 'pie08', 'circ', 'irisao', 'atlast'],
                        'secobs': ['Y60d','Yoff60d','X','Cross','T','Y90d'],
                        'thick': ['025','100'],
                        'centobs': [True, False],
@@ -1825,8 +1825,8 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
     _eval_fields =   { 'Pupil': _design_fields['Pupil'], 'FPM': _design_fields['FPM'], \
                        'LS': _design_fields['LS'], 'Image': _design_fields['Image'], \
                        'Tel': {'TelAp diam':(float, 12.)}, 'Target': {}, 'Aber': {}, 'WFSC': {} }
-    _LS_OD_map = {'hex1':76, 'hex2':82, 'hex3':81, 'hex4':82, 'pie08':90, 'pie12':90, 'key24':90}
-    _prim_secobs_map = {'hex1':'X', 'hex2':'X', 'hex3':'X', 'hex4':'X', 'pie08':'Cross', 'pie12':'Cross', 'key24':'Cross'}
+    _LS_OD_map = {'hex1':76, 'hex2':82, 'hex3':81, 'hex4':82, 'pie08':90, 'pie12':90, 'key24':90, 'circ':90}
+    _prim_secobs_map = {'hex1':'X', 'hex2':'X', 'hex3':'X', 'hex4':'X', 'pie08':'Cross', 'pie12':'Cross', 'key24':'Cross', 'circ':'Cross'}
 
     def __init__(self, verbose=False, **kwargs):
         super(NdiayeAPLC, self).__init__(**kwargs)
