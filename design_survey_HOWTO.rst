@@ -70,17 +70,19 @@ Change to the survey directory via
 
 ``$ cd /discover/nobackup/youruserid/surveydir``
 
-Launch the queue manager script, specifying the existing survey archive file (extension .pkl) as the first argument, and directing the output to **queuefill.log**.
+Launch the queue manager script, specifying the existing survey archive file (extension .pkl) as the first argument.
 
-``$ scda_queuefill.py awesomesurvey.pkl >> queuefill.log``
+``$ scda_queuefill.py awesomesurvey.pkl``
 
-If you print the queue log, it should indicate that it wrote a new crontab file, in this case named ``crontab_awesomesurvey``. Set the crontab so that scda_queufill is run automatically at hourly intervals:
+The console output should indicate that it wrote a new crontab file, in this case named ``crontab_awesomesurvey``. Set the crontab so that scda_queufill is run automatically at hourly intervals:
 
 ``$ crontab crontab_awesomesurvey``
 
 Optionally, you can edit the new crontab directly (for example, to modify the execution schedule) via
 
-``$ crontab -e``
+``$ crontab -e``  
+
+The queue manager script will log the survey progress to a text file named **queuefill_awesomesurvey.log**. When the survey completes, it will automatically compute the performance metrics of all the solutions, update the .pkl archive, and clear the crontab.
 
 4. Sync the results back to STScI
 ---------------------------------
