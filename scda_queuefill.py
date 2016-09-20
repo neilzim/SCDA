@@ -133,6 +133,8 @@ if solution_count == survey.N_combos or (new_submission_count == 0 and qcount ==
     print("Done! Computing metrics...")
     survey.get_metrics(verbose=False)
     print("Got the metrics")
+    survey.write_spreadsheet(overwrite=True)
+    print("Wrote spreadsheet")
     subprocess.check_call("crontab -r", shell=True)
     print("Removed crontab")
 
