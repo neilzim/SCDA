@@ -1093,7 +1093,10 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         gapstr_beg = TelAp_basename.find('gap')
         TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
         TelAp_nopad_fname = os.path.join( os.path.dirname(self.fileorg['TelAp fname']), TelAp_nopad_basename )
-        TelAp_p = np.loadtxt(TelAp_nopad_fname)
+        if os.path.exists(TelAp_nopad_fname):
+            TelAp_p = np.loadtxt(TelAp_nopad_fname)
+        else:
+            TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
         LS_p = np.loadtxt(self.fileorg['LS fname'])
         A_p = A_col.reshape(TelAp_p.shape)
