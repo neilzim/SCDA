@@ -397,12 +397,16 @@ class DesignParamSurvey(object):
         return status
 
     def get_metrics(self, fp2res=16, verbose=False):
+        telap_warning = False
         for coron in self.coron_list:
             if os.path.exists(coron.fileorg['sol fname']) and \
                 (coron.eval_metrics['fwhm area'] is None \
                  or coron.eval_metrics['apod nb res ratio'] is None):
-                coron.get_metrics(verbose=verbose)
+                telap_flag = coron.get_metrics(verbose=verbose)
                 coron.eval_status = True
+                if telap_flag > 0:
+                    telap_warning = True
+        logging.warning("No unpadded version of telescope aperture was found, so the optimization version was used to derive throughput metrics.")
 
     def write(self, fname=None):
         if fname is not None:
@@ -1095,8 +1099,10 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         TelAp_nopad_fname = os.path.join( os.path.dirname(self.fileorg['TelAp fname']), TelAp_nopad_basename )
         if os.path.exists(TelAp_nopad_fname):
             TelAp_p = np.loadtxt(TelAp_nopad_fname)
+            telap_flag = 0
         else:
             TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
+            telap_flag = 1
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
         LS_p = np.loadtxt(self.fileorg['LS fname'])
         A_p = A_col.reshape(TelAp_p.shape)
@@ -1123,7 +1129,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         if Nlam is None:
             Nlam = self.design['Image']['Nlam']
         if rho_out is None:
-            rho_out = self.design['Image']['oda']
+            rho_out = self.design['Image']['R1']
 
         # Pupil plane
         dx = (D/2)/N_A
@@ -1210,6 +1216,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             print("Band-averaged relative half-max throughput: {:.2f}%".format(100*self.eval_metrics['rel fwhm thrupt']))
             print("Band-averaged relative r=0.7 lam/D throughput: {:.2f}%".format(100*self.eval_metrics['rel p7ap thrupt']))
             print("Band-averaged FWHM PSF area / (lambda0/D)^2: {:.2f}".format(self.eval_metrics['fwhm area']))
+        return telap_flag
 
 class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane symmetry case
     def __init__(self, **kwargs):
@@ -2712,7 +2719,12 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         #    TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
         #else:
         #    TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
-        TelAp_p = np.loadtxt(TelAp_nopad_fname)
+        if os.path.exists(TelAp_nopad_fname):
+            TelAp_p = np.loadtxt(TelAp_nopad_fname)
+            telap_flag = 0
+        else:
+            TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
+            telap_flag = 1
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
         LS_p = np.loadtxt(self.fileorg['LS fname'])
         A_p = A_col.reshape(TelAp_p.shape)
@@ -2802,6 +2814,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             print("Band-averaged relative half-max throughput: {:.2f}%".format(100*self.eval_metrics['rel fwhm thrupt']))
             print("Band-averaged relative r=0.7 lam/D throughput: {:.2f}%".format(100*self.eval_metrics['rel p7ap thrupt']))
             print("Band-averaged FWHM PSF area / (lambda0/D)^2: {:.2f}".format(self.eval_metrics['fwhm area']))
+        return telap_flag
     
     def read_solution(self):
         logging.info("Reading in the apodizer solution and parse the optimizer log")
