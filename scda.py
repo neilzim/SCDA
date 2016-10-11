@@ -80,7 +80,8 @@ def make_ampl_bundle(coron_list, bundled_dir, queue_spec='auto', email=None, arc
                 shutil.copy2(coron.fileorg['LDZ fname'], ".")
             bundled_fileorg['LDZ fname'] = os.path.basename(coron.fileorg['LDZ fname'])
         design_params = coron.design.copy()
-        #design_params['FPM'].pop('M',None)
+        if 'M' in design_params['FPM']:
+            design_params['FPM'].pop('M',None)
         design_params['LS'].pop('s',None)
         design_params['Image'].pop('Nimg',None)
         design_params['Image'].pop('bw+',None)
@@ -855,7 +856,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
      
         self.amplname_coron = "SPLC_full"
         if self.design['Pupil']['prim'] is 'wfirst':
-            self.telap_descrip = "wfirstCobs{0:02d}sthick{1:s}_N{2:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['centobs'], self.design['Pupil']['thick'], \
+            self.telap_descrip = "wfirstCobs{0:02d}sthick{1:s}_N{2:04d}".format(self.design['Pupil']['centobs'], self.design['Pupil']['thick'], \
                                                                                 self.design['Pupil']['N'])
         else:
             self.telap_descrip = "{0:s}{1:s}{2:s}cobs{3:d}gap{4:d}_N{5:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
@@ -2160,49 +2161,6 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
         if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
             field_propagation = """
             #---------------------
-            var EB_real_X {mx in MXs, y in Ys, lam in Ls};
-            var EB_real {mx in MXs, my in MYs, lam in Ls};
-            
-            subject to st_EB_real_X {mx in MXs, y in Ys, lam in Ls}:
-                EB_real_X[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelApProp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
-            subject to st_EB_real {(mx, my) in FPMtrans, lam in Ls}:
-                EB_real[mx,my,lam] = 2/lam*sum {y in Ys} EB_real_X[mx,y,lam]*cos(2*pi*y*my/lam)*dy;
-            
-            #---------------------
-            var EC_real_X {u in Us, my in MYs, lam in Ls};
-            var EC_real {u in Us, v in Vs, lam in Ls};
-            
-            subject to st_EC_real_X {u in Us, my in MYs, lam in Ls}:
-                EC_real_X[u,my,lam] = 2*sum {mx in MXs: (mx,my) in FPMtrans} FPM[mx,my]*EB_real[mx,my,lam]*cos(2*pi*u*mx/lam)*dmx;
-            subject to st_EC_real {(u,v) in Lyot union LyotDarkZone, lam in Ls}:
-                EC_real[u,v,lam] = 2/lam*sum {my in MYs} EC_real_X[u,my,lam]*cos(2*pi*v*my/lam)*dmy;
-            
-            #---------------------
-            var ED_real_X {xi in Xis, v in Vs, lam in Ls};
-            var ED_real {xi in Xis, eta in Etas, lam in Ls};
-            
-            subject to st_ED_real_X {xi in Xis, v in Vs, lam in Ls}: 
-                ED_real_X[xi,v,lam] = 2*sum {u in Us: (u,v) in Lyot} LS[u,v]*EC_real[u,v,lam]*cos(2*pi*u*xi/lam)*du;
-            subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: 
-                ED_real[xi,eta,lam] = 2/lam*sum {v in Vs} ED_real_X[xi,v,lam]*cos(2*pi*v*eta/lam)*dv;
-            
-            #---------------------
-            var EB00_real_X {mx in MXs, y in Ys};
-            var EB00_real {mx in MXs, my in MYs};
-            var EC00_real_X {u in Us, my in MYs};
-            var EC00_real {u in Us, v in Vs};
-            var ED00_real := 0.0;
-
-            subject to st_EB00_real_X {mx in MXs, y in Ys}:
-                EB00_real_X[mx,y] = 2*sum {x in Xs: (x,y) in Pupil} TelApProp[x,y]*A[x,y]*cos(2*pi*x*mx)*dx;
-            subject to st_EB00_real {(mx, my) in FPMall}: 
-                EB00_real[mx,my] = 2*sum {y in Ys} EB00_real_X[mx,y]*cos(2*pi*y*my)*dy;
-            subject to st_EC00_real_X {u in Us, my in MYs}:
-                EC00_real_X[u,my] = 2*sum {mx in MXs: (mx,my) in FPMall} EB00_real[mx,my]*cos(2*pi*u*mx)*dmx;
-            subject to st_EC00_real {(u,v) in Lyot}:
-                EC00_real[u,v] = 2*sum {my in MYs} EC00_real_X[u,my]*cos(2*pi*v*my)*dmy;
-            subject to st_ED00_real:
-                ED00_real = 4.*sum {u in Us, v in Vs: (u,v) in Lyot} LS[u,v]*EC00_real[u,v]*du*dv;
             """
         else:
             field_propagation = """
@@ -2228,7 +2186,7 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
             subject to st_EC_part_imag {u in Us, my in MYs, lam in Ls}:
                 EC_part_imag[u,my,lam] = 2*sum {mx in MXs: (mx,my) in FPMtrans} FPM[mx,my]*EB_imag[mx,my,lam]*cos(2*pi*u*mx/lam)*dmx;
             subject to st_EC_real {(u,v) in Lyot, lam in Ls}:
-                EC_real[u,v,lam] = 2/lam*sum {my in MYs} ( EC_part_real[u,my,lam]*cos(2*pi*v*my/lam) + EC_part_imag[u,my,lam]*sin(2*pi*v*my/lam) )*dmy;
+                EC_real[u,v,lam] = 2/lam*sum {my in MYs} ( EC_part_real[u,my,lam]*cos(2*pi*v*my/lam) - EC_part_imag[u,my,lam]*sin(2*pi*v*my/lam) )*dmy;
             
             #---------------------
             var ED_part {xi in Xis, v in Vs, lam in Ls};
@@ -2262,7 +2220,7 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
             subject to st_EC00_part_imag {u in Us, my in MYs}:
                 EC00_part_imag[u,my] = 2*sum {mx in MXs: (mx,my) in FPMall} EB00_imag[mx,my]*cos(2*pi*u*mx)*dmx;
             subject to st_EC00_real {(u,v) in Lyot}:
-                EC00_real[u,v] = 2*sum {my in MYs} ( EC00_part_real[u,my]*cos(2*pi*v*my) + EC00_part_imag[u,my]*sin(2*pi*v*my) )*dmy;
+                EC00_real[u,v] = 2*sum {my in MYs} ( EC00_part_real[u,my]*cos(2*pi*v*my) - EC00_part_imag[u,my]*sin(2*pi*v*my) )*dmy;
             subject to st_ED00_real:
                 ED00_real = 2.*sum {u in Us, v in Vs: (u,v) in Lyot} LS[u,v]*EC00_real[u,v]*du*dv;
             """
