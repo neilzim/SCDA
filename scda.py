@@ -1129,7 +1129,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         if Nlam is None:
             Nlam = self.design['Image']['Nlam']
         if rho_out is None:
-            rho_out = self.design['Image']['R1']
+            rho_out = self.design['FPM']['R1']
 
         # Pupil plane
         dx = (D/2)/N_A
@@ -1187,7 +1187,6 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
 
         fwhm_ind_SPLC = np.greater_equal(intens_D_0, intens_D_0_peak/2)
         fwhm_ind_TelAp = np.greater_equal(intens_TelAp, intens_TelAp_peak/2)
-        fwhm_area_polychrom.append(np.sum(fwhm_ind_SPLC)*dxi*dxi)
 
         fwhm_sum_TelAp = np.sum(intens_TelAp[fwhm_ind_TelAp])*dxi*dxi
         fwhm_sum_SPLC = np.sum(intens_D_0[fwhm_ind_SPLC])*dxi*dxi
@@ -1197,9 +1196,9 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         self.eval_metrics['inc energy'] = np.sum(np.power(TelAp,2)*dx*dx)
         self.eval_metrics['tot thrupt'] = np.sum(intens_D_0*dxi*dxi)/np.sum(np.power(TelAp,2)*dx*dx)
         self.eval_metrics['fwhm thrupt'] = fwhm_sum_SPLC/np.sum(np.power(TelAp,2)*dx*dx)
-        self.eval_metrics['fwhm circ thrupt'] = fwhm_sum_APLC/(np.pi/4)
+        self.eval_metrics['fwhm circ thrupt'] = fwhm_sum_SPLC/(np.pi/4)
         self.eval_metrics['p7ap thrupt'] = p7ap_sum_SPLC/np.sum(np.power(TelAp,2)*dx*dx)
-        self.eval_metrics['p7ap circ thrupt'] = p7ap_sum_APLC/(np.pi/4)
+        self.eval_metrics['p7ap circ thrupt'] = p7ap_sum_SPLC/(np.pi/4)
         self.eval_metrics['rel fwhm thrupt'] = fwhm_sum_SPLC/fwhm_sum_TelAp
         self.eval_metrics['rel p7ap thrupt'] = p7ap_sum_SPLC/p7ap_sum_TelAp
         self.eval_metrics['fwhm area'] = np.sum(fwhm_ind_SPLC)*dxi*dxi
