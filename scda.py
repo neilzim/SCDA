@@ -2929,7 +2929,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         header = """\
         # AMPL program to optimize a half-plane symmetric APLC
         # Created by {0:s} with {1:s} on {2:s} at {3:s}
-        load amplgsl.dll;
+        # load amplgsl.dll;
         """.format(getpass.getuser(), os.path.basename(__file__), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
 
         if True: # no Lyot plane tolerancing constraints implemented yet
