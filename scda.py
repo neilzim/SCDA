@@ -80,7 +80,7 @@ def make_ampl_bundle(coron_list, bundled_dir, queue_spec='auto', email=None, arc
                 shutil.copy2(coron.fileorg['LDZ fname'], ".")
             bundled_fileorg['LDZ fname'] = os.path.basename(coron.fileorg['LDZ fname'])
         design_params = coron.design.copy()
-        if 'M' in design_params['FPM']:
+        if 'M' in design_params['FPM'] and isinstance(coron, scda.SPLC):
             design_params['FPM'].pop('M',None)
         design_params['LS'].pop('s',None)
         design_params['Image'].pop('Nimg',None)
