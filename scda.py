@@ -80,7 +80,7 @@ def make_ampl_bundle(coron_list, bundled_dir, queue_spec='auto', email=None, arc
                 shutil.copy2(coron.fileorg['LDZ fname'], ".")
             bundled_fileorg['LDZ fname'] = os.path.basename(coron.fileorg['LDZ fname'])
         design_params = coron.design.copy()
-        if 'M' in design_params['FPM'] and isinstance(coron, scda.SPLC):
+        if 'M' in design_params['FPM'] and isinstance(coron, SPLC): # M is only defined implicitly in the SPLC class
             design_params['FPM'].pop('M',None)
         design_params['LS'].pop('s',None)
         design_params['Image'].pop('Nimg',None)
@@ -91,7 +91,7 @@ def make_ampl_bundle(coron_list, bundled_dir, queue_spec='auto', email=None, arc
         if bundled_coron.check_ampl_input_files() is True:
             bundled_coron.write_ampl(overwrite=True)
             bundled_coron.write_slurm_script(queue_spec=queue_spec, email=email, arch=arch, 
-                                            overwrite=True, verbose=False)
+                                             overwrite=True, verbose=False)
         else:
             logging.warning("Input file configuration check failed; AMPL source file not written")
             logging.warning("Bundled file organization: {0}".format(bundled_coron.fileorg))
