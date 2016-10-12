@@ -3039,14 +3039,39 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             set Ls := setof {l in 1..1} 1;
             """
 
-        if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
-            sets_and_arrays = """
+        if self.design['Pupil']['edge'] is 'floor': # floor to binary
+            define_pupil_and_telap = """
+            #---------------------
+
+            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] == 1} (x,y);
+            param TelApProp {x in Xs, y in Ys};
+            let {x in Xs, y in Ys} TelApProp[x,y] := 0;
+            let {(x,y) in Pupil} TelApProp[x,y] := 1;
+            """
+        elif self.design['Pupil']['edge'] is 'round': # round to binary
+            define_pupil_and_telap = """
+            #---------------------
+
+            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0.5} (x,y);
+            param TelApProp {x in Xs, y in Ys};
+            let {x in Xs, y in Ys} TelApProp[x,y] := 0;
+            let {(x,y) in Pupil} TelApProp[x,y] := 1;
+            """
+        else: # gray, default
+            define_pupil_and_telap = """
             #---------------------
 
             set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
+            param TelApProp {x in Xs, y in Ys};
+            let {x in Xs, y in Ys} TelApProp[x,y] := 0;
+            let {(x,y) in Pupil} TelApProp[x,y] := TelAp[x,y];
+            """
+
+        if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
+            sets_and_arrays = """
             set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
             set Lyot := setof {x in Xs, y in Ys: LS[x,y] >= 0.5} (x,y);
-            set LyotDarkZone := setof {x in Xs, y in Ys: LDZ[x,y] > 0} (x,y);
+            set LyotDarkZone := setof {x in Xs, y in Ys: LDZ[x,y] == 1 && TelApProp[x,y] > 0} (x,y);
 
             param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
             
@@ -3057,9 +3082,6 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             """
         else:
             sets_and_arrays = """
-            #---------------------
-
-            set Pupil := setof {x in Xs, y in Ys: TelAp[x,y] > 0} (x,y);
             set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
             set Lyot := setof {x in Xs, y in Ys: LS[x,y] >= 0.5} (x,y);
 
@@ -3078,7 +3100,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         var EBm_imag {mx in MXs, my in MYs, lam in Ls};
 
         subject to st_EBm_part {mx in MXs, y in Ys, lam in Ls}:
-            EBm_part[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelAp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
+            EBm_part[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelApProp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
         subject to st_EBm_real {(mx,my) in Mask, lam in Ls}:
             EBm_real[mx,my,lam] = 1/lam*sum {y in Ys} EBm_part[mx,y,lam]*cos(2*pi*y*my/lam)*dy;
         subject to st_EBm_imag {(mx,my) in Mask, lam in Ls}:
@@ -3094,7 +3116,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         subject to st_EC_part_imag {x in Xs, my in MYs, lam in Ls}:
             EC_part_imag[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} FPM[mx,my]*EBm_imag[mx,my,lam]*cos(2*pi*x*mx/lam)*dmx;
         subject to st_EC {(x,y) in Lyot, lam in Ls}:
-            EC[x,y,lam] = TelAp[x,-y]*A[x,-y] - 2/lam*sum{my in MYs} ( EC_part_real[x,my,lam]*cos(2*pi*my*y/lam) + EC_part_imag[x,my,lam]*sin(2*pi*my*y/lam) )*dmy;
+            EC[x,y,lam] = TelApProp[x,-y]*A[x,-y] - 2/lam*sum{my in MYs} ( EC_part_real[x,my,lam]*cos(2*pi*my*y/lam) - EC_part_imag[x,my,lam]*sin(2*pi*my*y/lam) )*dmy;
         
         #---------------------
         var ED_part {xi in Xis, y in Ys, lam in Ls};
@@ -3102,7 +3124,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         var ED_imag {xi in Xis, eta in Etas, lam in Ls};
         
         subject to st_ED_part {xi in Xis, y in Ys, lam in Ls}:
-            ED_part[xi,y,lam] = 2*sum {x in Xs: (x,y) in Lyot} LS[x,y]*EC[x,y,lam]*cos(2*pi*x*xi/lam)*dx;
+            ED_part[xi,y,lam] = 2*sum {x in Xs: (x,y) in Lyot} EC[x,y,lam]*cos(2*pi*x*xi/lam)*dx;
         subject to st_ED_real {xi in Xis, eta in Etas, lam in Ls}:
             ED_real[xi,eta,lam] = 1/lam*sum {y in Ys} ED_part[xi,y,lam]*cos(2*pi*y*eta/lam)*dy;
         subject to st_ED_imag {xi in Xis, eta in Etas, lam in Ls}:
@@ -3110,7 +3132,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         
         #---------------------
         var ED00_real := 0.0;
-        subject to st_ED00_real: ED00_real = 2*sum {x in Xs, y in Ys: (x,y) in Lyot} (TelAp[x,y]*A[x,y])*dx*dy;
+        subject to st_ED00_real: ED00_real = 2*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*TelApProp[x,y])*dx*dy;
         """
 
         constraints = """
