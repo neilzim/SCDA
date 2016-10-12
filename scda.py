@@ -2437,7 +2437,7 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
 
 class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et al. (2015, 2016)
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 250)), ('prim',(str, 'hex3')), ('secobs',(str, None)), 
-                                                           ('thick',(str, '025')), ('centobs',(bool, True)),
+                                                           ('thick',(str, '025')), ('centobs',(int, 1)),
                                                            ('gap',(int, 1)), ('edge',(str, 'gray'))]) ),
                                    ( 'FPM', OrderedDict([('rad',(float, 4.)), ('M',(int, 60))]) ),
                                    ( 'LS', OrderedDict([('shape',(str, 'ann')), ('id',(int, 20)), ('od',(int, None)), ('obscure',(int, 0)),
@@ -2449,7 +2449,8 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                        'LS': _design_fields['LS'], 'Image': _design_fields['Image'], \
                        'Tel': {'TelAp diam':(float, 12.)}, 'Target': {}, 'Aber': {}, 'WFSC': {} }
     _LS_OD_map = {'hex1':76, 'hex2':82, 'hex3':81, 'hex4':82, 'pie08':90, 'pie12':90, 'key24':90, 'circ':90}
-    _prim_secobs_map = {'hex1':'X', 'hex2':'X', 'hex3':'X', 'hex4':'X', 'pie08':'Cross', 'pie12':'Cross', 'key24':'Cross', 'circ':'Cross'}
+    _prim_secobs_map = {'hex1':'X', 'hex2':'X', 'hex3':'X', 'hex4':'X', 
+                        'pie08':'Cross', 'pie12':'Cross', 'key24':'Cross', 'circ':'Cross', 'wfirst':None}
 
     def __init__(self, verbose=False, **kwargs):
         super(NdiayeAPLC, self).__init__(**kwargs)
@@ -2510,8 +2511,13 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             logging.info("File organization parameters: {}".format(self.fileorg))
      
         self.amplname_coron = "APLC_full"
-        self.telap_descrip = "{0:s}{1:s}{2:s}cobs{3:d}gap{4:d}_N{5:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
-                                                                                int(self.design['Pupil']['centobs']), self.design['Pupil']['gap'], self.design['Pupil']['N'])
+        if self.design['Pupil']['prim'] is 'wfirst':
+            self.telap_descrip = "wfirstCobs{0:02d}sthick{1:s}_N{2:04d}".format(self.design['Pupil']['centobs'], self.design['Pupil']['thick'], \
+                                                                                self.design['Pupil']['N'])
+        else:
+            self.telap_descrip = "{0:s}{1:s}{2:s}cobs{3:d}gap{4:d}_N{5:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], \
+                                                                                    self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), \
+                                                                                    self.design['Pupil']['gap'], self.design['Pupil']['N'])
         self.amplname_pupil = "{0:s}{1:s}".format(self.telap_descrip, self.design['Pupil']['edge'][0])
 
         self.amplname_fpm = "FPM{:02}M{:03}".format(int(round(100*self.design['FPM']['rad'])), self.design['FPM']['M'])
