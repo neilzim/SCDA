@@ -3073,7 +3073,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             set Lyot := setof {x in Xs, y in Ys: LS[x,y] >= 0.5} (x,y);
             set LyotDarkZone := setof {x in Xs, y in Ys: LDZ[x,y] == 1 && TelApProp[x,y] > 0} (x,y);
 
-            param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
+            param TR := sum {(x,y) in Pupil} TelApProp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
             
             var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
             
@@ -3085,7 +3085,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
             set Lyot := setof {x in Xs, y in Ys: LS[x,y] >= 0.5} (x,y);
 
-            param TR := sum {(x,y) in Pupil} TelAp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
+            param TR := sum {(x,y) in Pupil} TelApProp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
             
             var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
             
@@ -3197,6 +3197,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         mod_fobj.write( textwrap.dedent(define_coords) )
         mod_fobj.write( textwrap.dedent(load_masks) )
         mod_fobj.write( textwrap.dedent(define_wavelengths) )
+        mod_fobj.write( textwrap.dedent(define_pupil_and_telap) )
         mod_fobj.write( textwrap.dedent(sets_and_arrays) )
         mod_fobj.write( textwrap.dedent(field_propagation) )
         mod_fobj.write( textwrap.dedent(constraints) )
