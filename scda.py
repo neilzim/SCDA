@@ -295,13 +295,19 @@ class DesignParamSurvey(object):
         for (fixed_keycat, fixed_parname), fixed_val in zip(self.fixed_param_index, self.fixed_param_vals):
             design[fixed_keycat][fixed_parname] = fixed_val
         self.coron_list = []
-        for param_combo in self.varied_param_combos: # TODO: Switch the coronagraph type depending on the symmetry of the telescope aperture and support struts 
+        for idx, param_combo in enumerate(self.varied_param_combos): # TODO: Switch the coronagraph type depending on the symmetry of the telescope aperture and support struts 
             for (varied_keycat, varied_parname), current_val in zip(self.varied_param_index, param_combo):
                 design[varied_keycat][varied_parname] = current_val
             coron_fileorg = self.fileorg.copy()
             if 'survey fname' in coron_fileorg:
+                survey_name = os.path.basename(coron_fileorg['survey fname'][:-4])
                 coron_fileorg.pop('survey fname')
-            self.coron_list.append( coron_class(design=design, fileorg=self.fileorg, solver=self.solver) )
+            else:
+                survey_name = os.path.basename(os.path.abspath(self.fileorg['work dir']))
+            num_ID_digits = int(np.floor(np.log10(self.N_combos))) + 1
+            ID_fmt_str = "{{:s}}-{{:0{:d}d}}".format(num_ID_digits)
+            coron_fileorg['design ID'] = ID_fmt_str.format(survey_name, idx)
+            self.coron_list.append( coron_class(design=design, fileorg=coron_fileorg, solver=self.solver) )
  
         setattr(self, 'ampl_infile_status', False)
         self.check_ampl_input_files()
@@ -434,7 +440,7 @@ class DesignParamSurvey(object):
         else:
             if 'survey fname' not in self.fileorg or ('survey fname' in self.fileorg and self.fileorg['survey fname'] is None):
                 #csv_fname_tail = "scda_{:s}_survey_{:s}_{:s}.csv".format(self.coron_class.__name__, getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
-                csv_fname_tail = "{0:s}_{1:s}_{2:s}.csv".format(os.path.basename(self.fileorg['work dir']), getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
+                csv_fname_tail = "{0:s}_{1:s}_{2:s}.csv".format(os.path.basename(os.path.abspath(self.fileorg['work dir'])), getpass.getuser(), datetime.datetime.now().strftime("%Y-%m-%d"))
                 csv_fname = os.path.join(self.fileorg['work dir'], csv_fname_tail)
             else:
                 csv_fname = self.fileorg['survey fname'][:-4] + ".csv"
@@ -561,14 +567,14 @@ class DesignParamSurvey(object):
                 for (cat, name) in self.varied_param_index:
                     catrow.append(cat)
                     paramrow.append(name)
-                catrow.extend(['', 'AMPL program', '', '', '', 'Solution', '', 'Evaluation metrics', '', ''])
-                paramrow.extend(['', 'filename', 'exists?', 'input files?', 'submitted?', 'filename', 'exists?',
+                catrow.extend(['Design ID', 'AMPL program', '', '', '', 'Solution', '', 'Evaluation metrics', '', ''])
+                paramrow.extend(['survey-index', 'filename', 'exists?', 'input files?', 'submitted?', 'filename', 'exists?',
                                  'inc. energy', 'apodizer non-binarity', 'Tot thrupt', 'half-max thrupt', 'half-max circ thrupt', 'rel. half-max thrupt', 'r=0.7 thrupt',  'r=0.7 circ thrupt', 'rel. r=0.7 thrupt', 'PSF area'])
                 surveywriter.writerow(catrow)
                 surveywriter.writerow(paramrow)
                 for ii, param_combo in enumerate(self.varied_param_combos):
                     param_combo_row = list(param_combo)
-                    param_combo_row.append('')
+                    param_combo_row.append(self.coron_list[ii].fileorg['design ID'])
                     param_combo_row.append(os.path.basename(self.coron_list[ii].fileorg['ampl src fname'])) 
                     if os.path.exists(self.coron_list[ii].fileorg['ampl src fname']):
                         param_combo_row.append('Y')
@@ -636,7 +642,7 @@ class DesignParamSurvey(object):
 class LyotCoronagraph(object): # Lyot coronagraph base class
     _file_fields = { 'fileorg': ['work dir', 'ampl src dir', 'TelAp dir', 'FPM dir', 'LS dir',
                                  'sol dir', 'log dir', 'eval dir', 'slurm dir',
-                                 'ampl src fname', 'slurm fname', 'log fname', 'job name', 
+                                 'ampl src fname', 'slurm fname', 'log fname', 'job name', 'design ID', 
                                  'TelAp fname', 'FPM fname', 'LS fname', 'LDZ fname', 'sol fname'],
                      'solver': ['constr', 'method', 'presolve', 'threads', 'solver', 'crossover'] }
 
