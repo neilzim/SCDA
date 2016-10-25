@@ -24,6 +24,10 @@ try:
 except ImportError:
     from ordereddict import OrderedDict
 
+# debug
+#import matplotlib
+#import matplotlib.pyplot as plt
+
 def configure_log(log_fname=None):
 #    logger = logging.getLogger("scda.logger")
     logger = logging.getLogger()
@@ -977,9 +981,9 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         logging.info("Writing the AMPL program") # Not yet written for full-plane SPLC
 
     def get_onax_psf(self, fp2res=8, rho_inc=0.25, rho_out=None, Nlam=None): # for SPLC
-        if self.design['Pupil']['edge'] is 'floor': # floor to binary
+        if self.design['Pupil']['edge'] == 'floor': # floor to binary
             TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
-        elif self.design['Pupil']['edge'] is 'round': # round to binary
+        elif self.design['Pupil']['edge'] == 'round': # round to binary
             TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
         else: # keey it gray
             TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
@@ -1479,7 +1483,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             set Ls := setof {l in 1..1} 1;
             """
 
-        if self.design['Pupil']['edge'] is 'floor': # floor to binary
+        if self.design['Pupil']['edge'] == 'floor': # floor to binary
             define_pupil_and_telap = """
             #---------------------
 
@@ -1488,7 +1492,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             let {x in Xs, y in Ys} TelApProp[x,y] := 0;
             let {(x,y) in Pupil} TelApProp[x,y] := 1;
             """
-        elif self.design['Pupil']['edge'] is 'round': # round to binary
+        elif self.design['Pupil']['edge'] == 'round': # round to binary
             define_pupil_and_telap = """
             #---------------------
 
@@ -2102,7 +2106,7 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
             set Ls := setof {l in 1..1} 1;
             """
 
-        if self.design['Pupil']['edge'] is 'floor': # floor to binary
+        if self.design['Pupil']['edge'] == 'floor': # floor to binary
             define_pupil_and_telap = """
             #---------------------
 
@@ -2111,7 +2115,7 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
             let {x in Xs, y in Ys} TelApProp[x,y] := 0;
             let {(x,y) in Pupil} TelApProp[x,y] := 1;
             """
-        elif self.design['Pupil']['edge'] is 'round': # round to binary
+        elif self.design['Pupil']['edge'] == 'round': # round to binary
             define_pupil_and_telap = """
             #---------------------
 
@@ -2626,9 +2630,10 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         logging.info("Writing the AMPL program")
 
     def get_onax_psf(self, fp2res=8, rho_inc=0.25, rho_out=None, Nlam=None): # for APLC class
-        if self.design['Pupil']['edge'] is 'floor': # floor to binary
+        pdb.set_trace()
+        if self.design['Pupil']['edge'] == 'floor': # floor to binary
             TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
-        elif self.design['Pupil']['edge'] is 'round': # round to binary
+        elif self.design['Pupil']['edge'] == 'round': # round to binary
             TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
         else: # keey it gray
             TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
@@ -2724,9 +2729,9 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         gapstr_beg = TelAp_basename.find('gap')
         TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
         TelAp_nopad_fname = os.path.join( os.path.dirname(self.fileorg['TelAp fname']), TelAp_nopad_basename )
-        #if self.design['Pupil']['edge'] is 'floor': # floor to binary
+        #if self.design['Pupil']['edge'] == 'floor': # floor to binary
         #    TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
-        #elif self.design['Pupil']['edge'] is 'round': # round to binary
+        #elif self.design['Pupil']['edge'] == 'round': # round to binary
         #    TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
         #else:
         #    TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
@@ -3045,7 +3050,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             set Ls := setof {l in 1..1} 1;
             """
 
-        if self.design['Pupil']['edge'] is 'floor': # floor to binary
+        if self.design['Pupil']['edge'] == 'floor': # floor to binary
             define_pupil_and_telap = """
             #---------------------
 
@@ -3054,7 +3059,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             let {x in Xs, y in Ys} TelApProp[x,y] := 0;
             let {(x,y) in Pupil} TelApProp[x,y] := 1;
             """
-        elif self.design['Pupil']['edge'] is 'round': # round to binary
+        elif self.design['Pupil']['edge'] == 'round': # round to binary
             define_pupil_and_telap = """
             #---------------------
 
@@ -3564,7 +3569,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             set Ls := setof {l in 1..1} 1;
             """
 
-        if self.design['Pupil']['edge'] is 'floor': # floor to binary
+        if self.design['Pupil']['edge'] == 'floor': # floor to binary
             define_pupil_and_telap = """
             #---------------------
 
@@ -3573,7 +3578,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             let {x in Xs, y in Ys} TelApProp[x,y] := 0;
             let {(x,y) in Pupil} TelApProp[x,y] := 1;
             """
-        elif self.design['Pupil']['edge'] is 'round': # round to binary
+        elif self.design['Pupil']['edge'] == 'round': # round to binary
             define_pupil_and_telap = """
             #---------------------
 
