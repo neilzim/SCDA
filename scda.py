@@ -1098,8 +1098,6 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             for wi, wr in enumerate(wrs):
                 radial_intens_polychrom[wi, si] = np.mean(np.ravel(intens_polychrom[wi,:,:])[meas_ann_ind])
 
-        #pdb.set_trace()
-
         return intens_polychrom, seps, radial_intens_polychrom, FoV_mask
 
     def get_metrics(self, fp1res=8, fp2res=16, rho_out=None, Nlam=None, verbose=True): # for SPLC class
@@ -2630,7 +2628,6 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         logging.info("Writing the AMPL program")
 
     def get_onax_psf(self, fp2res=8, rho_inc=0.25, rho_out=None, Nlam=None): # for APLC class
-        pdb.set_trace()
         if self.design['Pupil']['edge'] == 'floor': # floor to binary
             TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
         elif self.design['Pupil']['edge'] == 'round': # round to binary
