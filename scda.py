@@ -2692,14 +2692,12 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
 
         intens_polychrom = np.zeros((Nlam, 2*M_fp2, 2*M_fp2))
         for wi, wr in enumerate(wrs):
-            Psi_B = dx*dx/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, xs)), TelAp*A ),
-                                           np.exp(-1j*2*np.pi/wr*np.dot(xs.T, mxs)))
+            Psi_A = TelAp*A
+            Psi_B = dx*dx/wr*np.exp(-1j*2*np.pi/wr*mxs.T*xs)*Psi_A*np.exp(-1j*2*np.pi/wr*xs.T*mxs)
             Psi_B_stop = np.multiply(Psi_B, FPM)
-            Psi_C = A*TelAp - dmx*dmx/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xs.T, mxs)), Psi_B_stop),
-                                                       np.exp(-1j*2*np.pi/wr*np.dot(mxs.T, xs)))
+            Psi_C = Psi_A[::-1,::-1] - dmx*dmx/wr*np.exp(-1j*2*np.pi/wr*xs.T*mxs)*Psi_B_stop*np.exp(-1j*2*np.pi/wr*mxs.T*xs)
             Psi_C_stop = np.multiply(Psi_C, LS)
-            Psi_D = dx*dx/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), Psi_C_stop),
-                                           np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
+            Psi_D = dx*dx/wr*np.exp(-1j*2*np.pi/wr*xis.T*xs)*Psi_C_stop*np.exp(-1j*2*np.pi/wr*xs.T*xis)
             Psi_D_0_peak = np.sum(A*TelAp*LS)*dx*dx/wr
             intens_polychrom[wi,:,:] = np.power(np.absolute(Psi_D)/Psi_D_0_peak, 2)
              
@@ -2828,14 +2826,138 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             print("Band-averaged relative r=0.7 lam/D throughput: {:.2f}%".format(100*self.eval_metrics['rel p7ap thrupt']))
             print("Band-averaged FWHM PSF area / (lambda0/D)^2: {:.2f}".format(self.eval_metrics['fwhm area']))
         return telap_flag
-    
-    def read_solution(self):
-        logging.info("Reading in the apodizer solution and parse the optimizer log")
-    def create_eval_model(self):
-        logging.info("Defining a python/Poppy model to evaluate the solution")
-    def eval_solution(self):
-        logging.info("Evaluating the design throughput, PSF FWHM, etc., and writing summary")
 
+    def make_yield_input_products(self, pixscale_lamoD=4, D_telap=12., 
+                                  star_diam_vec=None, Npts_star_diam=7,
+                                  lambda_cent=600e-9, Nlam=None):
+        if self.design['Pupil']['edge'] == 'floor': # floor to binary
+            TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
+        elif self.design['Pupil']['edge'] == 'round': # round to binary
+            TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
+        else: # keey it gray
+            TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
+        A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
+        FPM_p = np.loadtxt(self.fileorg['FPM fname'])
+        LS_p = np.loadtxt(self.fileorg['LS fname'])
+        A_p = A_col.reshape(TelAp_p.shape)
+        if isinstance(self, QuarterplaneAPLC):
+            TelAp = np.concatenate((np.concatenate((TelAp_p[::-1,::-1], TelAp_p[:,::-1]),axis=0),
+                                    np.concatenate((TelAp_p[::-1,:], TelAp_p),axis=0)), axis=1)
+            Apod = np.concatenate((np.concatenate((A_p[::-1,::-1], A_p[:,::-1]),axis=0),
+                                   np.concatenate((A_p[::-1,:], A_p),axis=0)), axis=1)
+            FPM = np.concatenate((np.concatenate((FPM_p[::-1,::-1], FPM_p[:,::-1]),axis=0),
+                                  np.concatenate((FPM_p[::-1,:], FPM_p),axis=0)), axis=1)
+            LS = np.concatenate((np.concatenate((LS_p[::-1,::-1], LS_p[:,::-1]),axis=0),
+                                 np.concatenate((LS_p[::-1,:], LS_p),axis=0)), axis=1)
+        elif isinstance(self, HalfplaneAPLC):
+            TelAp = np.concatenate((TelAp_p[:,::-1], TelAp_p), axis=1)
+            Apod = np.concatenate((A_p[:,::-1], A_p), axis=1)
+            FPM = np.concatenate((np.concatenate((FPM_p[::-1,::-1], FPM_p[:,::-1]),axis=0),
+                                  np.concatenate((FPM_p[::-1,:], FPM_p),axis=0)), axis=1)
+            LS = np.concatenate((LS_p[:,::-1], LS_p), axis=1)
+        else:
+            TelAp = TelAp_p
+            Apod = A_p
+            FPM = FPM_p
+            LS = LS_p
+
+        if star_diam_vec is None:
+            star_diam_vec = np.concatenate([np.linspace(0, 0.9, 10), np.linspace(1, 10, 10)])
+        if Nlam is None:
+            Nlam = coron.design['Image']['Nlam']
+        bw = coron.design['Image']['bw']
+        wrs = np.linspace(1.-bw/2, 1.+bw/2, Nlam)
+        
+        N = coron.design['Pupil']['N']
+        M_fp1 = coron.design['FPM']['M']
+        fpm_rad = coron.design['FPM']['rad']
+        rho2 = coron.design['Image']['oda'] + 0.25
+        M_fp2 = int(np.ceil(rho2*pixscale_lamoD))
+        
+        # pupil plane
+        dx = (D_telap/2)/N
+        dy = dx
+        xs = np.matrix(np.linspace(-N+0.5,N-0.5,2*N)*dx)
+        ys = xs
+        XX, YY = np.meshgrid(np.array(xs), np.array(xs))
+        
+        # FPM
+        dmx = fpm_rad/M_fp1
+        dmy = dmx
+        mxs = np.matrix(np.linspace(-M_fp1+0.5,M_fp1-0.5,2*M_fp1)*dmx)
+        mys = mxs
+        
+        # FP2
+        dxi = 1./pixscale_lamoD
+        xis = np.matrix(np.linspace(-M_fp2+0.5,M_fp2-0.5,2*M_fp2)*dxi)
+        etas = xis
+        
+        intens_map_vs_star_diam = np.zeros((Nlam, 2*M_fp2, 2*M_fp2))
+
+        for si, star_diam in enumerate(star_diam_vec):
+            intens_map_vs_star_diam[si,:,:] = get_finite_star_aplc_psf(TelAp, Apod, FPM, LS,
+                                                                       xs, dx, XX, YY, mxs, dmx, xis, dxi,
+                                                                       D_telap=D_telap, star_diam_mas=star_diam,
+                                                                       Npts_star_diam=Npts_star_diam)
+        return intens_map_vs_star_diam
+
+def get_finite_star_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis, dxi,
+                             D_telap=12., star_diam_mas=1., Npts_star_diam=11, lambda_cent=600e-9,
+                             wrs=None, seps=None, get_radial_curve=False):
+    if wrs is None:
+        wrs = np.linspace(0.95, 1.05, 5)
+
+    star_diam_lamoD = np.deg2rad(star_diam_mas/1000./3600.)/(lambda_cent/D_telap)
+    disk_vec_lamoD = np.linspace(-star_diam_lamoD/2, star_diam_lamoD/2, Npts_star_diam)
+
+    XiXi, EtaEta = np.meshgrid(disk_vec_lamoD, disk_vec_lamoD)
+    star_disk = (XiXi**2 + EtaEta**2 <= (star_diam_lamoD/2)**2)
+    disk_samp_XiEta = zip(XiXi[star_disk], EtaEta[star_disk])
+
+    intens_2d_src = np.zeros((xis.shape[1], xis.shape[1]))
+    
+    for (delxi, deleta) in disk_samp_XiEta:
+        intens_2d_bandavg = fast_bandavg_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx,
+                                                  xis, dxi, delxi, deleta, wrs)
+        intens_2d_src += intens_2d_bandavg/len(disk_samp_XiEta)
+       
+    if get_radial_curve: 
+        if seps is None:
+            seps = np.arange(2.0, 10.25, 0.25)
+        intens_radial_src = np.zeros(seps.shape)
+        
+        XXs = np.asarray(np.dot(np.matrix(np.ones(xis.shape)).T, xis))
+        YYs = np.asarray(np.dot(xis.T, np.matrix(np.ones(xis.shape))))
+        RRs = np.sqrt(XXs**2 + YYs**2)
+
+        for si, sep in enumerate(seps):
+            r_in = np.max([seps[0], sep-0.5])
+            r_out = np.min([seps[-1], sep+0.5])
+            meas_ann_mask = np.logical_and(np.greater_equal(RRs, r_in),
+                                           np.less_equal(RRs, r_out))
+            meas_ann_ind = np.nonzero(np.logical_and(np.greater_equal(RRs, r_in).ravel(),
+                                                     np.less_equal(RRs, r_out).ravel()))[0]
+            intens_radial_src[si] = np.mean(np.ravel(intens_2d_src)[meas_ann_ind])
+            
+        return intens_2d_src, intens_radial_src
+    else:
+        return intens_2d_src
+       
+def fast_bandavg_aplc_psf(TelAp, A, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis, dxi, delta_xi, delta_eta, wrs):
+    intens_D_polychrom = np.zeros((wrs.shape[0],xis.shape[1],xis.shape[1]))
+    for wi, wr in enumerate(wrs):
+        Psi_A = np.exp(-1j*2*np.pi/wr*(delta_xi*XX + delta_eta*YY))
+        Psi_A_stop = np.multiply(TelAp*A, Psi_A)
+        Psi_B = dx*dx/wr*np.exp(-1j*2*np.pi/wr*mxs.T*xs)*Psi_A_stop*np.exp(-1j*2*np.pi/wr*xs.T*mxs)
+        Psi_B_stop = np.multiply(Psi_B, FPM)
+        Psi_C = Psi_A_stop[::-1,::-1] - \
+                dmx*dmx/wr*np.exp(-1j*2*np.pi/wr*xs.T*mxs)*Psi_B_stop*np.exp(-1j*2*np.pi/wr*mxs.T*xs)
+        Psi_C_stop = np.multiply(Psi_C, LS)
+        Psi_D = dx*dx/wr*np.exp(-1j*2*np.pi/wr*xis.T*xs)*Psi_C_stop*np.exp(-1j*2*np.pi/wr*xs.T*xis)
+        Psi_D_0_peak = np.sum(TelAp*A*LS)*dx*dx/wr
+        intens_D_polychrom[wi,:,:] = np.power(np.absolute(Psi_D)/Psi_D_0_peak, 2)
+    return np.mean(intens_D_polychrom, axis=0)
+    
 class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symmetry case
     def __init__(self, **kwargs):
         super(HalfplaneAPLC, self).__init__(**kwargs)
