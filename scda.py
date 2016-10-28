@@ -2829,7 +2829,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
 
     def make_yield_input_products(self, pixscale_lamoD=4, D_telap=12., 
                                   star_diam_vec=None, Npts_star_diam=7,
-                                  lambda_cent=600e-9, Nlam=None):
+                                  lambda_cent=550e-9, Nlam=None):
         if self.design['Pupil']['edge'] == 'floor': # floor to binary
             TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
         elif self.design['Pupil']['edge'] == 'round': # round to binary
