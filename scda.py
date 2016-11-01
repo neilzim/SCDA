@@ -2828,12 +2828,11 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         return telap_flag
 
     def make_yield_input_products(self, pixscale_lamoD=4, star_diam_vec=None, Npts_star_diam=7, Nlam=None):
-        if self.design['Pupil']['edge'] == 'floor': # floor to binary
-            TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
-        elif self.design['Pupil']['edge'] == 'round': # round to binary
-            TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
-        else: # keey it gray
-            TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
+        TelAp_basename = os.path.basename(self.fileorg['TelAp fname'])
+        gapstr_beg = TelAp_basename.find('gap')
+        TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
+        TelAp_nopad_fname = os.path.join( os.path.dirname(self.fileorg['TelAp fname']), TelAp_nopad_basename )
+        TelAp_p = np.loadtxt(TelAp_nopad_fname)
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
         FPM_p = np.loadtxt(self.fileorg['FPM fname'])
         LS_p = np.loadtxt(self.fileorg['LS fname'])
@@ -2916,7 +2915,7 @@ def get_finite_star_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis
     
     for (delxi, deleta) in disk_samp_XiEta:
         intens_2d_bandavg = fast_bandavg_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx,
-                                                  xis, dxi, delxi, deleta, wrs)
+                                                  xis, dxi, delxi, deleta, wrs, norm='peak')
         intens_2d_src += intens_2d_bandavg/len(disk_samp_XiEta)
        
     if get_radial_curve: 
@@ -2941,19 +2940,29 @@ def get_finite_star_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis
     else:
         return intens_2d_src
        
-def fast_bandavg_aplc_psf(TelAp, A, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis, dxi, delta_xi, delta_eta, wrs):
-    intens_D_polychrom = np.zeros((wrs.shape[0],xis.shape[1],xis.shape[1]))
+def fast_bandavg_aplc_psf(TelAp, A, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis, dxi, delta_xi, delta_eta, wrs,
+                          norm = 'aperture'):
+    # norm parameter is either 'aperture' for illuminated aperture (per Stark yield input definition) or
+    # 'peak' for unocculted PSF peak (contrast units)
+    intens_D_polychrom = np.zeros((wrs.shape[0], xis.shape[1], xis.shape[1]))
+    if norm == 'peak':
+        intens_norm = np.sum(A*LS)*dx*dx/wrs
+    elif norm == 'aperture':
+        intens_norm = np.sum(TelAp)*dx*dx
     for wi, wr in enumerate(wrs):
         Psi_A = np.exp(-1j*2*np.pi/wr*(delta_xi*XX + delta_eta*YY))
-        Psi_A_stop = np.multiply(TelAp*A, Psi_A)
+        Psi_A_stop = np.multiply(A, Psi_A)
         Psi_B = dx*dx/wr*np.exp(-1j*2*np.pi/wr*mxs.T*xs)*Psi_A_stop*np.exp(-1j*2*np.pi/wr*xs.T*mxs)
         Psi_B_stop = np.multiply(Psi_B, FPM)
         Psi_C = Psi_A_stop[::-1,::-1] - \
                 dmx*dmx/wr*np.exp(-1j*2*np.pi/wr*xs.T*mxs)*Psi_B_stop*np.exp(-1j*2*np.pi/wr*mxs.T*xs)
         Psi_C_stop = np.multiply(Psi_C, LS)
         Psi_D = dx*dx/wr*np.exp(-1j*2*np.pi/wr*xis.T*xs)*Psi_C_stop*np.exp(-1j*2*np.pi/wr*xs.T*xis)
-        Psi_D_0_peak = np.sum(TelAp*A*LS)*dx*dx/wr
-        intens_D_polychrom[wi,:,:] = np.power(np.absolute(Psi_D)/Psi_D_0_peak, 2)
+        if norm == 'peak':
+            intens_D_polychrom[wi,:,:] = np.power(np.absolute(Psi_D)/intens_norm[wi], 2)
+        elif norm == 'aperture':
+            intens_D_polychrom[wi,:,:] = np.power(np.absolute(Psi_D)/intens_norm, 2)
+            
     return np.mean(intens_D_polychrom, axis=0)
     
 class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symmetry case
