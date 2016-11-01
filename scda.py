@@ -2827,9 +2827,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             print("Band-averaged FWHM PSF area / (lambda0/D)^2: {:.2f}".format(self.eval_metrics['fwhm area']))
         return telap_flag
 
-    def make_yield_input_products(self, pixscale_lamoD=4, D_telap=12., 
-                                  star_diam_vec=None, Npts_star_diam=7,
-                                  lambda_cent=600e-9, Nlam=None):
+    def make_yield_input_products(self, pixscale_lamoD=4, star_diam_vec=None, Npts_star_diam=7, Nlam=None):
         if self.design['Pupil']['edge'] == 'floor': # floor to binary
             TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
         elif self.design['Pupil']['edge'] == 'round': # round to binary
@@ -2862,20 +2860,21 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             LS = LS_p
 
         if star_diam_vec is None:
-            star_diam_vec = np.concatenate([np.linspace(0, 0.9, 10), np.linspace(1, 10, 10)])
+            star_diam_vec = np.concatenate([np.linspace(0,0.09,10), np.linspace(0.1, 1, 10), np.array([2., 3., 4.])])
         if Nlam is None:
-            Nlam = coron.design['Image']['Nlam']
-        bw = coron.design['Image']['bw']
+            Nlam = self.design['Image']['Nlam']
+        bw = self.design['Image']['bw']
         wrs = np.linspace(1.-bw/2, 1.+bw/2, Nlam)
         
-        N = coron.design['Pupil']['N']
-        M_fp1 = coron.design['FPM']['M']
-        fpm_rad = coron.design['FPM']['rad']
-        rho2 = coron.design['Image']['oda'] + 0.25
+        N = self.design['Pupil']['N']
+        M_fp1 = self.design['FPM']['M']
+        fpm_rad = self.design['FPM']['rad']
+        rho2 = self.design['Image']['oda'] + 0.25
         M_fp2 = int(np.ceil(rho2*pixscale_lamoD))
         
         # pupil plane
-        dx = (D_telap/2)/N
+        D = 1.
+        dx = (D/2)/N
         dy = dx
         xs = np.matrix(np.linspace(-N+0.5,N-0.5,2*N)*dx)
         ys = xs
@@ -2892,22 +2891,21 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         xis = np.matrix(np.linspace(-M_fp2+0.5,M_fp2-0.5,2*M_fp2)*dxi)
         etas = xis
         
-        intens_map_vs_star_diam = np.zeros((Nlam, 2*M_fp2, 2*M_fp2))
+        intens_map_vs_star_diam = np.zeros((len(star_diam_vec), 2*M_fp2, 2*M_fp2))
 
         for si, star_diam in enumerate(star_diam_vec):
             intens_map_vs_star_diam[si,:,:] = get_finite_star_aplc_psf(TelAp, Apod, FPM, LS,
                                                                        xs, dx, XX, YY, mxs, dmx, xis, dxi,
-                                                                       D_telap=D_telap, star_diam_mas=star_diam,
+                                                                       star_diam_lamoD=star_diam,
                                                                        Npts_star_diam=Npts_star_diam)
         return intens_map_vs_star_diam
 
 def get_finite_star_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis, dxi,
-                             D_telap=12., star_diam_mas=1., Npts_star_diam=11, lambda_cent=600e-9,
+                             star_diam_lamoD=0.1, Npts_star_diam=7,
                              wrs=None, seps=None, get_radial_curve=False):
     if wrs is None:
         wrs = np.linspace(0.95, 1.05, 5)
 
-    star_diam_lamoD = np.deg2rad(star_diam_mas/1000./3600.)/(lambda_cent/D_telap)
     disk_vec_lamoD = np.linspace(-star_diam_lamoD/2, star_diam_lamoD/2, Npts_star_diam)
 
     XiXi, EtaEta = np.meshgrid(disk_vec_lamoD, disk_vec_lamoD)
