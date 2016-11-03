@@ -23,6 +23,7 @@ try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
+import astropy.io.fits
 
 # debug
 #import matplotlib
@@ -645,7 +646,7 @@ class DesignParamSurvey(object):
 
 class LyotCoronagraph(object): # Lyot coronagraph base class
     _file_fields = { 'fileorg': ['work dir', 'ampl src dir', 'TelAp dir', 'FPM dir', 'LS dir',
-                                 'sol dir', 'log dir', 'eval dir', 'slurm dir',
+                                 'sol dir', 'log dir', 'eval dir', 'eval subdir', 'slurm dir',
                                  'ampl src fname', 'slurm fname', 'log fname', 'job name', 'design ID', 
                                  'TelAp fname', 'FPM fname', 'LS fname', 'LDZ fname', 'sol fname'],
                      'solver': ['constr', 'method', 'presolve', 'threads', 'solver', 'crossover'] }
@@ -687,7 +688,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         if 'work dir' not in self.fileorg or self.fileorg['work dir'] is None:
             self.fileorg['work dir'] = os.getcwd()
         for namekey in self._file_fields['fileorg']: # Set other missing directory locations to 'work dir'
-            if namekey.endswith('dir') and ( namekey not in self.fileorg or self.fileorg[namekey] is None ):
+            if namekey.endswith(' dir') and ( namekey not in self.fileorg or self.fileorg[namekey] is None ):
                 self.fileorg[namekey] = self.fileorg['work dir']
 
         # Make directories for optimization solutions and logs if they don't exist 
@@ -799,6 +800,70 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                 break
         self.ampl_infile_status = status
         return status
+
+    def write_yield_input_products(self, pixscale_lamoD=0.25, star_diam_vec=None, Npts_star_diam=7, Nlam=None, norm='aperture'):
+        if 'eval subdir' not in self.fileorg or self.fileorg['eval subdir'] is None:
+            self.fileorg['eval subdir'] = os.path.join(self.fileorg['eval dir'], self.fileorg['job name'])
+        if not os.path.exists(self.fileorg['eval dir']):
+            os.mkdir(self.fileorg['eval dir'])
+        if not os.path.exists(self.fileorg['eval subdir']):
+            os.mkdir(self.fileorg['eval subdir'])
+
+        if star_diam_vec is None:
+            star_diam_vec = np.concatenate([np.linspace(0,0.09,10), np.linspace(0.1, 1, 10), np.array([2., 3., 4.])])
+        if Nlam is None:
+            Nlam = self.design['Image']['Nlam']
+
+        stellar_intens, stellar_intens_diam_vec, \
+        offax_psf, offax_psf_offset_vec, sky_trans = \
+        self.get_yield_input_products(pixscale_lamoD, star_diam_vec, Npts_star_diam, Nlam, norm)
+
+        xycent_pix_coord = (float(stellar_intens.shape[2])/2, 
+                            float(stellar_intens.shape[1])/2)
+
+        obscure_ratio = (np.pi/4 - self.eval_metrics['inc energy'])/(np.pi/4)
+
+        stellar_intens_fname = os.path.join(self.fileorg['eval subdir'], 'stellar_intens.fits')
+#        stellar_intens_diam_list_fname = os.path.join(self.fileorg['eval subdir'], 'stellar_intens_diam_list.fits')
+        offax_psf_fname = os.path.join(self.fileorg['eval subdir'], 'offax_psf.fits')
+#        offax_psf_offset_list_fname = os.path.join(self.fileorg['eval subdir'], 'offax_psf_offset_list.fits')
+        sky_trans_fname = os.path.join(self.fileorg['eval subdir'], 'sky_trans.fits')
+
+        header = astropy.io.fits.Header()
+        header['DESIGN'] = self.fileorg['job name']
+        header['PIXSCALE'] = (pixscale_lamoD, 'pixel scale in units of lambda0/D')
+        header['LAMBDA'] = (1.0, 'central wavelength of the bandpass in microns')
+        header['MINLAM'] = (1.0-self.design['Image']['bw']/2, 'shortest wavelength of the bandpass in microns')
+        header['MAXLAM'] = (1.0+self.design['Image']['bw']/2, 'shortest wavelength of the bandpass in microns')
+        header['XCENTER'] = (xycent_pix_coord[0], 'center of the image in 00LL pixel coordinates')
+        header['YCENTER'] = (xycent_pix_coord[1], 'center of the image in 00LL pixel coordinates')
+        header['OBSCURED'] = (obscure_ratio, 'fraction of the aperture area that is obscured w.r.t. circular aperture')
+        header['JITTER'] = (0, 'RMS jitter per axis in mas')
+        header['N_LAM'] = (Nlam, 'number of wavelength samples used in evaluation')
+        header['N_STAR'] = (Npts_star_diam, 'number of points across stellar diameter')
+
+        stellar_intens_hdu = astropy.io.fits.PrimaryHDU(stellar_intens, header=header)
+        diam_tab_hdu = astropy.io.fits.BinTableHDU.from_columns(
+                           [astropy.io.fits.Column(name='star diameter (lambda0/D)', 
+                            format='D', array=stellar_intens_diam_vec)])
+        stellar_intens_hdulist = astropy.io.fits.HDUList([stellar_intens_hdu, diam_tab_hdu])
+        stellar_intens_hdulist.writeto(stellar_intens_fname, clobber=True)
+
+        offax_psf_hdu = astropy.io.fits.PrimaryHDU(offax_psf, header=header)
+        offset_tab_hdu = astropy.io.fits.BinTableHDU.from_columns(
+                             [astropy.io.fits.Column(name='x (lambda0/D)', format='E',
+                                                     array=offax_psf_offset_vec[:,0]),
+                              astropy.io.fits.Column(name='y (lambda0/D)', format='E',
+                                                     array=offax_psf_offset_vec[:,1])])
+        offax_psf_hdulist = astropy.io.fits.HDUList([offax_psf_hdu, offset_tab_hdu])
+        offax_psf_hdulist.writeto(offax_psf_fname, clobber=True)
+
+        sky_trans_hdu = astropy.io.fits.PrimaryHDU(sky_trans, header=header)
+        sky_trans_hdu.writeto(sky_trans_fname, clobber=True)
+
+        logging.info("Wrote stellar intensity map to {:s}".format(stellar_intens_fname))
+        logging.info("Wrote off-axis PSF to {:s}".format(offax_psf_fname))
+        logging.info("Wrote sky transmission map to {:s}".format(sky_trans_fname))
 
 class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diaphragm FPM 
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 125)), ('prim',(str, 'hex3')), ('secobs',(str, 'X')), 
@@ -2828,8 +2893,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         return telap_flag
 
     def get_yield_input_products(self, pixscale_lamoD=0.25, star_diam_vec=None, Npts_star_diam=7, Nlam=None, norm='aperture'):
-        # The off-axis PSF map only does horizontal (xi coordinate) PSF offsets.
-        # In the future, should add the option to loop over the full 2-d range of (xi, eta) offsets.
+        # Assumes quarter-plane symmetry in the final focal plane
         TelAp_basename = os.path.basename(self.fileorg['TelAp fname'])
         gapstr_beg = TelAp_basename.find('gap')
         TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
