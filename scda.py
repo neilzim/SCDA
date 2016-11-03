@@ -801,7 +801,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         self.ampl_infile_status = status
         return status
 
-    def write_yield_input_products(self, pixscale_lamoD=0.25, star_diam_vec=None, Npts_star_diam=7, Nlam=None, norm='aperture'):
+    def write_eval_products(self, pixscale_lamoD=0.25, star_diam_vec=None, Npts_star_diam=7, Nlam=None, norm='aperture'):
         if 'eval subdir' not in self.fileorg or self.fileorg['eval subdir'] is None:
             self.fileorg['eval subdir'] = os.path.join(self.fileorg['eval dir'], self.fileorg['job name'])
         if not os.path.exists(self.fileorg['eval dir']):
