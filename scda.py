@@ -2827,15 +2827,14 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             print("Band-averaged FWHM PSF area / (lambda0/D)^2: {:.2f}".format(self.eval_metrics['fwhm area']))
         return telap_flag
 
-    def make_yield_input_products(self, pixscale_lamoD=4, D_telap=12., 
-                                  star_diam_vec=None, Npts_star_diam=7,
-                                  lambda_cent=550e-9, Nlam=None):
-        if self.design['Pupil']['edge'] == 'floor': # floor to binary
-            TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
-        elif self.design['Pupil']['edge'] == 'round': # round to binary
-            TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
-        else: # keey it gray
-            TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
+    def get_yield_input_products(self, pixscale_lamoD=0.25, star_diam_vec=None, Npts_star_diam=7, Nlam=None, norm='aperture'):
+        # The off-axis PSF map only does horizontal (xi coordinate) PSF offsets.
+        # In the future, should add the option to loop over the full 2-d range of (xi, eta) offsets.
+        TelAp_basename = os.path.basename(self.fileorg['TelAp fname'])
+        gapstr_beg = TelAp_basename.find('gap')
+        TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
+        TelAp_nopad_fname = os.path.join( os.path.dirname(self.fileorg['TelAp fname']), TelAp_nopad_basename )
+        TelAp_p = np.loadtxt(TelAp_nopad_fname)
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
         FPM_p = np.loadtxt(self.fileorg['FPM fname'])
         LS_p = np.loadtxt(self.fileorg['LS fname'])
@@ -2862,52 +2861,74 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             LS = LS_p
 
         if star_diam_vec is None:
-            star_diam_vec = np.concatenate([np.linspace(0, 0.9, 10), np.linspace(1, 10, 10)])
+            star_diam_vec = np.concatenate([np.linspace(0,0.09,10), np.linspace(0.1, 1, 10), np.array([2., 3., 4.])])
         if Nlam is None:
-            Nlam = coron.design['Image']['Nlam']
-        bw = coron.design['Image']['bw']
+            Nlam = self.design['Image']['Nlam']
+        bw = self.design['Image']['bw']
         wrs = np.linspace(1.-bw/2, 1.+bw/2, Nlam)
         
-        N = coron.design['Pupil']['N']
-        M_fp1 = coron.design['FPM']['M']
-        fpm_rad = coron.design['FPM']['rad']
-        rho2 = coron.design['Image']['oda'] + 0.25
-        M_fp2 = int(np.ceil(rho2*pixscale_lamoD))
+        N = self.design['Pupil']['N']
+        M_fp1 = self.design['FPM']['M']
+        fpm_rad = self.design['FPM']['rad']
+        rho2 = self.design['Image']['oda'] + 0.5
+        M_fp2 = int(np.ceil(rho2/pixscale_lamoD))
+        M_fp2_ext = int(np.ceil((rho2+2.5)/pixscale_lamoD))
+        wc = M_fp2_ext - M_fp2
         
         # pupil plane
-        dx = (D_telap/2)/N
+        D = 1.
+        dx = (D/2)/N
         dy = dx
         xs = np.matrix(np.linspace(-N+0.5,N-0.5,2*N)*dx)
-        ys = xs
         XX, YY = np.meshgrid(np.array(xs), np.array(xs))
         
         # FPM
         dmx = fpm_rad/M_fp1
         dmy = dmx
         mxs = np.matrix(np.linspace(-M_fp1+0.5,M_fp1-0.5,2*M_fp1)*dmx)
-        mys = mxs
         
         # FP2
-        dxi = 1./pixscale_lamoD
+        dxi = pixscale_lamoD
         xis = np.matrix(np.linspace(-M_fp2+0.5,M_fp2-0.5,2*M_fp2)*dxi)
-        etas = xis
+        xis_ext = np.matrix(np.linspace(-M_fp2_ext+0.5,M_fp2_ext-0.5,2*M_fp2_ext)*dxi)
         
-        intens_map_vs_star_diam = np.zeros((Nlam, 2*M_fp2, 2*M_fp2))
+        offax_Xis = np.array(xis[0,M_fp2:].T)
+        offax_Xis_ext = np.array(xis_ext[0,M_fp2_ext:].T)
+        offax_XisEtas = zip(np.ravel(np.ones_like(offax_Xis)*offax_Xis.T), np.ravel(offax_Xis*np.ones_like(offax_Xis.T)))
+        offax_XisEtas_ext = zip(np.ravel(np.ones_like(offax_Xis_ext)*offax_Xis_ext.T), np.ravel(offax_Xis_ext*np.ones_like(offax_Xis_ext.T)))
+
+        intens_2d_vs_star_diam = np.zeros((len(star_diam_vec), 2*M_fp2, 2*M_fp2))
+        offax_psf_map_ext = np.zeros((len(offax_XisEtas_ext), 2*M_fp2, 2*M_fp2))
+        offax_psf_map = np.zeros((len(offax_XisEtas), 2*M_fp2, 2*M_fp2))
 
         for si, star_diam in enumerate(star_diam_vec):
-            intens_map_vs_star_diam[si,:,:] = get_finite_star_aplc_psf(TelAp, Apod, FPM, LS,
-                                                                       xs, dx, XX, YY, mxs, dmx, xis, dxi,
-                                                                       D_telap=D_telap, star_diam_mas=star_diam,
-                                                                       Npts_star_diam=Npts_star_diam)
-        return intens_map_vs_star_diam
+            intens_2d_vs_star_diam[si,:,:] = get_finite_star_aplc_psf(TelAp, Apod, FPM, LS,
+                                                                      xs, dx, XX, YY, mxs, dmx, xis, dxi,
+                                                                      star_diam, Npts_star_diam, wrs=wrs,
+                                                                      norm=norm)
+
+        for oi, (delta_xi, delta_eta) in enumerate(offax_XisEtas_ext):
+            offax_psf_map_ext[oi,:,:] = fast_bandavg_aplc_psf(TelAp, Apod, FPM, LS,
+                                                              xs, dx, XX, YY, mxs, dmx, xis, dxi,
+                                                              delta_xi, delta_eta, wrs, norm)
+            if (delta_xi, delta_eta) in offax_XisEtas:
+                ii = offax_XisEtas.index((delta_xi, delta_eta))
+                offax_psf_map[ii,:,:] = offax_psf_map_ext[oi,:,:]
+            
+        sky_trans_map = np.sum(np.concatenate([offax_psf_map_ext,
+                                               offax_psf_map_ext[:,::-1,:],
+                                               offax_psf_map_ext[:,:,::-1],
+                                               offax_psf_map_ext[:,::-1,::-1]], axis=0), axis=0)*dxi**2
+
+        return intens_2d_vs_star_diam, star_diam_vec.reshape((-1,1)), \
+               offax_psf_map, np.array(offax_XisEtas), sky_trans_map
 
 def get_finite_star_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis, dxi,
-                             D_telap=12., star_diam_mas=1., Npts_star_diam=11, lambda_cent=600e-9,
-                             wrs=None, seps=None, get_radial_curve=False):
+                             star_diam_lamoD=0.1, Npts_star_diam=7,
+                             wrs=None, seps=None, get_radial_curve=False, norm='peak'):
     if wrs is None:
         wrs = np.linspace(0.95, 1.05, 5)
 
-    star_diam_lamoD = np.deg2rad(star_diam_mas/1000./3600.)/(lambda_cent/D_telap)
     disk_vec_lamoD = np.linspace(-star_diam_lamoD/2, star_diam_lamoD/2, Npts_star_diam)
 
     XiXi, EtaEta = np.meshgrid(disk_vec_lamoD, disk_vec_lamoD)
@@ -2918,7 +2939,7 @@ def get_finite_star_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis
     
     for (delxi, deleta) in disk_samp_XiEta:
         intens_2d_bandavg = fast_bandavg_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx,
-                                                  xis, dxi, delxi, deleta, wrs)
+                                                  xis, dxi, delxi, deleta, wrs, norm)
         intens_2d_src += intens_2d_bandavg/len(disk_samp_XiEta)
        
     if get_radial_curve: 
@@ -2943,19 +2964,29 @@ def get_finite_star_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis
     else:
         return intens_2d_src
        
-def fast_bandavg_aplc_psf(TelAp, A, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis, dxi, delta_xi, delta_eta, wrs):
-    intens_D_polychrom = np.zeros((wrs.shape[0],xis.shape[1],xis.shape[1]))
+def fast_bandavg_aplc_psf(TelAp, A, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis, dxi, delta_xi, delta_eta, wrs,
+                          norm = 'peak'):
+    # norm parameter is either 'aperture' for integral of illuminated aperture energy (per Stark yield input definition),
+    # or 'peak' for unocculted PSF peak (contrast units)
+    intens_D_polychrom = np.zeros((wrs.shape[0], xis.shape[1], xis.shape[1]))
+    if norm == 'peak':
+        intens_norm = np.power(np.sum(A*LS)*dx*dx/wrs, 2)
+    elif norm == 'aperture':
+        intens_norm = np.sum(np.power(TelAp, 2))*dx*dx
     for wi, wr in enumerate(wrs):
         Psi_A = np.exp(-1j*2*np.pi/wr*(delta_xi*XX + delta_eta*YY))
-        Psi_A_stop = np.multiply(TelAp*A, Psi_A)
+        Psi_A_stop = np.multiply(Psi_A, A)
         Psi_B = dx*dx/wr*np.exp(-1j*2*np.pi/wr*mxs.T*xs)*Psi_A_stop*np.exp(-1j*2*np.pi/wr*xs.T*mxs)
         Psi_B_stop = np.multiply(Psi_B, FPM)
         Psi_C = Psi_A_stop[::-1,::-1] - \
                 dmx*dmx/wr*np.exp(-1j*2*np.pi/wr*xs.T*mxs)*Psi_B_stop*np.exp(-1j*2*np.pi/wr*mxs.T*xs)
         Psi_C_stop = np.multiply(Psi_C, LS)
         Psi_D = dx*dx/wr*np.exp(-1j*2*np.pi/wr*xis.T*xs)*Psi_C_stop*np.exp(-1j*2*np.pi/wr*xs.T*xis)
-        Psi_D_0_peak = np.sum(TelAp*A*LS)*dx*dx/wr
-        intens_D_polychrom[wi,:,:] = np.power(np.absolute(Psi_D)/Psi_D_0_peak, 2)
+        if norm == 'peak':
+            intens_D_polychrom[wi,:,:] = np.power(np.absolute(Psi_D), 2) / intens_norm[wi]
+        elif norm == 'aperture':
+            intens_D_polychrom[wi,:,:] = np.power(np.absolute(Psi_D), 2) / intens_norm
+            
     return np.mean(intens_D_polychrom, axis=0)
     
 class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symmetry case
