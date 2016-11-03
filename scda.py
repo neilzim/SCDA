@@ -3041,7 +3041,7 @@ def fast_bandavg_aplc_psf(TelAp, A, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis, dxi,
         if norm == 'peak':
             intens_D_polychrom[wi,:,:] = np.power(np.absolute(Psi_D), 2) / intens_norm[wi]
         elif norm == 'aperture':
-            intens_D_polychrom[wi,:,:] = np.power(np.absolute(Psi_D), 2) / intens_norm
+            intens_D_polychrom[wi,:,:] = dxi*dxi*np.power(np.absolute(Psi_D), 2) / intens_norm
             
     return np.mean(intens_D_polychrom, axis=0)
     
