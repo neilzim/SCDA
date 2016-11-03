@@ -23,7 +23,7 @@ try:
     from collections import OrderedDict
 except ImportError:
     from ordereddict import OrderedDict
-import astropy.io.fits
+import pyfits
 
 # debug
 #import matplotlib
@@ -829,7 +829,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
 #        offax_psf_offset_list_fname = os.path.join(self.fileorg['eval subdir'], 'offax_psf_offset_list.fits')
         sky_trans_fname = os.path.join(self.fileorg['eval subdir'], 'sky_trans.fits')
 
-        header = astropy.io.fits.Header()
+        header = pyfits.Header()
         header['DESIGN'] = self.fileorg['job name']
         header['PIXSCALE'] = (pixscale_lamoD, 'pixel scale in units of lambda0/D')
         header['LAMBDA'] = (1.0, 'central wavelength of the bandpass in microns')
@@ -842,23 +842,23 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         header['N_LAM'] = (Nlam, 'number of wavelength samples used in evaluation')
         header['N_STAR'] = (Npts_star_diam, 'number of points across stellar diameter')
 
-        stellar_intens_hdu = astropy.io.fits.PrimaryHDU(stellar_intens, header=header)
-        diam_tab_hdu = astropy.io.fits.BinTableHDU.from_columns(
-                           [astropy.io.fits.Column(name='star diameter (lambda0/D)', 
+        stellar_intens_hdu = pyfits.PrimaryHDU(stellar_intens, header=header)
+        diam_tab_hdu = pyfits.BinTableHDU.from_columns(
+                           [pyfits.Column(name='star diameter (lambda0/D)', 
                             format='D', array=stellar_intens_diam_vec)])
-        stellar_intens_hdulist = astropy.io.fits.HDUList([stellar_intens_hdu, diam_tab_hdu])
+        stellar_intens_hdulist = pyfits.HDUList([stellar_intens_hdu, diam_tab_hdu])
         stellar_intens_hdulist.writeto(stellar_intens_fname, clobber=True)
 
-        offax_psf_hdu = astropy.io.fits.PrimaryHDU(offax_psf, header=header)
-        offset_tab_hdu = astropy.io.fits.BinTableHDU.from_columns(
-                             [astropy.io.fits.Column(name='x (lambda0/D)', format='E',
+        offax_psf_hdu = pyfits.PrimaryHDU(offax_psf, header=header)
+        offset_tab_hdu = pyfits.BinTableHDU.from_columns(
+                             [pyfits.Column(name='x (lambda0/D)', format='E',
                                                      array=offax_psf_offset_vec[:,0]),
-                              astropy.io.fits.Column(name='y (lambda0/D)', format='E',
+                              pyfits.Column(name='y (lambda0/D)', format='E',
                                                      array=offax_psf_offset_vec[:,1])])
-        offax_psf_hdulist = astropy.io.fits.HDUList([offax_psf_hdu, offset_tab_hdu])
+        offax_psf_hdulist = pyfits.HDUList([offax_psf_hdu, offset_tab_hdu])
         offax_psf_hdulist.writeto(offax_psf_fname, clobber=True)
 
-        sky_trans_hdu = astropy.io.fits.PrimaryHDU(sky_trans, header=header)
+        sky_trans_hdu = pyfits.PrimaryHDU(sky_trans, header=header)
         sky_trans_hdu.writeto(sky_trans_fname, clobber=True)
 
         logging.info("Wrote stellar intensity map to {:s}".format(stellar_intens_fname))
