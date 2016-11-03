@@ -824,9 +824,9 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         obscure_ratio = (np.pi/4 - self.eval_metrics['inc energy'])/(np.pi/4)
 
         stellar_intens_fname = os.path.join(self.fileorg['eval subdir'], 'stellar_intens.fits')
-#        stellar_intens_diam_list_fname = os.path.join(self.fileorg['eval subdir'], 'stellar_intens_diam_list.fits')
+        stellar_intens_diam_list_fname = os.path.join(self.fileorg['eval subdir'], 'stellar_intens_diam_list.fits')
         offax_psf_fname = os.path.join(self.fileorg['eval subdir'], 'offax_psf.fits')
-#        offax_psf_offset_list_fname = os.path.join(self.fileorg['eval subdir'], 'offax_psf_offset_list.fits')
+        offax_psf_offset_list_fname = os.path.join(self.fileorg['eval subdir'], 'offax_psf_offset_list.fits')
         sky_trans_fname = os.path.join(self.fileorg['eval subdir'], 'sky_trans.fits')
 
         header = pyfits.Header()
@@ -843,26 +843,18 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         header['N_STAR'] = (Npts_star_diam, 'number of points across stellar diameter')
 
         stellar_intens_hdu = pyfits.PrimaryHDU(stellar_intens, header=header)
-        diam_tab_hdu = pyfits.BinTableHDU.from_columns(
-                           [pyfits.Column(name='star diameter (lambda0/D)', 
-                            format='D', array=stellar_intens_diam_vec)])
-        stellar_intens_hdulist = pyfits.HDUList([stellar_intens_hdu, diam_tab_hdu])
-        stellar_intens_hdulist.writeto(stellar_intens_fname, clobber=True)
-
+        stellar_intens_hdu.writeto(stellar_intens_fname, clobber=True)
+        diam_list_hdu = pyfits.PrimaryHDU(stellar_intens_diam_vec.reshape((1,-1)), header=header)
+        diam_list_hdu.writeto(stellar_intens_diam_list_fname, clobber=True)
         offax_psf_hdu = pyfits.PrimaryHDU(offax_psf, header=header)
-        offset_tab_hdu = pyfits.BinTableHDU.from_columns(
-                             [pyfits.Column(name='x (lambda0/D)', format='E',
-                                                     array=offax_psf_offset_vec[:,0]),
-                              pyfits.Column(name='y (lambda0/D)', format='E',
-                                                     array=offax_psf_offset_vec[:,1])])
-        offax_psf_hdulist = pyfits.HDUList([offax_psf_hdu, offset_tab_hdu])
-        offax_psf_hdulist.writeto(offax_psf_fname, clobber=True)
-
-        sky_trans_hdu = pyfits.PrimaryHDU(sky_trans, header=header)
-        sky_trans_hdu.writeto(sky_trans_fname, clobber=True)
-
+        offax_psf_hdu.writeto(offax_psf_fname, clobber=True)
+        offset_list_hdu = pyfits.PrimaryHDU(offax_psf_offset_vec.reshape((2,-1)), header=header)
+        offset_list_hdu.writeto(offax_psf_offset_list_fname, clobber=True)
+        
         logging.info("Wrote stellar intensity map to {:s}".format(stellar_intens_fname))
+        logging.info("Wrote stellar intensity diameter list to {:s}".format(stellar_intens_diam_list_fname))
         logging.info("Wrote off-axis PSF to {:s}".format(offax_psf_fname))
+        logging.info("Wrote off-axis PSF offset list to {:s}".format(offax_psf_offset_list_fname))
         logging.info("Wrote sky transmission map to {:s}".format(sky_trans_fname))
 
 class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diaphragm FPM 
