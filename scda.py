@@ -844,11 +844,11 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
 
         stellar_intens_hdu = pyfits.PrimaryHDU(stellar_intens, header=header)
         stellar_intens_hdu.writeto(stellar_intens_fname, clobber=True)
-        diam_list_hdu = pyfits.PrimaryHDU(stellar_intens_diam_vec.reshape((1,-1)), header=header)
+        diam_list_hdu = pyfits.PrimaryHDU(stellar_intens_diam_vec, header=header)
         diam_list_hdu.writeto(stellar_intens_diam_list_fname, clobber=True)
         offax_psf_hdu = pyfits.PrimaryHDU(offax_psf, header=header)
         offax_psf_hdu.writeto(offax_psf_fname, clobber=True)
-        offset_list_hdu = pyfits.PrimaryHDU(offax_psf_offset_vec.reshape((2,-1)), header=header)
+        offset_list_hdu = pyfits.PrimaryHDU(offax_psf_offset_vec, header=header)
         offset_list_hdu.writeto(offax_psf_offset_list_fname, clobber=True)
         
         logging.info("Wrote stellar intensity map to {:s}".format(stellar_intens_fname))
@@ -2976,8 +2976,8 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                                                offax_psf_map_ext[:,:,::-1],
                                                offax_psf_map_ext[:,::-1,::-1]], axis=0), axis=0)*dxi**2
 
-        return intens_2d_vs_star_diam, star_diam_vec.reshape((-1,1)), \
-               offax_psf_map, np.array(offax_XisEtas), sky_trans_map
+        return intens_2d_vs_star_diam, star_diam_vec, \
+               offax_psf_map, np.array(offax_XisEtas).T, sky_trans_map
 
 def get_finite_star_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis, dxi,
                              star_diam_lamoD=0.1, Npts_star_diam=7,
