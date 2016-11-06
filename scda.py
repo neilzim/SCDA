@@ -852,7 +852,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
             diam_2_curve, = plt.semilogy(seps, intens_curves[ind_diam_2,:], 'r', zorder=2)
         fpm_line = plt.vlines(self.design['FPM']['rad'], 10**-16, 1, linestyle='--', color='gray', zorder=1)
         plt.xlim([seps[0], seps[-1]])
-        plt.ylim([10**-(self.design['Image']['c']+1), 3*10**-(self.design['Image']['c'])])
+        plt.ylim([10**-(self.design['Image']['c']+1), 5*10**-(self.design['Image']['c'])])
         plt.ylabel(r'$I/I_\star$',fontsize=16)
         plt.xlabel(r'Separation ($\lambda/D$)',fontsize=12)
         if second_curve_diam is not None:
