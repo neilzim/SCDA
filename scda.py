@@ -27,6 +27,13 @@ import pyfits
 import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
+import matplotlib.patches
+matplotlib.rcParams['image.origin'] = 'lower'
+matplotlib.rcParams['image.interpolation'] = 'nearest'
+matplotlib.rcParams['image.cmap'] = 'gray'
+matplotlib.rcParams['axes.linewidth'] = 1.
+matplotlib.rcParams['lines.linewidth'] = 2.5
+matplotlib.rcParams['font.size'] = 12
 
 def configure_log(log_fname=None):
 #    logger = logging.getLogger("scda.logger")
@@ -800,25 +807,10 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         self.ampl_infile_status = status
         return status
 
-    def write_eval_products(self, pixscale_lamoD=0.25, star_diam_vec=None, Npts_star_diam=7, Nlam=None, norm='aperture'):
-        if 'eval subdir' not in self.fileorg or self.fileorg['eval subdir'] is None:
-            self.fileorg['eval subdir'] = os.path.join(self.fileorg['eval dir'], self.fileorg['job name'])
-        if not os.path.exists(self.fileorg['eval dir']):
-            os.mkdir(self.fileorg['eval dir'])
-        if not os.path.exists(self.fileorg['eval subdir']):
-            os.mkdir(self.fileorg['eval subdir'])
-
-        if star_diam_vec is None:
-            star_diam_vec = np.concatenate([np.linspace(0,0.09,10), np.linspace(0.1, 1, 10), np.array([2., 3., 4.])])
-        if Nlam is None:
-            Nlam = self.design['Image']['Nlam']
-        TelAp, Apod, FPM, LS = self.get_coron_masks()
-
-        stellar_intens_map, stellar_intens_curves, seps, stellar_intens_diam_vec, \
-        offax_psf, offax_psf_offset_vec, sky_trans, contrast_convert_fac = \
-        self.get_yield_input_products(pixscale_lamoD, star_diam_vec, Npts_star_diam, Nlam, norm)
-
-        plt.figure(figsize=(10,7))
+    def get_design_portrait(self, intens_maps, intens_curves, xis, seps, star_diams,
+                            second_curve_diam=None, use_gray_gap_zero=False):
+        TelAp, Apod, FPM, LS = self.get_coron_masks(use_gray_gap_zero=use_gray_gap_zero)
+        portrait_fig = plt.figure(figsize=(10,7))
         gs1 = gridspec.GridSpec(2, 3)
         gs1.update(left=0.01, right=0.99, bottom=0.02, top=0.99, wspace=0.01)
         ax1 = plt.subplot(gs1[0,0])
@@ -831,31 +823,79 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         plt.imshow(LS.T)
         _ =plt.axis('off')
         gs2 = gridspec.GridSpec(2, 3)
-        gs2.update(left=0.01, right=1.35, bottom=0.00, top=1.20, wspace=0.01)
+        gs2.update(left=0.03, right=1.36, bottom=0.04, top=1.10, wspace=0.01)
         ax4 = plt.subplot(gs2[1,0])
-        plt.imshow(np.log10(stellar_intens_map[0,:,:]*contrast_convert_fac),
+        pixscale_lamoD = xis[1] - xis[0]
+        tick_labels = np.arange(np.round(xis[0]), np.round(xis[-1]+pixscale_lamoD), 2.)
+        xc_pix = intens_maps.shape[-1]/2 - 0.5
+        fpm_rad_pix = self.design['FPM']['rad']/pixscale_lamoD
+        tick_locs = tick_labels/pixscale_lamoD + xc_pix
+        plt.imshow(np.log10(intens_maps[0,:,:]),
                    vmin=-(self.design['Image']['c']+2),
                    vmax=-(self.design['Image']['c']-1), cmap='CMRmap')
-        _ =plt.axis('off')
+        fpm_circle = matplotlib.patches.Circle((xc_pix, xc_pix), fpm_rad_pix, facecolor='none',
+                                               edgecolor='w', linewidth=2., alpha=1.,
+                                               clip_on=False, linestyle='--')
+        ax4.add_patch(fpm_circle)
+        plt.xticks(tick_locs, tick_labels)
+        plt.yticks(tick_locs, tick_labels)
+        plt.tick_params(labelsize=9)
         plt.colorbar(orientation='vertical', shrink=0.75, pad=0.03)
         gs3 = gridspec.GridSpec(2, 3)
-        gs3.update(left=0.35, right=0.95, bottom=0.08, top=1.05, wspace=0.01)
+        gs3.update(left=0.36, right=0.98, bottom=0.08, top=1.05, wspace=0.01)
         ax5 = plt.subplot(gs3[1,1:])
-        plt.semilogy(seps, stellar_intens_curves[0,:]*contrast_convert_fac, 'b')
-        plt.vlines(self.design['FPM']['rad'], 10**-16, 1, linestyle='-.', color='gray')
+        diam_1 = star_diams[0]
+        diam_1_curve, = plt.semilogy(seps, intens_curves[0,:], 'b', zorder=3)
+        if second_curve_diam is not None:
+            ind_diam_2 = np.argmin(np.abs(np.array(star_diams) - second_curve_diam))
+            diam_2 = star_diams[ind_diam_2]
+            diam_2_curve, = plt.semilogy(seps, intens_curves[ind_diam_2,:], 'r', zorder=2)
+        fpm_line = plt.vlines(self.design['FPM']['rad'], 10**-16, 1, linestyle='--', color='gray', zorder=1)
         plt.xlim([seps[0], seps[-1]])
         plt.ylim([10**-(self.design['Image']['c']+1), 3*10**-(self.design['Image']['c'])])
-        plt.ylabel(r'$I/I_0$',fontsize=16)
+        plt.ylabel(r'$I/I_\star$',fontsize=16)
         plt.xlabel(r'Separation ($\lambda/D$)',fontsize=12)
-        plt.legend(['Intensity avg\'d over\nwavelength and azimuth', 'FPM radius'], fontsize=12, loc='upper center')
-        summary_plot_fname = os.path.join(self.fileorg['eval subdir'], '{:s}_summary.png'.format(self.fileorg['job name']))
-        plt.savefig(summary_plot_fname, dpi=300)
-        plt.clf()
-        logging.info("Wrote summary plot to {:s}".format(summary_plot_fname))
+        if second_curve_diam is not None:
+            plt.legend([diam_1_curve, diam_2_curve, fpm_line],
+                       [r'$\theta_\star=${:.2f} $\lambda/D$'.format(diam_1),
+                        r'$\theta_\star=${:.2f} $\lambda/D$'.format(diam_2),
+                        'FPM radius'], fontsize=12, loc='upper center')
+        else:
+            plt.legend([diam_1_curve, fpm_line],
+                       [r'$\theta_\star=${:.2f} $\lambda/D$'.format(diam_1),
+                        'FPM radius'], fontsize=12, loc='upper center')
+        return portrait_fig
+
+    def write_eval_products(self, pixscale_lamoD=0.25, star_diam_vec=None, Npts_star_diam=7, Nlam=None, 
+                            norm='aperture', second_curve_diam=0.2, dpi=300):
+        if 'eval subdir' not in self.fileorg or self.fileorg['eval subdir'] is None:
+            self.fileorg['eval subdir'] = os.path.join(self.fileorg['eval dir'], self.fileorg['job name'])
+        if not os.path.exists(self.fileorg['eval dir']):
+            os.mkdir(self.fileorg['eval dir'])
+        if not os.path.exists(self.fileorg['eval subdir']):
+            os.mkdir(self.fileorg['eval subdir'])
+
+        if star_diam_vec is None:
+            star_diam_vec = np.concatenate([np.linspace(0,0.09,10), np.linspace(0.1, 1, 10), np.array([2., 3., 4.])])
+        if Nlam is None:
+            Nlam = self.design['Image']['Nlam']
+
+        stellar_intens_map, stellar_intens_curves, xis, seps, stellar_intens_diam_vec, \
+        offax_psf, offax_psf_offset_vec, sky_trans, contrast_convert_fac = \
+          self.get_yield_input_products(pixscale_lamoD, star_diam_vec, Npts_star_diam, Nlam, norm)
+
+        design_portrait_fig = \
+          self.get_design_portrait(stellar_intens_map*contrast_convert_fac,
+                                   stellar_intens_curves*contrast_convert_fac,
+                                   xis, seps, star_diam_vec,
+                                   second_curve_diam=second_curve_diam, use_gray_gap_zero=False)
+        design_portrait_fname = os.path.join(self.fileorg['eval subdir'], 'DesignPortrait_{:s}.png'.format(self.fileorg['job name']))
+        design_portrait_fig.savefig(design_portrait_fname, dpi=dpi)
+        logging.info("Wrote design potrait to {:s}".format(design_portrait_fname))
+        plt.close(design_portrait_fig)
 
         xycent_pix_coord = (float(stellar_intens_map.shape[2])/2, 
                             float(stellar_intens_map.shape[1])/2)
-
         obscure_ratio = (np.pi/4 - self.eval_metrics['inc energy'])/(np.pi/4)
 
         stellar_intens_fname = os.path.join(self.fileorg['eval subdir'], 'stellar_intens.fits')
@@ -1074,15 +1114,15 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
     def write_ampl(self, overwrite=False):
         logging.info("Writing the AMPL program") # Not yet written for full-plane SPLC
 
-    def get_coron_masks(self, use_gap_zero=True):
+    def get_coron_masks(self, use_gray_gap_zero=True):
         TelAp_basename = os.path.basename(self.fileorg['TelAp fname'])
-        if use_gap_zero:
+        if use_gray_gap_zero:
             gapstr_beg = TelAp_basename.find('gap')
             TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
             TelAp_nopad_fname = os.path.join( os.path.dirname(self.fileorg['TelAp fname']), TelAp_nopad_basename )
             TelAp_p = np.loadtxt(TelAp_nopad_fname)
         else:
-            TelAp_p = np.loadtxt(self.fileorgp['TelAp fname'])
+            TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname']))
 
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
         FPM_p = np.loadtxt(self.fileorg['FPM fname'])
@@ -2757,15 +2797,15 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
     def write_ampl(self, overwrite=False):
         logging.info("Writing the AMPL program")
 
-    def get_coron_masks(self, use_gap_zero=True):
+    def get_coron_masks(self, use_gray_gap_zero=True):
         TelAp_basename = os.path.basename(self.fileorg['TelAp fname'])
-        if use_gap_zero:
+        if use_gray_gap_zero:
             gapstr_beg = TelAp_basename.find('gap')
             TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
             TelAp_nopad_fname = os.path.join( os.path.dirname(self.fileorg['TelAp fname']), TelAp_nopad_basename )
             TelAp_p = np.loadtxt(TelAp_nopad_fname)
         else:
-            TelAp_p = np.loadtxt(self.fileorgp['TelAp fname'])
+            TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname']))
 
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
         FPM_p = np.loadtxt(self.fileorg['FPM fname'])
@@ -2995,7 +3035,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
 
     def get_yield_input_products(self, pixscale_lamoD=0.25, star_diam_vec=None, Npts_star_diam=7, Nlam=None, norm='aperture'):
         # Assumes quarter-plane symmetry in the final focal plane
-        TelAp, Apod, FPM, LS = self.get_coron_masks()
+        TelAp, Apod, FPM, LS = self.get_coron_masks(use_gray_gap_zero=True)
 
         if star_diam_vec is None:
             star_diam_vec = np.concatenate([np.linspace(0,0.09,10), np.linspace(0.1, 1, 10), np.array([2., 3., 4.])])
@@ -3067,7 +3107,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                                                offax_psf_map_ext[:,:,::-1],
                                                offax_psf_map_ext[:,::-1,::-1]], axis=0), axis=0)
 
-        return intens_2d_vs_star_diam, intens_rad_vs_star_diam, seps, star_diam_vec, \
+        return intens_2d_vs_star_diam, intens_rad_vs_star_diam, np.ravel(xis), seps, star_diam_vec, \
                offax_psf_map, np.array(offax_XisEtas).T, sky_trans_map, contrast_convert_fac
 
 def get_finite_star_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis, dxi,
