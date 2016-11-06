@@ -25,10 +25,10 @@ except ImportError:
     from ordereddict import OrderedDict
 import pyfits
 import matplotlib
+matplotlib.use('Agg') # non-interactive
 import matplotlib.pyplot as plt
 import matplotlib.gridspec as gridspec
 import matplotlib.patches
-matplotlib.use('Agg') # non-interactive
 matplotlib.rcParams['image.origin'] = 'lower'
 matplotlib.rcParams['image.interpolation'] = 'nearest'
 matplotlib.rcParams['image.cmap'] = 'gray'
