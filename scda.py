@@ -3305,19 +3305,19 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             param Rmask := {1:0.3f};
             param rho0 := {2:0.2f};
             param rho1 := {3:0.2f};
+            param ang := {4:0.1f};      # opening angle of dark bowtie constraint region
             
             #---------------------
-            param N := {4:d};				# discretization parameter (pupil)
-            param M := {5:d};				# discretization parameter (mask)
-            param Nimg := {6:d};           # discretization parameter (image)
+            param N := {5:d};				# discretization parameter (pupil)
+            param M := {6:d};				# discretization parameter (mask)
+            param Nimg := {7:d};           # discretization parameter (image)
                                   
             #---------------------
-            param bw := {7:0.2f};
-            param Nlam := {8:d};
-            
-            #---------------------
+            param bw := {8:0.2f};
+            param Nlam := {9:d};
             """.format(self.design['Image']['c'], self.design['FPM']['rad'], self.design['FPM']['rad']+self.design['Image']['ida'],
-                       self.design['Image']['oda'], self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['Nimg'], \
+                       self.design['Image']['oda'], np.abs(self.design['Image']['bowang']),
+                       self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['Nimg'],
                        self.design['Image']['bw'], self.design['Image']['Nlam'])
 
         define_coords = """
@@ -3436,9 +3436,6 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             param TR := sum {(x,y) in Pupil} TelApProp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
             
             var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
-            
-            #---------------------
-            set DarkHole := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= rho0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta);
             """
         else:
             sets_and_arrays = """
@@ -3448,9 +3445,31 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             param TR := sum {(x,y) in Pupil} TelApProp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
             
             var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
-            
+            """
+
+        if self.design['Image']['bowang'] == 180:
+            dark_hole = """
             #---------------------
+
             set DarkHole := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= rho0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta);
+            """
+        elif self.design['Image']['bowang'] < 0: # vertical bowtie region
+            dark_hole = """
+            #---------------------
+
+            set DarkHole := setof {xi in Xis, eta in Etas:
+                sqrt(xi^2+eta^2) >= rho0 && 
+                sqrt(xi^2+eta^2) <= rho1 &&
+                eta >= xi*tan(ang/2*pi/180)} (xi,eta);
+            """
+        else: # horizontal bowtie region
+            dark_hole = """
+            #---------------------
+
+            set DarkHole := setof {xi in Xis, eta in Etas: 
+                sqrt(xi^2+eta^2) >= rho0 && 
+                sqrt(xi^2+eta^2) <= rho1 &&
+                eta <= xi*tan(ang/2*pi/180)} (xi,eta);
             """
 
         field_propagation = """
@@ -3559,6 +3578,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         mod_fobj.write( textwrap.dedent(define_wavelengths) )
         mod_fobj.write( textwrap.dedent(define_pupil_and_telap) )
         mod_fobj.write( textwrap.dedent(sets_and_arrays) )
+        mod_fobj.write( textwrap.dedent(dark_hole) )
         mod_fobj.write( textwrap.dedent(field_propagation) )
         mod_fobj.write( textwrap.dedent(constraints) )
         #mod_fobj.write( textwrap.dedent(misc_options) )
@@ -3796,7 +3816,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             param Rmask := {2:0.3f};
             param rho0 := {3:0.2f};
             param rho1 := {4:0.2f};
-            param bowang := {5:0.1f};
+            param ang := {5:0.1f};      # opening angle of dark bowtie constraint region
             
             #---------------------
             param N := {6:d};				# discretization parameter (pupil)
@@ -3806,8 +3826,6 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             #---------------------
             param bw := {9:0.2f};
             param Nlam := {10:d};
-            
-            #---------------------
             """.format(self.design['Image']['c'], self.design['LS']['s'], self.design['FPM']['rad'],
                        self.design['FPM']['rad']+self.design['Image']['ida'], self.design['Image']['oda'],
 					   np.abs(self.design['Image']['bowang']), self.design['Pupil']['N'], self.design['FPM']['M'],
@@ -3835,8 +3853,6 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             #---------------------
             param bw := {8:0.2f};
             param Nlam := {9:d};
-            
-            #---------------------
             """.format(self.design['Image']['c'], self.design['FPM']['rad'], self.design['FPM']['rad']+self.design['Image']['ida'],
                        self.design['Image']['oda'], np.abs(self.design['Image']['bowang']),
 					   self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['Nimg'],
@@ -3959,9 +3975,6 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             param TR := sum {(x,y) in Pupil} TelApProp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
             
             var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
-            
-            #---------------------
-            set DarkHole := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= rho0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta);
             """
         else:
             sets_and_arrays = """
@@ -3971,9 +3984,30 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             param TR := sum {(x,y) in Pupil} TelApProp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
             
             var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
-            
+            """
+        if self.design['Image']['bowang'] == 180:
+            dark_hole = """
             #---------------------
+
             set DarkHole := setof {xi in Xis, eta in Etas: sqrt(xi^2+eta^2) >= rho0 && sqrt(xi^2+eta^2) <= rho1} (xi,eta);
+            """
+        elif self.design['Image']['bowang'] < 0: # vertical bowtie region
+            dark_hole = """
+            #---------------------
+
+            set DarkHole := setof {xi in Xis, eta in Etas:
+                sqrt(xi^2+eta^2) >= rho0 && 
+                sqrt(xi^2+eta^2) <= rho1 &&
+                eta >= xi*tan(ang/2*pi/180)} (xi,eta);
+            """
+        else: # horizontal bowtie region
+            dark_hole = """
+            #---------------------
+
+            set DarkHole := setof {xi in Xis, eta in Etas: 
+                sqrt(xi^2+eta^2) >= rho0 && 
+                sqrt(xi^2+eta^2) <= rho1 &&
+                eta <= xi*tan(ang/2*pi/180)} (xi,eta);
             """
  
         if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
@@ -4104,6 +4138,7 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         mod_fobj.write( textwrap.dedent(define_wavelengths) )
         mod_fobj.write( textwrap.dedent(define_pupil_and_telap) )
         mod_fobj.write( textwrap.dedent(sets_and_arrays) )
+        mod_fobj.write( textwrap.dedent(dark_hole) )
         mod_fobj.write( textwrap.dedent(field_propagation) )
         mod_fobj.write( textwrap.dedent(constraints) )
         #mod_fobj.write( textwrap.dedent(misc_options) )
