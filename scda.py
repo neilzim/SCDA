@@ -2621,7 +2621,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                                    ( 'FPM', OrderedDict([('rad',(float, 4.)), ('M',(int, 60))]) ),
                                    ( 'LS', OrderedDict([('shape',(str, 'ann')), ('id',(int, 20)), ('od',(int, None)), ('obscure',(int, 0)),
                                                         ('pad',(int, 0)), ('aligntol',(int, None)), ('aligntolcon',(float, 3.))]) ),
-                                   ( 'Image', OrderedDict([('c',(float, 10.)), ('ida',(float, -0.5)), ('oda',(float, 10.)),
+                                   ( 'Image', OrderedDict([('c',(float, 10.)), ('ida',(float, -0.5)), ('oda',(float, 10.)), ('bowang',(int, 180)),
                                                            ('bw',(float, 0.10)), ('Nlam',(int, 1)), ('fpres',(int,2)),
                                                            ('wingang',(float, None)), ('incon',(float, None)), ('wingcon',(float, None))]) ) ])
     _eval_fields =   { 'Pupil': _design_fields['Pupil'], 'FPM': _design_fields['FPM'], \
@@ -2717,6 +2717,17 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                                    int(round(10*(self.design['FPM']['rad']+self.design['Image']['ida']))), int(round(10*self.design['Image']['oda'])), \
                                    int(round(10*self.design['Image']['wingang'])), int(round(100*self.design['Image']['bw'])), \
                                    self.design['Image']['Nlam'], self.design['Image']['fpres'])
+        elif self.design['Image']['bowang'] != 180: # bowtie image constraints
+		    if self.design['Image']['bowang'] >= 0: # horizontal bowtie
+				self.amplname_image = "Img{:03}C_{:02}DA{:03}HB{:03}_BW{:02}Nlam{:02}fpres{:1}".format(int(round(10*self.design['Image']['c'])),
+                                       int(round(10*(self.design['FPM']['rad']+self.design['Image']['ida']))), int(round(10*self.design['Image']['oda'])),
+                                       np.abs(self.design['Image']['bowang']), int(round(100*self.design['Image']['bw'])),
+									   self.design['Image']['Nlam'], self.design['Image']['fpres'])
+		    else:
+				self.amplname_image = "Img{:03}C_{:02}DA{:03}VB{:03}_BW{:02}Nlam{:02}fpres{:1}".format(int(round(10*self.design['Image']['c'])),
+                                       int(round(10*(self.design['FPM']['rad']+self.design['Image']['ida']))), int(round(10*self.design['Image']['oda'])),
+                                       np.abs(self.design['Image']['bowang']), int(round(100*self.design['Image']['bw'])),
+									   self.design['Image']['Nlam'], self.design['Image']['fpres'])
         else:
             self.amplname_image = "Img{:03}C_{:02}DA{:03}_BW{:02}Nlam{:02}fpres{:1}".format(int(round(10*self.design['Image']['c'])), \
                                    int(round(10*(self.design['FPM']['rad']+self.design['Image']['ida']))), int(round(10*self.design['Image']['oda'])), \
@@ -3785,20 +3796,22 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             param Rmask := {2:0.3f};
             param rho0 := {3:0.2f};
             param rho1 := {4:0.2f};
+            param bowang := {5:0.1f};
             
             #---------------------
-            param N := {5:d};				# discretization parameter (pupil)
-            param M := {6:d};				# discretization parameter (mask)
-            param Nimg := {7:d};           # discretization parameter (image)
+            param N := {6:d};				# discretization parameter (pupil)
+            param M := {7:d};				# discretization parameter (mask)
+            param Nimg := {8:d};           # discretization parameter (image)
                                   
             #---------------------
-            param bw := {8:0.2f};
-            param Nlam := {9:d};
+            param bw := {9:0.2f};
+            param Nlam := {10:d};
             
             #---------------------
-            """.format(self.design['Image']['c'], self.design['LS']['s'], self.design['FPM']['rad'], \
-                       self.design['FPM']['rad']+self.design['Image']['ida'], self.design['Image']['oda'], self.design['Pupil']['N'], \
-                       self.design['FPM']['M'], self.design['Image']['Nimg'], self.design['Image']['bw'], self.design['Image']['Nlam'])
+            """.format(self.design['Image']['c'], self.design['LS']['s'], self.design['FPM']['rad'],
+                       self.design['FPM']['rad']+self.design['Image']['ida'], self.design['Image']['oda'],
+					   np.abs(self.design['Image']['bowang']), self.design['Pupil']['N'], self.design['FPM']['M'],
+					   self.design['Image']['Nimg'], self.design['Image']['bw'], self.design['Image']['Nlam'])
         else:
             params = """
             #---------------------
@@ -3812,19 +3825,21 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
             param Rmask := {1:0.3f};
             param rho0 := {2:0.2f};
             param rho1 := {3:0.2f};
+            param bowang := {4:0.1f};
             
             #---------------------
-            param N := {4:d};				# discretization parameter (pupil)
-            param M := {5:d};				# discretization parameter (mask)
-            param Nimg := {6:d};           # discretization parameter (image)
+            param N := {5:d};				# discretization parameter (pupil)
+            param M := {6:d};				# discretization parameter (mask)
+            param Nimg := {7:d};           # discretization parameter (image)
                                   
             #---------------------
-            param bw := {7:0.2f};
-            param Nlam := {8:d};
+            param bw := {8:0.2f};
+            param Nlam := {9:d};
             
             #---------------------
             """.format(self.design['Image']['c'], self.design['FPM']['rad'], self.design['FPM']['rad']+self.design['Image']['ida'],
-                       self.design['Image']['oda'], self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['Nimg'], \
+                       self.design['Image']['oda'], np.abs(self.design['Image']['bowang']),
+					   self.design['Pupil']['N'], self.design['FPM']['M'], self.design['Image']['Nimg'],
                        self.design['Image']['bw'], self.design['Image']['Nlam'])
 
         define_coords = """
