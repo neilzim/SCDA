@@ -438,7 +438,7 @@ class DesignParamSurvey(object):
                 for line in lines:
                     if 'iterations' in line and 'seconds' in line:
                         split_line = line.split()
-                        coron.ampl_completion_time = float(split_line[split_line.index('seconds')-1])
+                        coron.ampl_completion_time = float(split_line[split_line.index('seconds')-1])/3600
                         break
         if telap_warning:
             logging.warning("No unpadded version of telescope aperture was found, so the optimization version was used to derive throughput metrics.")
@@ -597,7 +597,7 @@ class DesignParamSurvey(object):
                     catrow.append(cat)
                     paramrow.append(name)
                 catrow.extend(['Design ID', 'AMPL program', '', '', '', 'Solution', '', 'Evaluation metrics', '', ''])
-                paramrow.extend(['survey-index', 'filename', 'exists?', 'input files?', 'submitted?', 'filename', 'exists?', 'completion time',
+                paramrow.extend(['survey-index', 'filename', 'exists?', 'input files?', 'submitted?', 'filename', 'exists?', 'comp time (h)',
                                  'inc. energy', 'apodizer non-binarity', 'Tot thrupt', 'half-max thrupt', 'half-max circ thrupt', 'rel. half-max thrupt', 'r=0.7 thrupt',  'r=0.7 circ thrupt', 'rel. r=0.7 thrupt', 'PSF area'])
                 surveywriter.writerow(catrow)
                 surveywriter.writerow(paramrow)

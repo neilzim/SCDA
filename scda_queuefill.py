@@ -113,13 +113,14 @@ for coron in survey.coron_list:
             solution_count += 1
 
             if os.path.exists(coron.fileorg['log fname']):
-                log = open(coron.fileorg['log fname'])
-                lines = log.readlines()
-                for line in lines:
-                    if 'iterations' in line and 'seconds' in line:
-                        split_line = line.split()
-                        coron.ampl_completion_time = float(split_line[split_line.index('seconds')-1])
-                        break
+                if hasattr(coron, 'ampl_completion_time') and coron.solver['method'] == 'barhom':
+                    log = open(coron.fileorg['log fname'])
+                    lines = log.readlines()
+                    for line in lines:
+                        if 'iterations' in line and 'seconds' in line:
+                            split_line = line.split()
+                            coron.ampl_completion_time = float(split_line[split_line.index('seconds')-1])/3600
+                            break
                 log_mode = os.stat(coron.fileorg['log fname']).st_mode
                 if not bool(stat.S_IRGRP & log_mode):
                     os.chmod(coron.fileorg['log fname'], 0644)
