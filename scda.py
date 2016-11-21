@@ -622,7 +622,7 @@ class DesignParamSurvey(object):
                         param_combo_row.append('Y')
                     else:
                         param_combo_row.append('N')
-                    if self.coron_list[ii].ampl_completion_time is not None:
+                    if hasattr(self.coron_list[ii], 'ampl_completion_time') and self.coron_list[ii].ampl_completion_time is not None:
                         param_combo_row.append(self.coron_list[ii].ampl_completion_time)
                     else:
                         param_combo_row.append('')
