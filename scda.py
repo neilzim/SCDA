@@ -586,7 +586,7 @@ class DesignParamSurvey(object):
                     catrow.append(cat)
                     paramrow.append(name)
                 catrow.extend(['Design ID', 'AMPL program', '', '', '', 'Solution', '', 'Evaluation metrics', '', ''])
-                paramrow.extend(['survey-index', 'filename', 'exists?', 'input files?', 'submitted?', 'filename', 'exists?',
+                paramrow.extend(['survey-index', 'filename', 'exists?', 'input files?', 'submitted?', 'filename', 'exists?', 'completion time',
                                  'inc. energy', 'apodizer non-binarity', 'Tot thrupt', 'half-max thrupt', 'half-max circ thrupt', 'rel. half-max thrupt', 'r=0.7 thrupt',  'r=0.7 circ thrupt', 'rel. r=0.7 thrupt', 'PSF area'])
                 surveywriter.writerow(catrow)
                 surveywriter.writerow(paramrow)
@@ -611,6 +611,10 @@ class DesignParamSurvey(object):
                         param_combo_row.append('Y')
                     else:
                         param_combo_row.append('N')
+                    if self.coron_list[ii].ampl_completion_time is not None:
+                        param_combo_row.append(self.coron_list[ii].ampl_completion_time)
+                    else:
+                        param_combo_row.append('')
                     if self.coron_list[ii].eval_metrics['inc energy'] is not None:
                         param_combo_row.append(self.coron_list[ii].eval_metrics['inc energy'])
                     else:
@@ -787,6 +791,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
             self.check_ampl_input_files()
 
         setattr(self, 'ampl_submission_status', None) # Only changed by the queue filler program
+        setattr(self, 'ampl_completion_time', None) # Only changed by the queue filler program
 
         setattr(self, 'eval_metrics', {})
         self.eval_metrics['inc energy'] = None

@@ -105,7 +105,7 @@ queue_timeout_count = 0
 for coron in survey.coron_list:
     if coron.ampl_submission_status is True:
         overall_submission_count += 1
-        if os.path.exists(coron.fileorg['sol fname']):
+        if os.path.exists(coron.fileorg['sol fname']) and coron.solution_status == False:
             sol_mode = os.stat(coron.fileorg['sol fname']).st_mode
             if not bool(stat.S_IRGRP & sol_mode):
                 os.chmod(coron.fileorg['sol fname'], 0644)
@@ -113,6 +113,13 @@ for coron in survey.coron_list:
             solution_count += 1
 
             if os.path.exists(coron.fileorg['log fname']):
+                log = open(coron.fileorg['log fname'])
+                lines = test_log.readlines()
+                for line in lines:
+                    if 'iterations' in line and 'seconds' in line:
+                        split_line = line.split()
+                        coron.ampl_completion_time = float(split_line[split_line.index('seconds')-1])
+                        break
                 log_mode = os.stat(coron.fileorg['log fname']).st_mode
                 if not bool(stat.S_IRGRP & log_mode):
                     os.chmod(coron.fileorg['log fname'], 0644)
