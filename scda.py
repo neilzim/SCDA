@@ -802,6 +802,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
             self.check_ampl_input_files()
 
         setattr(self, 'ampl_submission_status', None) # Only changed by the queue filler program
+        setattr(self, 'solution_status', False) # Only changed by the queue filler program
         setattr(self, 'ampl_completion_time', None)
 
         setattr(self, 'eval_metrics', {})
