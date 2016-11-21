@@ -151,6 +151,12 @@ def merge_design_param_surveys(survey_list, merged_survey_fname=None):
     merged_survey.N_combos = len(merged_survey.varied_param_combos)
     if merged_survey_fname is not None: # unless specified, use the same name as the first input survey
         merged_survey.fileorg['survey fname'] = merged_survey_fname
+
+    merged_survey_name = os.path.basename(merged_survey.fileorg['survey fname'][:-4])
+    num_ID_digits = int(np.floor(np.log10(merged_survey.N_combos))) + 1
+    ID_fmt_str = "{{:s}}-{{:0{:d}d}}".format(num_ID_digits)
+    for idx, coron in enumerate(merged_survey.coron_list): # overwrite design IDs in coron_list
+        coron.fileorg['design ID'] = ID_fmt_str.format(merged_survey_name, idx)
     
     return merged_survey
 
