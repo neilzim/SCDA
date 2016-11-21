@@ -114,7 +114,7 @@ for coron in survey.coron_list:
 
             if os.path.exists(coron.fileorg['log fname']):
                 log = open(coron.fileorg['log fname'])
-                lines = test_log.readlines()
+                lines = log.readlines()
                 for line in lines:
                     if 'iterations' in line and 'seconds' in line:
                         split_line = line.split()

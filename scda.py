@@ -430,7 +430,18 @@ class DesignParamSurvey(object):
                 coron.eval_status = True
                 if telap_flag > 0:
                     telap_warning = True
-        logging.warning("No unpadded version of telescope aperture was found, so the optimization version was used to derive throughput metrics.")
+            if os.path.exists(coron.fileorg['sol fname']) and os.path.exists(coron.fileorg['log fname']) and \
+               (not hasattr(coron, 'ampl_completion_time') or coron.ampl_completion_time is None):
+                setattr(coron, 'ampl_completion_time', None)
+                log = open(coron.fileorg['log fname'])
+                lines = log.readlines()
+                for line in lines:
+                    if 'iterations' in line and 'seconds' in line:
+                        split_line = line.split()
+                        coron.ampl_completion_time = float(split_line[split_line.index('seconds')-1])
+                        break
+        if telap_warning:
+            logging.warning("No unpadded version of telescope aperture was found, so the optimization version was used to derive throughput metrics.")
 
     def write(self, fname=None):
         if fname is not None:
@@ -791,7 +802,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
             self.check_ampl_input_files()
 
         setattr(self, 'ampl_submission_status', None) # Only changed by the queue filler program
-        setattr(self, 'ampl_completion_time', None) # Only changed by the queue filler program
+        setattr(self, 'ampl_completion_time', None)
 
         setattr(self, 'eval_metrics', {})
         self.eval_metrics['inc energy'] = None
