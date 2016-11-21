@@ -2707,7 +2707,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         elif self.design['LS']['obscure'] == 1: # LS includes secondary aperture features
             if self.design['Pupil']['prim'] is 'wfirst':
                 self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}WFIRST{3:s}Pad{4:02d}".format(self.design['LS']['shape'],
-                                    self.design['LS']['id'], self.design['LS']['od'], 'WFIRST',
+                                    self.design['LS']['id'], self.design['LS']['od'],
                                     self.design['Pupil']['thick'], self.design['LS']['pad'])
 
             else:
@@ -2932,13 +2932,25 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         YYs = np.asarray(np.dot(etas.T, np.matrix(np.ones(etas.shape))))
         RRs = np.sqrt(XXs**2 + YYs**2)
 
+        if self.design['Image']['bowang'] != 180: # Define bowtie angle constraints
+            if self.design['Image']['bowang'] >= 0: # horizontal dark zone
+                theta_quad = np.rad2deg(np.arctan2(YYs[M_fp2:,M_fp2:], XXs[M_fp2:,M_fp2:]))
+                theta_quad_mask = np.less(theta_quad, self.design['Image']['bowang']/2)
+            else: # vertical dark zone
+                theta_quad = np.rad2deg(np.arctan2(YYs[M_fp2:,M_fp2:], XXs[M_fp2:,M_fp2:]))
+                theta_quad_mask = np.greater(theta_quad, self.design['Image']['bowang']/2)
+            theta_rhs_mask = np.concatenate((theta_quad_mask[::-1,:], theta_quad_mask), axis=0)
+            theta_mask = np.concatenate((theta_rhs_mask[:,::-1], theta_rhs_mask), axis=1)
+
         for si, sep in enumerate(seps):
             r_in = np.max([seps[0], sep-0.25])
             r_out = np.min([seps[-1], sep+0.25])
-            meas_ann_mask = np.logical_and(np.greater_equal(RRs, r_in),
-                                           np.less_equal(RRs, r_out))
-            meas_ann_ind = np.nonzero(np.logical_and(np.greater_equal(RRs, r_in).ravel(),
-                                                     np.less_equal(RRs, r_out).ravel()))[0]
+            if self.design['Image']['bowang'] != 180: # apply bowtie angle constraints
+                meas_mask = (theta_mask & (RRs >= r_in) & (RRs <= r_out))
+                meas_ann_ind = np.nonzero(np.ravel(meas_mask))[0]
+            else: # no angle constraints
+                meas_ann_ind = np.nonzero(np.logical_and(np.greater_equal(RRs, r_in).ravel(),
+                                                         np.less_equal(RRs, r_out).ravel()))[0]
             for wi, wr in enumerate(wrs):
                 radial_intens_polychrom[wi, si] = np.mean(np.ravel(intens_polychrom[wi,:,:])[meas_ann_ind])
 
@@ -3160,8 +3172,6 @@ def get_finite_star_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis
         for si, sep in enumerate(seps):
             r_in = np.max([seps[0], sep-0.25])
             r_out = np.min([seps[-1], sep+0.25])
-            meas_ann_mask = np.logical_and(np.greater_equal(RRs, r_in),
-                                           np.less_equal(RRs, r_out))
             meas_ann_ind = np.nonzero(np.logical_and(np.greater_equal(RRs, r_in).ravel(),
                                                      np.less_equal(RRs, r_out).ravel()))[0]
             intens_radial_src[si] = np.mean(np.ravel(intens_2d_src)[meas_ann_ind])
@@ -3236,10 +3246,9 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             elif self.design['LS']['obscure'] == 1:
                 if self.design['Pupil']['prim'] is 'wfirst':
                     self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + \
-                                                             "{0:s}{1:02d}D{2:02d}_WFIRST{3:s}Pad{5:02d}_N{6:04d}.dat".format(
+                                                             "{0:s}{1:02d}D{2:02d}_WFIRST{3:s}Pad{4:02d}_N{5:04d}.dat".format(
                                                              self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
-                                                             self.design['Pupil']['thick'],
-                                                             self.design['LS']['pad'], self.design['Pupil']['N'])) )
+                                                             self.design['Pupil']['thick'], self.design['LS']['pad'], self.design['Pupil']['N'])) )
                 else:
                     self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + \
                                                              "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}Pad{5:02d}_N{6:04d}.dat".format(
