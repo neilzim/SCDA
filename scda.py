@@ -1035,7 +1035,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                                                                                     int(self.design['Pupil']['centobs']), self.design['Pupil']['gap'], self.design['Pupil']['N'])
         self.amplname_pupil = "{0:s}{1:s}".format(self.telap_descrip, self.design['Pupil']['edge'][0])
 
-        self.amplname_fpm = "FPM{0:02d}R{1:03d}{2:s}{3:03d}res{4:02d}".format(int(round(10*self.design['FPM']['R0'])), int(round(10*self.design['FPM']['R1'])),
+        self.amplname_fpm = "FPM{0:03d}R{1:03d}{2:s}{3:03d}res{4:02d}".format(int(10*self.design['FPM']['R0']), int(10*self.design['FPM']['R1']),
                                                                               self.design['FPM']['orient'], self.design['FPM']['openang'], self.design['FPM']['fpmres'])
         if self.design['LS']['obscure'] == 2: # LS includes primary and secondary aperture features
             self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}{4:s}{5:s}cobs{6:d}Pad{7:02d}".format(self.design['LS']['shape'], self.design['LS']['id'], \
@@ -1090,8 +1090,9 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
 
             if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
                 self.fileorg['FPM fname'] = \
-                  os.path.join( self.fileorg['FPM dir'], "FPM_full_diaphragm_{0:03d}M{1:03d}_{2:s}{3:03d}deg.dat".format(
-                                                          int(round(self.design['FPM']['fpmres']*self.design['FPM']['R0'])),
+                  os.path.join( self.fileorg['FPM dir'], "FPM_full_diaphragm_{0:03d}R{1:03d}M{2:03d}_{3:s}{4:03d}deg.dat".format(
+                                                          int(10*self.design['FPM']['fpmres']*self.design['FPM']['R0']),
+                                                          int(10*self.design['FPM']['fpmres']*self.design['FPM']['R1']),
                                                           int(np.ceil(self.design['FPM']['fpmres']*self.design['FPM']['R1'])),
                                                           self.design['FPM']['orient'], self.design['FPM']['openang']) )
 
@@ -1448,8 +1449,9 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
 
         if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
             self.fileorg['FPM fname'] = \
-              os.path.join( self.fileorg['FPM dir'], "FPM_quart_diaphragm_{0:03d}M{1:03d}_{2:s}{3:03d}deg.dat".format(
-                                                      int(round(self.design['FPM']['fpmres']*self.design['FPM']['R0'])),
+              os.path.join( self.fileorg['FPM dir'], "FPM_quart_diaphragm_{0:03d}R{1:03d}M{2:03d}_{3:s}{4:03d}deg.dat".format(
+                                                      int(10*self.design['FPM']['fpmres']*self.design['FPM']['R0']),
+                                                      int(10*self.design['FPM']['fpmres']*self.design['FPM']['R1']),
                                                       int(np.ceil(self.design['FPM']['fpmres']*self.design['FPM']['R1'])),
                                                       self.design['FPM']['orient'], self.design['FPM']['openang']) )
 
@@ -2071,8 +2073,9 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
 
         if 'FPM fname' not in self.fileorg or self.fileorg['FPM fname'] is None:
             self.fileorg['FPM fname'] = \
-              os.path.join( self.fileorg['FPM dir'], "FPM_quart_diaphragm_{0:03d}M{1:03d}_{2:s}{3:03d}deg.dat".format(
-                                                      int(round(self.design['FPM']['fpmres']*self.design['FPM']['R0'])),
+              os.path.join( self.fileorg['FPM dir'], "FPM_quart_diaphragm_{0:03d}R{1:03d}M{2:03d}_{3:s}{4:03d}deg.dat".format(
+                                                      int(10*self.design['FPM']['fpmres']*self.design['FPM']['R0']),
+                                                      int(10*self.design['FPM']['fpmres']*self.design['FPM']['R1']),
                                                       int(np.ceil(self.design['FPM']['fpmres']*self.design['FPM']['R1'])),
                                                       self.design['FPM']['orient'], self.design['FPM']['openang']) )
 
