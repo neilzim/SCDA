@@ -967,7 +967,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                                    ( 'LS', OrderedDict([('N',(int, 125)), ('shape',(str, 'ann')), ('id',(int, 25)), ('od',(int, 75)),
                                                         ('obscure',(int, 0)), ('pad',(int, 0)),
                                                         ('aligntol',(int, None)), ('aligntolcon',(float, 3.))]) ),
-                                   ( 'Image', OrderedDict([('c',(float, 10.)), ('bw',(float, 0.10)), ('Nlam',(int, 5)),
+                                   ( 'Image', OrderedDict([('c',(float, 10.)), ('bw',(float, 0.10)), ('Nlam',(int, 1)),
                                                            ('dR',(float, -0.5)), ('fpres',(int,2))]) ) ])
     _eval_fields =   { 'Pupil': _design_fields['Pupil'], 'FPM': _design_fields['FPM'], \
                        'LS': _design_fields['LS'], 'Image': _design_fields['Image'], \
@@ -1014,7 +1014,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             self.design['Image']['bw+'] = self.design['Image']['bw']
         # Unless Nlam is explicitly specified, set the number of wavelength samples according to the bandwidth
         if self.design['Image']['Nlam'] == 1 and self.design['Image']['bw+'] > 0:
-            self.design['Image']['Nlam'] = int(np.ceil(self.design['Image']['bw+']/(0.10/3)))
+            self.design['Image']['Nlam'] = int(np.ceil(self.design['Image']['bw+']/(0.12/4)))
         # Set a private attribute for the number of image plane samples between the center and the outer constraint angle
         self.design['Image']['Nimg'] = int( np.ceil( self.design['Image']['fpres']*self.design['FPM']['R1']/(1. - self.design['Image']['bw+']/2) ) )
         if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon']:
