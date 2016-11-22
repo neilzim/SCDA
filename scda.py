@@ -334,6 +334,33 @@ class DesignParamSurvey(object):
         setattr(self, 'solution_status', False)
         setattr(self, 'eval_status', False)
 
+    def write_serial_bash(self, overwrite=False, override_infile_status=False):
+        # Write a bash script to sequentially run each program in a design survey
+        coron_fileorg = self.fileorg.copy()
+        if 'survey fname' in coron_fileorg:
+            survey_name = os.path.basename(coron_fileorg['survey fname'][:-4])
+        else:
+            survey_name = os.path.basename(os.path.abspath(coron_fileorg['work dir']))
+        serial_bash_fname = os.path.join(coron_fileorg['work dir'], "run_" + survey_name + "_serial.sh")
+
+        if self.ampl_infile_status is False and not override_infile_status:
+            logging.warning("Error: the most recent input file check for this survey configuration failed.")
+            logging.warning("The override_infile_status switch is off, so write_serial_bash() will now abort.")
+            return 2
+        if not os.path.exists(serial_bash_fname) or overwrite:
+            serial_bash_fobj = open(serial_bash_fname, "w")
+            serial_bash_fobj.write("#! /bin/bash -x\n")
+            for coron in self.coron_list:
+                serial_bash_fobj.write("ampl {0:s} > {1:s}\n".format(coron.fileorg['ampl src fname'],
+                                                                     coron.fileorg['log fname']))
+            serial_bash_fobj.close()
+            os.chmod(serial_bash_fname, 0775)
+            logging.info("Wrote serial bash survey script to {:s}".format(serial_bash_fname))
+            return serial_bash_fname
+        else:
+            logging.warning("Denied overwrite of serial bash survey script {:s}".format(serial_bash_fname))
+            return 1
+
     def write_ampl_batch(self, overwrite=False, override_infile_status=False):
         write_count = 0
         overwrite_deny_count = 0
