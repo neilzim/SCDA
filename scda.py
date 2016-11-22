@@ -1275,9 +1275,9 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         rad_mask = rad_mask_1d.reshape(RRs.shape)
         if self.design['FPM']['openang'] < 180:
             if self.design['FPM']['orient'] == 'V':
-                theta_quad_mask = np.greater_equal(theta_quad, self.design['FPM']['openang']/2)
+                theta_quad_mask = np.greater(theta_quad, self.design['FPM']['openang']/2)
             else:
-                theta_quad_mask = np.less_equal(theta_quad, self.design['FPM']['openang']/2)
+                theta_quad_mask = np.less(theta_quad, self.design['FPM']['openang']/2)
             theta_rhs_mask = np.concatenate((theta_quad_mask[::-1,:], theta_quad_mask), axis=0)
             theta_mask = np.concatenate((theta_rhs_mask[:,::-1], theta_rhs_mask), axis=1)
             FoV_mask = theta_mask*rad_mask
