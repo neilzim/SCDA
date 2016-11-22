@@ -1287,11 +1287,13 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         for si, sep in enumerate(seps):
             r_in = np.max([seps[0], sep-0.25])
             r_out = np.min([seps[-1], sep+0.25])
-            meas_ann_ind = np.nonzero(np.logical_and(np.greater_equal(RRs, r_in).ravel(),
-                                                     np.less_equal(RRs, r_out).ravel(),
-                                                     np.greater(theta_mask, 0).ravel()))[0]
-            for wi, wr in enumerate(wrs):
-                radial_intens_polychrom[wi, si] = np.mean(np.ravel(intens_polychrom[wi,:,:])[meas_ann_ind])
+            meas_mask = (FoV_mask & (RRs >= r_in) & (RRs <= r_out))
+            meas_ann_ind = np.nonzero(np.ravel(meas_mask))[0]
+            if len(meas_ann_ind) > 0:
+                for wi, wr in enumerate(wrs):
+                    radial_intens_polychrom[wi, si] = np.mean(np.ravel(intens_polychrom[wi,:,:])[meas_ann_ind])
+            else:
+                radial_intens_polychrom[:, si] = np.nan
 
         return xis, intens_polychrom, seps, radial_intens_polychrom, FoV_mask
 
