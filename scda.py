@@ -1293,7 +1293,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             for wi, wr in enumerate(wrs):
                 radial_intens_polychrom[wi, si] = np.mean(np.ravel(intens_polychrom[wi,:,:])[meas_ann_ind])
 
-        return intens_polychrom, seps, radial_intens_polychrom, FoV_mask
+        return xis, intens_polychrom, seps, radial_intens_polychrom, FoV_mask
 
     def get_metrics(self, fp1res=8, fp2res=16, rho_out=None, Nlam=None, verbose=True): # for SPLC class
         TelAp_basename = os.path.basename(self.fileorg['TelAp fname'])
@@ -2980,7 +2980,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             for wi, wr in enumerate(wrs):
                 radial_intens_polychrom[wi, si] = np.mean(np.ravel(intens_polychrom[wi,:,:])[meas_ann_ind])
 
-        return intens_polychrom, seps, radial_intens_polychrom
+        return xis, intens_polychrom, seps, radial_intens_polychrom
 
     def get_metrics(self, fp2res=16, rho_out=None, Nlam=None, verbose=True): # for APLC class
         TelAp_basename = os.path.basename(self.fileorg['TelAp fname'])
