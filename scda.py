@@ -334,14 +334,18 @@ class DesignParamSurvey(object):
         setattr(self, 'solution_status', False)
         setattr(self, 'eval_status', False)
 
-    def write_serial_bash(self, overwrite=False, override_infile_status=False):
+    def write_serial_bash(self, serial_bash_fname=None, overwrite=False, override_infile_status=False):
         # Write a bash script to sequentially run each program in a design survey
-        coron_fileorg = self.fileorg.copy()
-        if 'survey fname' in coron_fileorg:
-            survey_name = os.path.basename(coron_fileorg['survey fname'][:-4])
+        if serial_bash_fname is None:
+            coron_fileorg = self.fileorg.copy()
+            if 'survey fname' in coron_fileorg:
+                survey_name = os.path.basename(coron_fileorg['survey fname'][:-4])
+            else:
+                survey_name = os.path.basename(os.path.abspath(coron_fileorg['work dir']))
+            serial_bash_fname = os.path.join(coron_fileorg['work dir'], "run_" + survey_name + "_serial.sh")
         else:
-            survey_name = os.path.basename(os.path.abspath(coron_fileorg['work dir']))
-        serial_bash_fname = os.path.join(coron_fileorg['work dir'], "run_" + survey_name + "_serial.sh")
+            basename = os.path.basename(serial_bash_fname)
+            serial_bash_fname = os.path.join(coron_fileorg['work dir'], basename)
 
         if self.ampl_infile_status is False and not override_infile_status:
             logging.warning("Error: the most recent input file check for this survey configuration failed.")
@@ -2723,7 +2727,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             self.design['Pupil']['secobs'] = self._prim_secobs_map[self.design['Pupil']['prim']]
         # Unless Nlam is explicitly specified, set the number of wavelength samples according to the bandwidth
         if self.design['Image']['Nlam'] == 1 and self.design['Image']['bw'] > 0:
-            self.design['Image']['Nlam'] = int(np.ceil(self.design['Image']['bw']/(0.10/3)))
+            self.design['Image']['Nlam'] = int(np.ceil(self.design['Image']['bw']/(0.12/4)))
         # Finally, set a private attribute for the number of image plane samples between the center and the outer constraint angle
         if self.design['Image']['wingang'] is not None:
             self.design['Image']['Nimg'] = int( np.ceil( self.design['Image']['fpres']*self.design['Image']['wingang']/(1. - self.design['Image']['bw']/2) ) )
