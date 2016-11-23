@@ -105,7 +105,7 @@ queue_timeout_count = 0
 for coron in survey.coron_list:
     if coron.ampl_submission_status is True:
         overall_submission_count += 1
-        if os.path.exists(coron.fileorg['sol fname']) and coron.solution_status == False:
+        if os.path.exists(coron.fileorg['sol fname']):
             sol_mode = os.stat(coron.fileorg['sol fname']).st_mode
             if not bool(stat.S_IRGRP & sol_mode):
                 os.chmod(coron.fileorg['sol fname'], 0644)
