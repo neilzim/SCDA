@@ -1207,6 +1207,42 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             LS = LS_p
         return TelAp, Apod, FPM, LS
 
+    def get_coords(self, fp2res=8, rho_out=None, Nlam=None): # for SPLC, with separate Lyot plane sampling
+        D = 1.
+        N_A = self.design['Pupil']['N']
+        N_L = self.design['LS']['N']
+        bw = self.design['Image']['bw']
+        fpmres = self.design['FPM']['fpmres']
+        M_fp1 = self.design['FPM']['M']
+        if rho_out is None:
+            rho_out = self.design['FPM']['R1'] + 0.5
+        if Nlam is None:
+            Nlam = self.design['Image']['Nlam']
+        M_fp2 = int(np.ceil(rho_out*fp2res))
+        
+        # pupil plane
+        dx = (D/2)/N_A
+        dy = dx
+        xs = np.matrix(np.linspace(-N_A+0.5,N_A-0.5,2*N_A)*dx)
+        XX, YY = np.meshgrid(np.array(xs), np.array(xs))
+        
+        # FPM
+        dmx = 1./fpmres
+        mxs = np.matrix(np.linspace(-M_fp1+0.5,M_fp1-0.5,2*M_fp1)*dmx)
+
+        # Lyot plane
+        du = (D/2)/N_L
+        us = np.matrix(np.linspace(-N_L+0.5,N_L-0.5,2*N_L)*du)
+        
+        # FP2
+        dxi = 1./fp2res
+        xis = np.matrix(np.linspace(-M_fp2+0.5,M_fp2-0.5,2*M_fp2)*dxi)
+
+        # wavelength ratios
+        wrs = np.linspace(1.-bw/2, 1.+bw/2, Nlam)
+
+        return xs, dx, XX, YY, mxs, dmx, us, du, xis, dxi, wrs
+
     def get_onax_psf(self, fp2res=8, rho_inc=0.25, rho_out=None, Nlam=None): # for SPLC
         if self.design['Pupil']['edge'] == 'floor': # floor to binary
             TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
@@ -2912,6 +2948,38 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             LS = LS_p
         return TelAp, Apod, FPM, LS
 
+    def get_coords(self, fp2res=8, rho_out=None, Nlam=None): # for APLC
+        D = 1.
+        N = self.design['Pupil']['N']
+        bw = self.design['Image']['bw']
+        M_fp1 = self.design['FPM']['M']
+        if rho_out is None:
+            rho_out = self.design['Image']['oda'] + 0.5
+        if Nlam is None:
+            Nlam = self.design['Image']['Nlam']
+        M_fp2 = int(np.ceil(rho_out*fp2res))
+        
+        # pupil plane
+        dx = (D/2)/N
+        dy = dx
+        xs = np.matrix(np.linspace(-N+0.5,N-0.5,2*N)*dx)
+        XX, YY = np.meshgrid(np.array(xs), np.array(xs))
+        
+        # FPM
+        dmx = self.design['FPM']['rad']/M_fp1
+        dmy = dmx
+        mxs = np.matrix(np.linspace(-M_fp1+0.5,M_fp1-0.5,2*M_fp1)*dmx)
+        mys = mxs
+
+        # FP2
+        dxi = 1./fp2res
+        xis = np.matrix(np.linspace(-M_fp2+0.5,M_fp2-0.5,2*M_fp2)*dxi)
+
+        # wavelength ratios
+        wrs = np.linspace(1.-bw/2, 1.+bw/2, Nlam)
+
+        return xs, dx, XX, YY, mxs, dmx, xis, dxi, wrs
+
     def get_onax_psf(self, fp2res=8, rho_inc=0.25, rho_out=None, Nlam=None): # for APLC class
         if self.design['Pupil']['edge'] == 'floor': # floor to binary
             TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
@@ -3078,10 +3146,10 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         intens_TelAp_polychrom = np.zeros((Nlam, 2*M_fp2, 2*M_fp2))
         intens_TelAp_peak_polychrom = np.zeros((Nlam, 1))
         for wi, wr in enumerate(wrs):
-            Psi_D_0 = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), TelAp*A*LS),
+            Psi_D_0 = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), TelAp*A*LS[::-1,::-1]),
                                              np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
             intens_D_0_polychrom[wi] = np.power(np.absolute(Psi_D_0), 2)
-            intens_D_0_peak_polychrom[wi] = (np.sum(TelAp*A*LS)*dx*dy/wr)**2
+            intens_D_0_peak_polychrom[wi] = (np.sum(TelAp*A*LS[::-1,::-1])*dx*dy/wr)**2
             Psi_TelAp = dx*dy/wr*np.dot(np.dot(np.exp(-1j*2*np.pi/wr*np.dot(xis.T, xs)), TelAp),
                                                np.exp(-1j*2*np.pi/wr*np.dot(xs.T, xis)))
             intens_TelAp_polychrom[wi] = np.power(np.absolute(Psi_TelAp), 2)
@@ -3246,7 +3314,7 @@ def fast_bandavg_aplc_psf(TelAp, A, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis, dxi,
     # or 'peak' for unocculted PSF peak (contrast units)
     intens_D_polychrom = np.zeros((wrs.shape[0], xis.shape[1], xis.shape[1]))
     if norm == 'peak':
-        intens_norm = np.power(np.sum(A*LS)*dx*dx/wrs, 2)
+        intens_norm = np.power(np.sum(A*LS[::-1,::-1])*dx*dx/wrs, 2)
     elif norm == 'aperture':
         intens_norm = np.sum(np.power(TelAp, 2))*dx*dx
     for wi, wr in enumerate(wrs):
@@ -3263,6 +3331,35 @@ def fast_bandavg_aplc_psf(TelAp, A, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis, dxi,
         elif norm == 'aperture':
             intens_D_polychrom[wi,:,:] = dxi*dxi*np.power(np.absolute(Psi_D), 2) / intens_norm
             
+    return np.mean(intens_D_polychrom, axis=0)
+
+def fast_bandavg_splc_psf(TelAp, A, FPM, LS, xs, dx, XX, YY, mxs, dmx, us, du, xis, dxi, delta_xi, delta_eta, wrs,
+                          norm = 'peak'):
+    # norm parameter is either 'aperture' for integral of illuminated aperture energy (per Stark yield input definition),
+    # or 'peak' for unocculted PSF peak (contrast units)
+    intens_D_polychrom = np.zeros((wrs.shape[0], xis.shape[1], xis.shape[1]))
+    if norm == 'aperture':
+        intens_norm = np.sum(np.power(TelAp, 2))*dx*dx
+    for wi, wr in enumerate(wrs):
+        Psi_A = np.exp(-1j*2*np.pi/wr*(delta_xi*XX + delta_eta*YY))
+        Psi_A_stop = np.multiply(Psi_A, A)
+        Psi_B = dx*dx/wr*np.exp(-1j*2*np.pi/wr*mxs.T*xs)*Psi_A_stop*np.exp(-1j*2*np.pi/wr*xs.T*mxs)
+        Psi_B_0 = dx*dx/wr*np.exp(-1j*2*np.pi/wr*mxs.T*xs)*A*np.exp(-1j*2*np.pi/wr*xs.T*mxs)
+        Psi_B_stop = np.multiply(Psi_B, FPM)
+        Psi_C = dmx*dmx/wr*np.exp(-1j*2*np.pi/wr*us.T*mxs)*Psi_B_stop*np.exp(-1j*2*np.pi/wr*mxs.T*us)
+        Psi_C_0 = dmx*dmx/wr*np.exp(-1j*2*np.pi/wr*us.T*mxs)*Psi_B_0*np.exp(-1j*2*np.pi/wr*mxs.T*us)
+        Psi_C_stop = np.multiply(Psi_C, LS)
+        Psi_C_0_stop = np.multiply(Psi_C_0, LS)
+        Psi_D = du*du/wr*np.exp(-1j*2*np.pi/wr*xis.T*us)*Psi_C_stop*np.exp(-1j*2*np.pi/wr*us.T*xis)
+        Psi_D_0_peak = du*du/wr*np.sum(Psi_C_0_stop)
+        if norm == 'peak':
+            intens_D_polychrom[wi,:,:] = np.power(np.absolute(Psi_D), 2) / np.power(np.absolute(Psi_D_0_peak), 2)
+        elif norm == 'aperture':
+            intens_D_polychrom[wi,:,:] = dxi*dxi*np.power(np.absolute(Psi_D), 2) / intens_norm
+        else:
+            logging.error('unrecognized value for norm parameter')
+            return 1
+
     return np.mean(intens_D_polychrom, axis=0)
     
 class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symmetry case
