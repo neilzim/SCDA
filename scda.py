@@ -2458,7 +2458,7 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
             subject to st_EB_real {(mx, my) in FPMtrans, lam in Ls}:
                 EB_real[mx,my,lam] = 1/lam*sum {y in Ys} EB_part[mx,y,lam]*cos(2*pi*y*my/lam)*dy;
             subject to st_EB_imag {(mx, my) in FPMtrans, lam in Ls}:
-                EB_imag[mx,my,lam] = 1/lam*sum {y in Ys} EB_part[mx,y,lam]*sin(2*pi*y*my/lam)*dy;
+                EB_imag[mx,my,lam] = -1/lam*sum {y in Ys} EB_part[mx,y,lam]*sin(2*pi*y*my/lam)*dy;
             
             #---------------------
             var EC_part_real {u in Us, my in MYs, lam in Ls};
@@ -2470,7 +2470,7 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
             subject to st_EC_part_imag {u in Us, my in MYs, lam in Ls}:
                 EC_part_imag[u,my,lam] = 2*sum {mx in MXs: (mx,my) in FPMtrans} FPM[mx,my]*EB_imag[mx,my,lam]*cos(2*pi*u*mx/lam)*dmx;
             subject to st_EC_real {(u,v) in Lyot, lam in Ls}:
-                EC_real[u,v,lam] = 2/lam*sum {my in MYs} ( EC_part_real[u,my,lam]*cos(2*pi*v*my/lam) - EC_part_imag[u,my,lam]*sin(2*pi*v*my/lam) )*dmy;
+                EC_real[u,v,lam] = 2/lam*sum {my in MYs} ( EC_part_real[u,my,lam]*cos(2*pi*v*my/lam) + EC_part_imag[u,my,lam]*sin(2*pi*v*my/lam) )*dmy;
             
             #---------------------
             var ED_part {xi in Xis, v in Vs, lam in Ls};
@@ -2482,7 +2482,7 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
             subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: 
                 ED_real[xi,eta,lam] = 1/lam*sum {v in Vs} ED_part[xi,v,lam]*cos(2*pi*v*eta/lam)*dv;
             subject to st_ED_imag {(xi, eta) in DarkHole, lam in Ls}: 
-                ED_imag[xi,eta,lam] = 1/lam*sum {v in Vs} ED_part[xi,v,lam]*sin(2*pi*v*eta/lam)*dv;
+                ED_imag[xi,eta,lam] = -1/lam*sum {v in Vs} ED_part[xi,v,lam]*sin(2*pi*v*eta/lam)*dv;
             
             #---------------------
             var EB00_part {mx in MXs, y in Ys};
@@ -2498,13 +2498,13 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
             subject to st_EB00_real {(mx, my) in FPMall}: 
                 EB00_real[mx,my] = sum {y in Ys} EB00_part[mx,y]*cos(2*pi*y*my)*dy;
             subject to st_EB00_imag {(mx, my) in FPMall}: 
-                EB00_imag[mx,my] = sum {y in Ys} EB00_part[mx,y]*sin(2*pi*y*my)*dy;
+                EB00_imag[mx,my] = sum {y in Ys} -EB00_part[mx,y]*sin(2*pi*y*my)*dy;
             subject to st_EC00_part_real {u in Us, my in MYs}:
                 EC00_part_real[u,my] = 2*sum {mx in MXs: (mx,my) in FPMall} EB00_real[mx,my]*cos(2*pi*u*mx)*dmx;
             subject to st_EC00_part_imag {u in Us, my in MYs}:
                 EC00_part_imag[u,my] = 2*sum {mx in MXs: (mx,my) in FPMall} EB00_imag[mx,my]*cos(2*pi*u*mx)*dmx;
             subject to st_EC00_real {(u,v) in Lyot}:
-                EC00_real[u,v] = 2*sum {my in MYs} ( EC00_part_real[u,my]*cos(2*pi*v*my) - EC00_part_imag[u,my]*sin(2*pi*v*my) )*dmy;
+                EC00_real[u,v] = 2*sum {my in MYs} ( EC00_part_real[u,my]*cos(2*pi*v*my) + EC00_part_imag[u,my]*sin(2*pi*v*my) )*dmy;
             subject to st_ED00_real:
                 ED00_real = 2.*sum {u in Us, v in Vs: (u,v) in Lyot} LS[u,v]*EC00_real[u,v]*du*dv;
             """
@@ -3621,8 +3621,10 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
             sets_and_arrays = """
             set Mask := setof {mx in MXs, my in MYs: FPM[mx,my] > 0} (mx,my);
             set Lyot := setof {x in Xs, y in Ys: LS[x,y] >= 0.5} (x,y);
+            set LyotFlip := setof {x in Xs, y in Ys: LS[x,-y] >= 0.5} (x,y);
+            set TransArea := Pupil union LyotFlip;
 
-            param TR := sum {(x,y) in Pupil} TelApProp[x,y]*dx*dy; # Transmission of the Pupil. Used for calibration.
+            param TransAreaNorm := sum {(x,y) in Pupil} TelApProp[x,y];
             
             var A {x in Xs, y in Ys} >= 0, <= 1, := 0.5;
             """
@@ -3663,7 +3665,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         subject to st_EBm_real {(mx,my) in Mask, lam in Ls}:
             EBm_real[mx,my,lam] = 1/lam*sum {y in Ys} EBm_part[mx,y,lam]*cos(2*pi*y*my/lam)*dy;
         subject to st_EBm_imag {(mx,my) in Mask, lam in Ls}:
-            EBm_imag[mx,my,lam] = 1/lam*sum {y in Ys} EBm_part[mx,y,lam]*sin(2*pi*y*my/lam)*dy;
+            EBm_imag[mx,my,lam] = -1/lam*sum {y in Ys} EBm_part[mx,y,lam]*sin(2*pi*y*my/lam)*dy;
         
         #---------------------
         var EC_part_real {x in Xs, my in MYs, lam in Ls};
@@ -3675,7 +3677,7 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         subject to st_EC_part_imag {x in Xs, my in MYs, lam in Ls}:
             EC_part_imag[x,my,lam] = 2*sum {mx in MXs: (mx,my) in Mask} FPM[mx,my]*EBm_imag[mx,my,lam]*cos(2*pi*x*mx/lam)*dmx;
         subject to st_EC {(x,y) in Lyot, lam in Ls}:
-            ECm[x,y,lam] = 2/lam*sum {my in MYs} ( EC_part_real[x,my,lam]*cos(2*pi*my*y/lam) - EC_part_imag[x,my,lam]*sin(2*pi*my*y/lam) )*dmy;
+            ECm[x,y,lam] = 2/lam*sum {my in MYs} ( EC_part_real[x,my,lam]*cos(2*pi*my*y/lam) + EC_part_imag[x,my,lam]*sin(2*pi*my*y/lam) )*dmy;
         
         #---------------------
         var ED_part {xi in Xis, y in Ys, lam in Ls};
@@ -3687,16 +3689,16 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         subject to st_ED_real {xi in Xis, eta in Etas, lam in Ls}:
             ED_real[xi,eta,lam] = 1/lam*sum {y in Ys} ED_part[xi,y,lam]*cos(2*pi*y*eta/lam)*dy;
         subject to st_ED_imag {xi in Xis, eta in Etas, lam in Ls}:
-            ED_imag[xi,eta,lam] = 1/lam*sum {y in Ys} ED_part[xi,y,lam]*sin(2*pi*y*eta/lam)*dy;
+            ED_imag[xi,eta,lam] = -1/lam*sum {y in Ys} ED_part[xi,y,lam]*sin(2*pi*y*eta/lam)*dy;
         
         #---------------------
         var ED00_real := 0.0;
-        subject to st_ED00_real: ED00_real = 2*sum {x in Xs, y in Ys: (x,y) in Lyot} (A[x,y]*TelApProp[x,y])*dx*dy;
+        subject to st_ED00_real: ED00_real = 2*sum {x in Xs, y in Ys: (x,y) in LyotFlip} (A[x,y]*TelApProp[x,y])*dx*dy;
         """
 
         constraints = """
         #---------------------
-        maximize throughput: sum{(x,y) in Pupil} A[x,y]*dx*dy/TR;
+        maximize throughput: sum{(x,y) in TransArea} A[x,y]/TransAreaNorm;
 
         subject to sidelobe_real_pos {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real/lam/sqrt(2.);
         subject to sidelobe_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/lam/sqrt(2.);
