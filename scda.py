@@ -1062,6 +1062,8 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
         if self.design['Pupil']['prim'] is 'wfirst':
             self.telap_descrip = "wfirstCobs{0:02d}sthick{1:s}_N{2:04d}".format(self.design['Pupil']['centobs'], self.design['Pupil']['thick'], \
                                                                                 self.design['Pupil']['N'])
+        elif self.design['Pupil']['prim'] is 'wfirstCycle5':
+            self.telap_descrip = "wfirstCycle5_N{0:04d}".format(self.design['Pupil']['N'])
         else:
             self.telap_descrip = "{0:s}{1:s}{2:s}cobs{3:d}gap{4:d}_N{5:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], self.design['Pupil']['thick'], \
                                                                                     int(self.design['Pupil']['centobs']), self.design['Pupil']['gap'], self.design['Pupil']['N'])
@@ -2723,9 +2725,9 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
     _eval_fields =   { 'Pupil': _design_fields['Pupil'], 'FPM': _design_fields['FPM'], \
                        'LS': _design_fields['LS'], 'Image': _design_fields['Image'], \
                        'Tel': {'TelAp diam':(float, 12.)}, 'Target': {}, 'Aber': {}, 'WFSC': {} }
-    _LS_OD_map = {'hex1':76, 'hex2':82, 'hex3':81, 'hex4':82, 'pie08':90, 'pie12':90, 'key24':90, 'circ':90, 'wfirst':90}
+    _LS_OD_map = {'hex1':76, 'hex2':82, 'hex3':81, 'hex4':82, 'pie08':90, 'pie12':90, 'key24':90, 'circ':90, 'wfirst':90, 'wfirstCycle5':90}
     _prim_secobs_map = {'hex1':'X', 'hex2':'X', 'hex3':'X', 'hex4':'X', 'ochex1':'X', 'ochex2':'X', 'ochex3':'X', 'ochex4':'X',
-                        'pie08':'Cross', 'pie12':'Cross', 'key24':'Cross', 'circ':'Cross', 'wfirst':'WFIRST'}
+                        'pie08':'Cross', 'pie12':'Cross', 'key24':'Cross', 'circ':'Cross', 'wfirst':'WFIRST', 'wfirstCycle5':'wfirstCycle5'}
 
     def __init__(self, verbose=False, **kwargs):
         super(NdiayeAPLC, self).__init__(**kwargs)
@@ -2789,6 +2791,8 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         if self.design['Pupil']['prim'] is 'wfirst':
             self.telap_descrip = "wfirstCobs{0:02d}sthick{1:s}_N{2:04d}".format(self.design['Pupil']['centobs'], self.design['Pupil']['thick'], \
                                                                                 self.design['Pupil']['N'])
+        elif self.design['Pupil']['prim'] is 'wfirstCycle5':
+            self.telap_descrip = "wfirstCycle5_N{0:04d}".format(self.design['Pupil']['N'])
         else:
             self.telap_descrip = "{0:s}{1:s}{2:s}cobs{3:d}gap{4:d}_N{5:04d}".format(self.design['Pupil']['prim'], self.design['Pupil']['secobs'], \
                                                                                     self.design['Pupil']['thick'], int(self.design['Pupil']['centobs']), \
@@ -2805,7 +2809,9 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                 self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}WFIRST{3:s}Pad{4:02d}".format(self.design['LS']['shape'],
                                     self.design['LS']['id'], self.design['LS']['od'],
                                     self.design['Pupil']['thick'], self.design['LS']['pad'])
-
+            elif self.design['Pupil']['prim'] == 'wfirstCycle5':
+                self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}Pad{3:02d}".format(self.design['LS']['shape'],
+                                    self.design['LS']['id'], self.design['LS']['od'], self.design['LS']['pad'])
             else:
                 self.amplname_ls = "LS{0:s}{1:02d}D{2:02d}{3:s}{4:s}Pad{5:02d}".format(self.design['LS']['shape'],
                                     self.design['LS']['id'], self.design['LS']['od'],
@@ -3406,6 +3412,11 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
                                                              "{0:s}{1:02d}D{2:02d}_WFIRST{3:s}Pad{4:02d}_N{5:04d}.dat".format(
                                                              self.design['LS']['shape'], self.design['LS']['id'], self.design['LS']['od'],
                                                              self.design['Pupil']['thick'], self.design['LS']['pad'], self.design['Pupil']['N'])) )
+                elif self.design['Pupil']['prim'] is 'wfirstCycle5':
+                    self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + \
+                                                             "ann{0:02d}D{1:02d}_{2:s}Pad{3:02d}_N{4:04d}.dat".format(
+                                                             self.design['LS']['id'], self.design['LS']['od'], self.design['LS']['shape'], 
+                                                             self.design['LS']['pad'], self.design['Pupil']['N'])) )
                 else:
                     self.fileorg['LS fname'] = os.path.join( self.fileorg['LS dir'], ("LS_half_" + \
                                                              "{0:s}{1:02d}D{2:02d}_{3:s}{4:s}Pad{5:02d}_N{6:04d}.dat".format(
