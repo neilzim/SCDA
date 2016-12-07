@@ -628,7 +628,7 @@ class DesignParamSurvey(object):
                     catrow.append(cat)
                     paramrow.append(name)
                 catrow.extend(['Design ID', 'AMPL program', '', '', '', 'Solution', '', 'Evaluation metrics', '', ''])
-                paramrow.extend(['survey-index', 'filename', 'exists?', 'input files?', 'submitted?', 'filename', 'exists?', 'comp time (h)',
+                paramrow.extend(['survey-index', 'src filename', 'src exists?', 'input files?', 'submitted?', 'sol filename', 'sol exists?', 'comp time (h)',
                                  'inc. energy', 'apodizer non-binarity', 'Tot thrupt', 'half-max thrupt', 'half-max circ thrupt', 'rel. half-max thrupt', 'r=0.7 thrupt',  'r=0.7 circ thrupt', 'rel. r=0.7 thrupt', 'PSF area'])
                 surveywriter.writerow(catrow)
                 surveywriter.writerow(paramrow)
@@ -2070,7 +2070,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
                 """.format(time_est_hrs)
         elif queue_spec is '1h':
             set_queue = """
-            #SBATCH --qos=debug
+            #SBATCH --qos=allnccs
             #SBATCH --time=1:00:00
             """
         elif queue_spec is '12h':
@@ -2666,7 +2666,7 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
                 """.format(time_est_hrs)
         elif queue_spec is '1h':
             set_queue = """
-            #SBATCH --qos=debug
+            #SBATCH --qos=allnccs
             #SBATCH --time=1:00:00
             """
         elif queue_spec is '12h':
