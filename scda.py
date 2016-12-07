@@ -3066,7 +3066,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         YYs = np.asarray(np.dot(etas.T, np.matrix(np.ones(etas.shape))))
         RRs = np.sqrt(XXs**2 + YYs**2)
 
-        if self.design['Image']['bowang'] != 180: # Define bowtie angle constraints
+        if 'bowang' in self.design['Image'] and self.design['Image']['bowang'] != 180: # Define bowtie angle constraints
             if self.design['Image']['bowang'] >= 0: # horizontal dark zone
                 theta_quad = np.rad2deg(np.arctan2(YYs[M_fp2:,M_fp2:], XXs[M_fp2:,M_fp2:]))
                 theta_quad_mask = np.less(theta_quad, self.design['Image']['bowang']/2)
@@ -3079,7 +3079,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         for si, sep in enumerate(seps):
             r_in = np.max([seps[0], sep-0.25])
             r_out = np.min([seps[-1], sep+0.25])
-            if self.design['Image']['bowang'] != 180: # apply bowtie angle constraints
+            if 'bowang' in self.design['Image'] and self.design['Image']['bowang'] != 180: # apply bowtie angle constraints
                 meas_mask = (theta_mask & (RRs >= r_in) & (RRs <= r_out))
                 meas_ann_ind = np.nonzero(np.ravel(meas_mask))[0]
             else: # no angle constraints
