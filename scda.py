@@ -628,7 +628,7 @@ class DesignParamSurvey(object):
                     catrow.append(cat)
                     paramrow.append(name)
                 catrow.extend(['Design ID', 'AMPL program', '', '', '', 'Solution', '', 'Evaluation metrics', '', ''])
-                paramrow.extend(['survey-index', 'filename', 'exists?', 'input files?', 'submitted?', 'filename', 'exists?', 'comp time (h)',
+                paramrow.extend(['survey-index', 'src filename', 'src exists?', 'input files?', 'submitted?', 'sol filename', 'sol exists?', 'comp time (h)',
                                  'inc. energy', 'apodizer non-binarity', 'Tot thrupt', 'half-max thrupt', 'half-max circ thrupt', 'rel. half-max thrupt', 'r=0.7 thrupt',  'r=0.7 circ thrupt', 'rel. r=0.7 thrupt', 'PSF area'])
                 surveywriter.writerow(catrow)
                 surveywriter.writerow(paramrow)
@@ -2070,7 +2070,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
                 """.format(time_est_hrs)
         elif queue_spec is '1h':
             set_queue = """
-            #SBATCH --qos=debug
+            #SBATCH --qos=allnccs
             #SBATCH --time=1:00:00
             """
         elif queue_spec is '12h':
@@ -2666,7 +2666,7 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
                 """.format(time_est_hrs)
         elif queue_spec is '1h':
             set_queue = """
-            #SBATCH --qos=debug
+            #SBATCH --qos=allnccs
             #SBATCH --time=1:00:00
             """
         elif queue_spec is '12h':
@@ -3066,7 +3066,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         YYs = np.asarray(np.dot(etas.T, np.matrix(np.ones(etas.shape))))
         RRs = np.sqrt(XXs**2 + YYs**2)
 
-        if self.design['Image']['bowang'] != 180: # Define bowtie angle constraints
+        if 'bowang' in self.design['Image'] and self.design['Image']['bowang'] != 180: # Define bowtie angle constraints
             if self.design['Image']['bowang'] >= 0: # horizontal dark zone
                 theta_quad = np.rad2deg(np.arctan2(YYs[M_fp2:,M_fp2:], XXs[M_fp2:,M_fp2:]))
                 theta_quad_mask = np.less(theta_quad, self.design['Image']['bowang']/2)
@@ -3079,7 +3079,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         for si, sep in enumerate(seps):
             r_in = np.max([seps[0], sep-0.25])
             r_out = np.min([seps[-1], sep+0.25])
-            if self.design['Image']['bowang'] != 180: # apply bowtie angle constraints
+            if 'bowang' in self.design['Image'] and self.design['Image']['bowang'] != 180: # apply bowtie angle constraints
                 meas_mask = (theta_mask & (RRs >= r_in) & (RRs <= r_out))
                 meas_ann_ind = np.nonzero(np.ravel(meas_mask))[0]
             else: # no angle constraints
