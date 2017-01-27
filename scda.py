@@ -372,7 +372,7 @@ class DesignParamSurvey(object):
         for coron in self.coron_list:
             status = coron.write_ampl(overwrite, override_infile_status, verbose=False)
             if status == 2:
-                infine_deny_count += 1
+                infile_deny_count += 1
             elif status == 1:
                 overwrite_deny_count += 1
             else:
@@ -884,7 +884,11 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         pixscale_lamoD = xis[1] - xis[0]
         tick_labels = np.arange(np.round(xis[0]), np.round(xis[-1]+pixscale_lamoD), 2.)
         xc_pix = intens_maps.shape[-1]/2 - 0.5
-        fpm_rad_pix = self.design['FPM']['rad']/pixscale_lamoD
+        if isinstance(self, NdiayeAPLC):
+            fpm_rad = self.design['FPM']['rad']
+        else:
+            fpm_rad = self.design['FPM']['R0']
+        fpm_rad_pix = fpm_rad/pixscale_lamoD
         tick_locs = tick_labels/pixscale_lamoD + xc_pix
         plt.imshow(np.log10(intens_maps[0,:,:]),
                    vmin=-(self.design['Image']['c']+2),
@@ -906,7 +910,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
             ind_diam_2 = np.argmin(np.abs(np.array(star_diams) - second_curve_diam))
             diam_2 = star_diams[ind_diam_2]
             diam_2_curve, = plt.semilogy(seps, intens_curves[ind_diam_2,:], 'r', zorder=2)
-        fpm_line = plt.vlines(self.design['FPM']['rad'], 10**-16, 1, linestyle='--', color='gray', zorder=1)
+        fpm_line = plt.vlines(fpm_rad, 10**-16, 1, linestyle='--', color='gray', zorder=1)
         plt.xlim([seps[0], seps[-1]])
         plt.ylim([10**-(self.design['Image']['c']+1), 5*10**-(self.design['Image']['c'])])
         plt.ylabel(r'$I/I_\star$',fontsize=16)
@@ -922,10 +926,69 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                         'FPM radius'], fontsize=12, loc='upper center')
         return portrait_fig
 
+    def write_design_package(self, eval_path=None, pixscale_lamoD=0.25, Nlam=None, dpi=300):
+        """
+		Write a coronagraph design package including mask files (Telescope pupil,
+        Apodizer, FPM, Lyot stop) in FITS format and a simple portrait viewgraph.
+        TBA: example PSF evaluation scripts.
+        """
+        if eval_path is None:
+            if 'design ID' in self.fileorg:
+                design_label = "{:s}_{:s}".format(self.fileorg['design ID'],
+                                                  self.fileorg['job name'])
+            else:
+                design_label = self.fileorg['job name']
+            self.fileorg['eval subdir'] = os.path.join(self.fileorg['eval dir'], design_label)
+        else:
+            self.fileorg['eval subdir'] = os.path.normpath(eval_path)
+            design_label = os.path.basename(eval_path)
+        eval_path = self.fileorg['eval subdir']
+        if not os.path.exists(eval_path):
+            os.mkdir(eval_path)
+        if Nlam is None:
+            Nlam = 2*self.design['Image']['Nlam'] + 1
+
+        TelAp, Apod, FPM, LS = self.get_coron_masks(use_gray_gap_zero=False)
+        telap_hdu = pyfits.PrimaryHDU(TelAp)
+        telap_fits_fname = os.path.join(eval_path, 'TelAp.fits')
+        telap_hdu.writeto(telap_fits_fname, clobber=True)
+        apod_hdu = pyfits.PrimaryHDU(Apod)
+        apod_fits_fname = os.path.join(eval_path, 'Apod.fits')
+        apod_hdu.writeto(apod_fits_fname, clobber=True)
+        fpm_hdu = pyfits.PrimaryHDU(FPM)
+        fpm_fits_fname = os.path.join(eval_path, 'FPM.fits')
+        fpm_hdu.writeto(fpm_fits_fname, clobber=True)
+        LS_hdu = pyfits.PrimaryHDU(LS)
+        LS_fits_fname = os.path.join(eval_path, 'LS.fits')
+        LS_hdu.writeto(LS_fits_fname, clobber=True)
+
+        if isinstance(self, NdiayeAPLC):
+            xis, intens_polychrom, seps, radial_intens_polychrom = self.get_onax_psf(Nlam=Nlam)
+        elif isinstance(self, SPLC):
+            xis, intens_polychrom, seps, radial_intens_polychrom, fov_mask = self.get_onax_psf(Nlam=Nlam)
+        else:
+            logging.error("Unsupported coronagraph class {}".format(self.__class__))
+            return 1
+
+        portrait_fig = \
+          self.get_design_portrait(np.mean(intens_polychrom, axis=0).reshape(
+                                    (1,intens_polychrom.shape[1],intens_polychrom.shape[2])),
+                                   np.mean(radial_intens_polychrom, axis=0).reshape((1,len(seps))),
+                                   np.array(xis.T), seps, [0.])
+        portrait_fname = os.path.join(eval_path, 'DesignPortrait_simple_{:s}.png'.format(design_label))
+        portrait_fig.savefig(portrait_fname, dpi=dpi)
+
+        return eval_path
+
     def write_eval_products(self, pixscale_lamoD=0.25, star_diam_vec=None, Npts_star_diam=7, Nlam=None, 
                             norm='aperture', second_curve_diam=0.2, dpi=300):
         if 'eval subdir' not in self.fileorg or self.fileorg['eval subdir'] is None:
-            self.fileorg['eval subdir'] = os.path.join(self.fileorg['eval dir'], self.fileorg['job name'])
+            if 'design ID' in self.fileorg:
+                design_label = "{:s}_{:s}".format(self.fileorg['design ID'],
+                                                  self.fileorg['job name'])
+            else:
+                design_label = self.fileorg['job name']
+            self.fileorg['eval subdir'] = os.path.join(self.fileorg['eval dir'], design_label)
         if not os.path.exists(self.fileorg['eval dir']):
             os.mkdir(self.fileorg['eval dir'])
         if not os.path.exists(self.fileorg['eval subdir']):
@@ -934,7 +997,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         if star_diam_vec is None:
             star_diam_vec = np.concatenate([np.linspace(0,0.09,10), np.linspace(0.1, 1, 10), np.array([2., 3., 4.])])
         if Nlam is None:
-            Nlam = self.design['Image']['Nlam']
+            Nlam = 2*self.design['Image']['Nlam'] + 1
 
         stellar_intens_map, stellar_intens_curves, xis, seps, stellar_intens_diam_vec, \
         offax_psf, offax_psf_offset_vec, sky_trans, contrast_convert_fac = \
