@@ -715,7 +715,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                      'presolve': [True, False], 'threads': [None]+range(1,33), 'crossover': [None]+[True, False] }
 
     _aperture_menu = { 'prim': ['hex1', 'hex2', 'hex3', 'hex4', 'key24', 'pie12', 'pie08', 'circ', 
-			                    'ochex1', 'ochex2', 'ochex3', 'ochex4', 'irisao', 'atlast'],
+			                    'ochex1', 'ochex2', 'ochex3', 'ochex4', 'irisao', 'atlast', 'luvoir15m'],
                        'secobs': ['Y60d','Yoff60d','X','Cross','T','Y90d'],
                        'thick': ['025','100'],
                        'centobs': [True, False],
