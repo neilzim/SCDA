@@ -876,7 +876,8 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         plt.imshow(Apod)
         _ = plt.axis('off')
         ax3 = plt.subplot(gs1[0,2])
-        plt.imshow(LS.T)
+        #plt.imshow(LS.T) # why was this previously transposed?
+        plt.imshow(LS)
         _ =plt.axis('off')
         gs2 = gridspec.GridSpec(2, 3)
         gs2.update(left=0.03, right=1.36, bottom=0.04, top=1.10, wspace=0.01)
