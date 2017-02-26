@@ -300,6 +300,7 @@ class DesignParamSurvey(object):
                 else:
                     logging.warning("Warning: Unrecognized field {0} in solver argument".format(field))
         # Handle missing values
+        if 'planeofconstr' not in self.solver or self.solver['planeofconstr'] is None: self.solver['planeofconstr'] = 'FP2'
         if 'constr' not in self.solver or self.solver['constr'] is None: self.solver['constr'] = 'lin'
         if 'method' not in self.solver or self.solver['method'] is None: self.solver['method'] = 'bar'
         if 'presolve' not in self.solver or self.solver['presolve'] is None: self.solver['presolve'] = True
@@ -710,7 +711,8 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                                  'TelAp fname', 'FPM fname', 'LS fname', 'LDZ fname', 'sol fname'],
                      'solver': ['constr', 'method', 'presolve', 'threads', 'solver', 'crossover'] }
 
-    _solver_menu = { 'constr': ['lin', 'quad'], 'solver': ['LOQO', 'gurobi', 'gurobix'], 
+	_solver_menu = { 'planeofconstr': ['FP1', 'Lyot', 'FP2'], 
+					 'constr': ['lin', 'quad'], 'solver': ['LOQO', 'gurobi', 'gurobix'], 
                      'method': ['bar', 'barhom', 'dualsimp'],
                      'presolve': [True, False], 'threads': [None]+range(1,33), 'crossover': [None]+[True, False] }
 
