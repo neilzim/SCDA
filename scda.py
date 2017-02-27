@@ -709,9 +709,9 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                                  'sol dir', 'log dir', 'eval dir', 'eval subdir', 'slurm dir',
                                  'ampl src fname', 'slurm fname', 'log fname', 'job name', 'design ID', 
                                  'TelAp fname', 'FPM fname', 'LS fname', 'LDZ fname', 'sol fname'],
-                     'solver': ['constr', 'method', 'presolve', 'threads', 'solver', 'crossover'] }
+                     'solver': ['planeofconstr', 'constr', 'method', 'presolve', 'threads', 'solver', 'crossover'] }
 
-	_solver_menu = { 'planeofconstr': ['FP1', 'Lyot', 'FP2'], 
+    _solver_menu = { 'planeofconstr': ['FP1', 'Lyot', 'FP2'], 
 					 'constr': ['lin', 'quad'], 'solver': ['LOQO', 'gurobi', 'gurobix'], 
                      'method': ['bar', 'barhom', 'dualsimp'],
                      'presolve': [True, False], 'threads': [None]+range(1,33), 'crossover': [None]+[True, False] }
@@ -1886,7 +1886,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
                 eta >= xi*tan(ang/2*pi/180)} (xi,eta);
             """
 
-		field_propagation_to_FP1 = """
+        field_propagation_to_FP1 = """
         #---------------------
         var EB_real_X {mx in MXs, y in Ys, lam in Ls};
         var EB_real {mx in MXs, my in MYs, lam in Ls};
@@ -1898,7 +1898,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
         
 		"""
 
-		if self.solver['planeofconstr'] == 'Lyot' or self.solver['planeofconstr'] == 'FP2':
+        if self.solver['planeofconstr'] == 'Lyot' or self.solver['planeofconstr'] == 'FP2':
             if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
                 field_propagation_to_Lyot = """
                 #---------------------
@@ -1923,7 +1923,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
                     EC_real[u,v,lam] = 2/lam*sum {my in MYs} EC_real_X[u,my,lam]*cos(2*pi*v*my/lam)*dmy;
                 
                 """
-		else:
+        else:
             field_propagation_to_Lyot = """
 			"""
 
@@ -1939,8 +1939,11 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
                 ED_real[xi,eta,lam] = 2/lam*sum {v in Vs} ED_real_X[xi,v,lam]*cos(2*pi*v*eta/lam)*dv;
             
 		    """
+        else:
+		    field_propagation_to_FP2 = """
+		    """
 
-		if self.solver['planeofconstr'] == 'Lyot' or self.solver['planeofconstr'] == 'FP2':
+        if self.solver['planeofconstr'] == 'Lyot' or self.solver['planeofconstr'] == 'FP2':
 		    field_propagation_unocc_to_FP1 = """
             #---------------------
             var EB00_real_X {mx in MXs, y in Ys};
@@ -1960,27 +1963,27 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             subject to st_EC00_real {(u,v) in Lyot}:
                 EC00_real[u,v] = 2*sum {my in MYs} EC00_real_X[u,my]*cos(2*pi*v*my)*dmy;
 			"""
-		else: # stop at FP1
-		    field_propagation_unocc_to_FP1 = """
+        else: # stop at FP1
+            field_propagation_unocc_to_FP1 = """
             var E00_ref := 0.0;
             subject to st_E00_ref:
                 E00_ref = 4.*sum {(x,y) in Pupil} A[x,y]*dx*dy;
-			"""
-		    field_propagation_unocc_to_Lyot = """
-			"""
-		if self.solver['planeofconstr'] == 'FP2':
-		    field_propagation_unocc_to_FP2 = """
+            """
+            field_propagation_unocc_to_Lyot = """
+            """
+        if self.solver['planeofconstr'] == 'FP2':
+            field_propagation_unocc_to_FP2 = """
             subject to st_E00_ref:
                 E00_ref = 4.*sum {u in Us, v in Vs: (u,v) in Lyot} LS[u,v]*EC00_real[u,v]*du*dv;
-			"""
-	    elif self.solver['planeofconstr'] == 'Lyot':
-		    field_propagation_unocc_to_FP2 = """
+            """
+        elif self.solver['planeofconstr'] == 'Lyot':
+            field_propagation_unocc_to_FP2 = """
             subject to st_E00_ref:
                 E00_ref = 1;
-			"""
-		else:
-		    field_propagation_unocc_to_FP2 = """
-			"""
+            """
+        else:
+            field_propagation_unocc_to_FP2 = """
+            """
 
         if self.solver['planeofconstr'] == 'FP1':
             constraints = """
@@ -1992,7 +1995,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             subject to sidelobe_zero_real_neg {(mx,my) in FPMtrans}:
                 EB_real[mx,my,1] >= -10^(-c/2)*E00_ref/lam/sqrt(2.);
             """
-	    else: # for now Lyot constraint case is not defined
+        else: # for now Lyot constraint case is not defined
             if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None:
                 constraints = """
                 #---------------------
