@@ -1991,9 +1991,9 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             maximize throughput: sum{(x,y) in Pupil} A[x,y]*dx*dy/TR;
            
             subject to sidelobe_zero_real_pos {(mx,my) in FPMtrans}:
-                EB_real[mx,my,1] <= 10^(-c/2)*E00_ref/lam/sqrt(2.);
+                EB_real[mx,my,1] <= 10^(-c/2)*E00_ref/sqrt(2.);
             subject to sidelobe_zero_real_neg {(mx,my) in FPMtrans}:
-                EB_real[mx,my,1] >= -10^(-c/2)*E00_ref/lam/sqrt(2.);
+                EB_real[mx,my,1] >= -10^(-c/2)*E00_ref/sqrt(2.);
             """
         else: # for now Lyot constraint case is not defined
             if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None:
