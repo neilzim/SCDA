@@ -1248,6 +1248,8 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
             TelAp_nopad_fname = os.path.join( os.path.dirname(self.fileorg['TelAp fname']), TelAp_nopad_basename )
             TelAp_p = np.loadtxt(TelAp_nopad_fname)
+        elif self.design['Pupil']['edge'] == 'floor': # floor to binary
+            TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname']))
         else:
             TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname']))
 
@@ -3016,7 +3018,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
             TelAp_nopad_fname = os.path.join( os.path.dirname(self.fileorg['TelAp fname']), TelAp_nopad_basename )
             TelAp_p = np.loadtxt(TelAp_nopad_fname)
-        else if self.design['Pupil']['edge'] == 'floor': # floor to binary
+        elif self.design['Pupil']['edge'] == 'floor': # floor to binary
             TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname']))
         else:
             TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname']))
