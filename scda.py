@@ -1899,8 +1899,7 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             EB_real_X[mx,y,lam] = 2*sum {x in Xs: (x,y) in Pupil} TelApProp[x,y]*A[x,y]*cos(2*pi*x*mx/lam)*dx;
         subject to st_EB_real {(mx, my) in FPMtrans, lam in Ls}:
             EB_real[mx,my,lam] = 2/lam*sum {y in Ys} EB_real_X[mx,y,lam]*cos(2*pi*y*my/lam)*dy;
-        
-		"""
+        """
 
         if self.solver['planeofconstr'] == 'Lyot' or self.solver['planeofconstr'] == 'FP2':
             if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
@@ -1929,10 +1928,10 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
                 """
         else:
             field_propagation_to_Lyot = """
-			"""
+	    """
 
         if self.solver['planeofconstr'] == 'FP2':
-		    field_propagation_to_FP2 = """
+	    field_propagation_to_FP2 = """
             #---------------------
             var ED_real_X {xi in Xis, v in Vs, lam in Ls};
             var ED_real {xi in Xis, eta in Etas, lam in Ls};
@@ -1942,13 +1941,13 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
             subject to st_ED_real {(xi, eta) in DarkHole, lam in Ls}: 
                 ED_real[xi,eta,lam] = 2/lam*sum {v in Vs} ED_real_X[xi,v,lam]*cos(2*pi*v*eta/lam)*dv;
             
-		    """
+	    """
         else:
-		    field_propagation_to_FP2 = """
-		    """
+	    field_propagation_to_FP2 = """
+	    """
 
         if self.solver['planeofconstr'] == 'Lyot' or self.solver['planeofconstr'] == 'FP2':
-		    field_propagation_unocc_to_FP1 = """
+	    field_propagation_unocc_to_FP1 = """
             #---------------------
             var EB00_real_X {mx in MXs, y in Ys};
             var EB00_real {mx in MXs, my in MYs};
@@ -1960,13 +1959,13 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
                 EB00_real_X[mx,y] = 2*sum {x in Xs: (x,y) in Pupil} TelApProp[x,y]*A[x,y]*cos(2*pi*x*mx)*dx;
             subject to st_EB00_real {(mx, my) in FPMall}: 
                 EB00_real[mx,my] = 2*sum {y in Ys} EB00_real_X[mx,y]*cos(2*pi*y*my)*dy;
-		    """
-		    field_propagation_unocc_to_Lyot = """
+            """
+	    field_propagation_unocc_to_Lyot = """
             subject to st_EC00_real_X {u in Us, my in MYs}:
                 EC00_real_X[u,my] = 2*sum {mx in MXs: (mx,my) in FPMall} EB00_real[mx,my]*cos(2*pi*u*mx)*dmx;
             subject to st_EC00_real {(u,v) in Lyot}:
                 EC00_real[u,v] = 2*sum {my in MYs} EC00_real_X[u,my]*cos(2*pi*v*my)*dmy;
-			"""
+            """
         else: # stop at FP1
             field_propagation_unocc_to_FP1 = """
             var E00_ref := 0.0;
@@ -2538,11 +2537,11 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
             """
  
         if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None: 
-            field_propagation = """
+            field_propagation_to_FP1 = """
             #---------------------
             """
         else:
-            field_propagation = """
+            field_propagation_to_FP1 = """
             #---------------------
             var EB_part {mx in MXs, y in Ys, lam in Ls};
             var EB_real {mx in MXs, my in MYs, lam in Ls};
@@ -2554,6 +2553,10 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
                 EB_real[mx,my,lam] = 1/lam*sum {y in Ys} EB_part[mx,y,lam]*cos(2*pi*y*my/lam)*dy;
             subject to st_EB_imag {(mx, my) in FPMtrans, lam in Ls}:
                 EB_imag[mx,my,lam] = -1/lam*sum {y in Ys} EB_part[mx,y,lam]*sin(2*pi*y*my/lam)*dy;
+            """
+
+        if self.solver['planeofconstr'] == 'Lyot' or self.solver['planeofconstr'] == 'FP2':
+            field_propagation_to_Lyot = """
             
             #---------------------
             var EC_part_real {u in Us, my in MYs, lam in Ls};
@@ -2566,7 +2569,13 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
                 EC_part_imag[u,my,lam] = 2*sum {mx in MXs: (mx,my) in FPMtrans} FPM[mx,my]*EB_imag[mx,my,lam]*cos(2*pi*u*mx/lam)*dmx;
             subject to st_EC_real {(u,v) in Lyot, lam in Ls}:
                 EC_real[u,v,lam] = 2/lam*sum {my in MYs} ( EC_part_real[u,my,lam]*cos(2*pi*v*my/lam) + EC_part_imag[u,my,lam]*sin(2*pi*v*my/lam) )*dmy;
+            """
+        else:
+            field_propagation_to_Lyot = """
+	    """
             
+        if self.solver['planeofconstr'] == 'FP2':
+	    field_propagation_to_FP2 = """
             #---------------------
             var ED_part {xi in Xis, v in Vs, lam in Ls};
             var ED_real {xi in Xis, eta in Etas, lam in Ls};
@@ -2579,6 +2588,13 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
             subject to st_ED_imag {(xi, eta) in DarkHole, lam in Ls}: 
                 ED_imag[xi,eta,lam] = -1/lam*sum {v in Vs} ED_part[xi,v,lam]*sin(2*pi*v*eta/lam)*dv;
             
+	    """
+        else:
+	    field_propagation_to_FP2 = """
+	    """
+
+        if self.solver['planeofconstr'] == 'Lyot' or self.solver['planeofconstr'] == 'FP2':
+	    field_propagation_unocc_to_FP1 = """
             #---------------------
             var EB00_part {mx in MXs, y in Ys};
             var EB00_real {mx in MXs, my in MYs};
@@ -2594,39 +2610,64 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
                 EB00_real[mx,my] = sum {y in Ys} EB00_part[mx,y]*cos(2*pi*y*my)*dy;
             subject to st_EB00_imag {(mx, my) in FPMall}: 
                 EB00_imag[mx,my] = sum {y in Ys} -EB00_part[mx,y]*sin(2*pi*y*my)*dy;
+            """
+	    field_propagation_unocc_to_Lyot = """
             subject to st_EC00_part_real {u in Us, my in MYs}:
                 EC00_part_real[u,my] = 2*sum {mx in MXs: (mx,my) in FPMall} EB00_real[mx,my]*cos(2*pi*u*mx)*dmx;
             subject to st_EC00_part_imag {u in Us, my in MYs}:
                 EC00_part_imag[u,my] = 2*sum {mx in MXs: (mx,my) in FPMall} EB00_imag[mx,my]*cos(2*pi*u*mx)*dmx;
             subject to st_EC00_real {(u,v) in Lyot}:
                 EC00_real[u,v] = 2*sum {my in MYs} ( EC00_part_real[u,my]*cos(2*pi*v*my) + EC00_part_imag[u,my]*sin(2*pi*v*my) )*dmy;
+            """
+        else: # stop at FP1
+            field_propagation_unocc_to_FP1 = """
+            var E00_ref := 0.0;
+            subject to st_E00_ref:
+                E00_ref = 2.*sum {(x,y) in Pupil} A[x,y]*dx*dy;
+            """
+            field_propagation_unocc_to_Lyot = """
+            """
+        if self.solver['planeofconstr'] == 'FP2':
+            field_propagation_unocc_to_FP2 = """
             subject to st_ED00_real:
                 ED00_real = 2.*sum {u in Us, v in Vs: (u,v) in Lyot} LS[u,v]*EC00_real[u,v]*du*dv;
             """
-
-        if self.design['LS']['aligntol'] is not None and self.design['LS']['aligntolcon'] is not None:
-            constraints = """
-            #---------------------
-            maximize throughput: sum{(x,y) in Pupil} A[x,y]*dx*dy/TR;
-           
-            subject to Lyot_aligntol_constr_pos {(x,y) in LyotDarkZone, lam in Ls}:
-                EC_real[x,y,lam] <= 10^-s;
-            subject to Lyot_aligntol_constr_neg {(x,y) in LyotDarkZone, lam in Ls}:
-                EC_real[x,y,lam] >= -10^-s;
-            subject to sidelobe_zero_real_pos {(xi,eta) in DarkHole, lam in Ls}:
-                ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real/lam/sqrt(2.);
-            subject to sidelobe_zero_real_neg {(xi,eta) in DarkHole, lam in Ls}:
-                ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/lam/sqrt(2.);
+        elif self.solver['planeofconstr'] == 'Lyot':
+            field_propagation_unocc_to_FP2 = """
+            subject to st_E00_ref:
+                E00_ref = 1;
             """
         else:
+            field_propagation_unocc_to_FP2 = """
+            """
+
+        if self.solver['planeofconstr'] == 'FP1':
             constraints = """
             #---------------------
             maximize throughput: sum{(x,y) in Pupil} A[x,y]*dx*dy/TR;
             
-            subject to sidelobe_real_pos {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real/lam/sqrt(2.);
-            subject to sidelobe_real_neg {(xi,eta) in DarkHole, lam in Ls}: ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/lam/sqrt(2.);
-            subject to sidelobe_imag_pos {(xi,eta) in DarkHole, lam in Ls}: ED_imag[xi,eta,lam] <= 10^(-c/2)*ED00_real/lam/sqrt(2.);
-            subject to sidelobe_imag_neg {(xi,eta) in DarkHole, lam in Ls}: ED_imag[xi,eta,lam] >= -10^(-c/2)*ED00_real/lam/sqrt(2.);
+            subject to sidelobe_real_pos {(mx,my) in FPMtrans}:
+                EB_real[mx,my,1] <= 10^(-c/2)*E00_ref/sqrt(2.);
+            subject to sidelobe_real_neg {(mx,my) in FPMtrans}:
+                EB_real[mx,my,1] >= -10^(-c/2)*E00_ref/sqrt(2.);
+            subject to sidelobe_imag_pos {(mx,my) in FPMtrans}:
+                EB_imag[mx,my,1] <= 10^(-c/2)*E00_ref/sqrt(2.);
+            subject to sidelobe_imag_neg {(mx,my) in FPMtrans}:
+                EB_imag[mx,my,1] >= -10^(-c/2)*E00_ref/sqrt(2.);
+            """
+        else: 
+            constraints = """
+            #---------------------
+            maximize throughput: sum{(x,y) in Pupil} A[x,y]*dx*dy/TR;
+
+            subject to sidelobe_real_pos {(xi,eta) in DarkHole, lam in Ls}: 
+                ED_real[xi,eta,lam] <= 10^(-c/2)*ED00_real/lam/sqrt(2.);
+            subject to sidelobe_real_neg {(xi,eta) in DarkHole, lam in Ls}: 
+                ED_real[xi,eta,lam] >= -10^(-c/2)*ED00_real/lam/sqrt(2.);
+            subject to sidelobe_imag_pos {(xi,eta) in DarkHole, lam in Ls}: 
+                ED_imag[xi,eta,lam] <= 10^(-c/2)*ED00_real/lam/sqrt(2.);
+            subject to sidelobe_imag_neg {(xi,eta) in DarkHole, lam in Ls}:
+                ED_imag[xi,eta,lam] >= -10^(-c/2)*ED00_real/lam/sqrt(2.);
             """
  
         misc_options = """
@@ -2663,7 +2704,7 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
         solve;
  
         display solve_result_num, solve_result;
-        display ED00_real; 
+        display E00_ref; 
         """
  
         store_results = """
@@ -2684,7 +2725,15 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
         mod_fobj.write( textwrap.dedent(define_pupil_and_telap) )
         mod_fobj.write( textwrap.dedent(sets_and_arrays_part1) )
         mod_fobj.write( textwrap.dedent(sets_and_arrays_part2) )
-        mod_fobj.write( textwrap.dedent(field_propagation) )
+
+        mod_fobj.write( textwrap.dedent(field_propagation_to_FP1) )
+        mod_fobj.write( textwrap.dedent(field_propagation_to_Lyot) )
+        mod_fobj.write( textwrap.dedent(field_propagation_to_FP2) )
+
+        mod_fobj.write( textwrap.dedent(field_propagation_unocc_to_FP1) )
+        mod_fobj.write( textwrap.dedent(field_propagation_unocc_to_Lyot) )
+        mod_fobj.write( textwrap.dedent(field_propagation_unocc_to_FP2) )
+
         mod_fobj.write( textwrap.dedent(constraints) )
         #mod_fobj.write( textwrap.dedent(misc_options) )
         mod_fobj.write( textwrap.dedent(solver) )
