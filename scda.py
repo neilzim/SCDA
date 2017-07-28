@@ -2058,7 +2058,6 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
         solve;
  
         display solve_result_num, solve_result;
-        display E00_ref; 
         """
  
         store_results = """
@@ -2704,7 +2703,6 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
         solve;
  
         display solve_result_num, solve_result;
-        display E00_ref; 
         """
  
         store_results = """
@@ -3895,7 +3893,6 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         solve;
  
         display solve_result_num, solve_result;
-        display ED00_real; 
         """
  
         store_results = """
@@ -4455,7 +4452,6 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         solve;
  
         display solve_result_num, solve_result;
-        display ED00_real; 
         """
  
         store_results = """
