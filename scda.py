@@ -933,7 +933,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
 
     def write_design_package(self, eval_path=None, pixscale_lamoD=0.25, Nlam=None, dpi=300):
         """
-		Write a coronagraph design package including mask files (Telescope pupil,
+        Write a coronagraph design package including mask files (Telescope pupil,
         Apodizer, FPM, Lyot stop) in FITS format and a simple portrait viewgraph.
         TBA: example PSF evaluation scripts.
         """
