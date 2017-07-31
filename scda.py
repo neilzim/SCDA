@@ -896,8 +896,8 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         fpm_rad_pix = fpm_rad/pixscale_lamoD
         tick_locs = tick_labels/pixscale_lamoD + xc_pix
         plt.imshow(np.log10(intens_maps[0,:,:]),
-                   vmin=-(self.design['Image']['c']+2),
-                   vmax=-(self.design['Image']['c']-1), cmap='CMRmap')
+                   vmin=-(self.design['Image']['c']+1),
+                   vmax=-(self.design['Image']['c']-2), cmap='CMRmap')
         fpm_circle = matplotlib.patches.Circle((xc_pix, xc_pix), fpm_rad_pix, facecolor='none',
                                                edgecolor='w', linewidth=2., alpha=1.,
                                                clip_on=False, linestyle='--')
@@ -3445,15 +3445,15 @@ def get_finite_star_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis
         XXs = np.asarray(np.dot(np.matrix(np.ones(xis.shape)).T, xis))
         YYs = np.asarray(np.dot(xis.T, np.matrix(np.ones(xis.shape))))
         RRs = np.sqrt(XXs**2 + YYs**2)
-        M_fp2 = XXs.shape[0] // 2
+        M_fp2 = XXs.shape[0] / 2
 
         if bowang != 180: # Define bowtie angle constraints
             if bowang >= 0: # horizontal dark zone
                 theta_quad = np.rad2deg(np.arctan2(YYs[M_fp2:,M_fp2:], XXs[M_fp2:,M_fp2:]))
-                theta_quad_mask = np.less(theta_quad, bowang/2)
+                theta_quad_mask = np.less(theta_quad, bowang/2.)
             else: # vertical dark zone
                 theta_quad = np.rad2deg(np.arctan2(YYs[M_fp2:,M_fp2:], XXs[M_fp2:,M_fp2:]))
-                theta_quad_mask = np.greater(theta_quad, -bowang/2)
+                theta_quad_mask = np.greater(theta_quad, -bowang/2.)
             theta_rhs_mask = np.concatenate((theta_quad_mask[::-1,:], theta_quad_mask), axis=0)
             theta_mask = np.concatenate((theta_rhs_mask[:,::-1], theta_rhs_mask), axis=1)
 
