@@ -13,6 +13,7 @@ import datetime
 import textwrap
 import csv
 import numpy as np
+import skimage.transform
 import pdb
 import getpass
 import socket
@@ -868,21 +869,39 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         return status
 
     def get_design_portrait(self, intens_maps, intens_curves, xis, seps, star_diams,
-                            second_curve_diam=None, use_gray_gap_zero=False):
-        TelAp, Apod, FPM, LS = self.get_coron_masks(use_gray_gap_zero=use_gray_gap_zero)
+                            second_curve_diam=None, use_gray_gap_zero=False, get_big_telap=False):
+        if get_big_telap:
+            TelAp_big, TelAp, Apod, FPM, LS = self.get_coron_masks(use_gray_gap_zero=use_gray_gap_zero, get_big_telap=True)
+        else:
+            TelAp, Apod, FPM, LS = self.get_coron_masks(use_gray_gap_zero=use_gray_gap_zero, get_big_telap=False)
+        N = self.design['Pupil']['N']
+        matplotlib.rcParams['font.size'] = 12
         portrait_fig = plt.figure(figsize=(10,7))
         gs1 = gridspec.GridSpec(2, 3)
         gs1.update(left=0.01, right=0.99, bottom=0.02, top=0.99, wspace=0.01)
-        ax1 = plt.subplot(gs1[0,0])
-        plt.imshow(TelAp)
-        _ = plt.axis('off')
-        ax2 = plt.subplot(gs1[0,1])
-        plt.imshow(Apod)
-        _ = plt.axis('off')
-        ax3 = plt.subplot(gs1[0,2])
-        #plt.imshow(LS.T) # why was this previously transposed?
-        plt.imshow(LS)
-        _ =plt.axis('off')
+        if get_big_telap:
+           ax1 = plt.subplot(gs1[0,0])
+           s = 4
+           scaled_TelAp = skimage.transform.rescale(TelAp, s, order=0)
+           plt.imshow(scaled_TelAp[s*(N+N/2):, s*N:s*(N+N/2)] + \
+                      TelAp_big[s*(N+N/2):, s*N:s*(N+N/2)])
+           _ = plt.axis('off')
+           ax2 = plt.subplot(gs1[0,1])
+           plt.imshow(TelAp - LS)
+           _ = plt.axis('off')
+           ax3 = plt.subplot(gs1[0,2])
+           plt.imshow(Apod)
+           _ =plt.axis('off')
+        else:
+           ax1 = plt.subplot(gs1[0,0])
+           plt.imshow(TelAp)
+           _ = plt.axis('off')
+           ax2 = plt.subplot(gs1[0,1])
+           plt.imshow(TelAp - LS)
+           _ = plt.axis('off')
+           ax3 = plt.subplot(gs1[0,2])
+           plt.imshow(Apod)
+           _ =plt.axis('off')
         gs2 = gridspec.GridSpec(2, 3)
         gs2.update(left=0.03, right=1.36, bottom=0.04, top=1.10, wspace=0.01)
         ax4 = plt.subplot(gs2[1,0])
@@ -910,16 +929,19 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         gs3.update(left=0.36, right=0.98, bottom=0.08, top=1.05, wspace=0.01)
         ax5 = plt.subplot(gs3[1,1:])
         diam_1 = star_diams[0]
-        diam_1_curve, = plt.semilogy(seps, intens_curves[0,:], 'b', zorder=3)
+        #diam_1_curve, = plt.semilogy(seps, intens_curves[0,:], 'b', zorder=3)
+        diam_1_curve, = plt.semilogy(seps, intens_curves[0,:], color=plt.cm.tab10(0), zorder=3)
         if second_curve_diam is not None:
             ind_diam_2 = np.argmin(np.abs(np.array(star_diams) - second_curve_diam))
             diam_2 = star_diams[ind_diam_2]
-            diam_2_curve, = plt.semilogy(seps, intens_curves[ind_diam_2,:], 'r', zorder=2)
+            #diam_2_curve, = plt.semilogy(seps, intens_curves[ind_diam_2,:], 'r', zorder=2)
+            diam_2_curve, = plt.semilogy(seps, intens_curves[ind_diam_2,:], color=plt.cm.tab10(3), zorder=2)
         fpm_line = plt.vlines(fpm_rad, 10**-16, 1, linestyle='--', color='gray', zorder=1)
         plt.xlim([seps[0], seps[-1]])
         plt.ylim([10**-(self.design['Image']['c']+1), 5*10**-(self.design['Image']['c'])])
         plt.ylabel(r'$I/I_\star$',fontsize=16)
         plt.xlabel(r'Separation ($\lambda/D$)',fontsize=12)
+        plt.grid('on')
         if second_curve_diam is not None:
             plt.legend([diam_1_curve, diam_2_curve, fpm_line],
                        [r'$\theta_\star=${:.2f} $\lambda/D$'.format(diam_1),
@@ -986,7 +1008,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         return eval_path
 
     def write_eval_products(self, pixscale_lamoD=0.25, star_diam_vec=None, Npts_star_diam=7, Nlam=None, 
-                            norm='aperture', second_curve_diam=0.2, dpi=300):
+                            norm='aperture', second_curve_diam=0.2, dpi=300, get_big_telap=False):
         if 'eval subdir' not in self.fileorg or self.fileorg['eval subdir'] is None:
             if 'design ID' in self.fileorg:
                 design_label = "{:s}_{:s}".format(self.fileorg['design ID'],
@@ -1012,7 +1034,8 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
           self.get_design_portrait(stellar_intens_map*contrast_convert_fac,
                                    stellar_intens_curves*contrast_convert_fac,
                                    xis, seps, star_diam_vec,
-                                   second_curve_diam=second_curve_diam, use_gray_gap_zero=False)
+                                   second_curve_diam=second_curve_diam, use_gray_gap_zero=False,
+                                   get_big_telap=get_big_telap)
         design_portrait_fname = os.path.join(self.fileorg['eval subdir'], 'DesignPortrait_{:s}.png'.format(self.fileorg['job name']))
         design_portrait_fig.savefig(design_portrait_fname, dpi=dpi)
         logging.info("Wrote design potrait to {:s}".format(design_portrait_fname))
@@ -1241,7 +1264,7 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
     def write_ampl(self, overwrite=False):
         logging.info("Writing the AMPL program") # Not yet written for full-plane SPLC
 
-    def get_coron_masks(self, use_gray_gap_zero=True):
+    def get_coron_masks(self, use_gray_gap_zero=True, get_big_telap=False):
         TelAp_basename = os.path.basename(self.fileorg['TelAp fname'])
         if use_gray_gap_zero:
             gapstr_beg = TelAp_basename.find('gap')
@@ -1252,6 +1275,15 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname']))
         else:
             TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname']))
+
+        if get_big_telap:
+            s = 4
+            gapstr_beg = TelAp_basename.find('gap')
+            TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
+            TelAp_nopad_fname = os.path.join( os.path.dirname(self.fileorg['TelAp fname']), TelAp_nopad_basename )
+            TelAp_big_nopad_fname = TelAp_nopad_fname.replace('N{:04d}'.format(self.design['Pupil']['N']),
+                                                              'N{:04d}'.format(s*self.design['Pupil']['N']))
+            TelAp_bp = np.loadtxt(TelAp_big_nopad_fname)
 
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
         FPM_p = np.loadtxt(self.fileorg['FPM fname'])
@@ -1266,18 +1298,28 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
                                   np.concatenate((FPM_p[::-1,:], FPM_p),axis=0)), axis=1)
             LS = np.concatenate((np.concatenate((LS_p[::-1,::-1], LS_p[:,::-1]),axis=0),
                                  np.concatenate((LS_p[::-1,:], LS_p),axis=0)), axis=1)
+            if get_big_telap:
+                TelAp_big = np.concatenate((np.concatenate((TelAp_bp[::-1,::-1], TelAp_bp[:,::-1]),axis=0),
+                                            np.concatenate((TelAp_bp[::-1,:], TelAp_bp),axis=0)), axis=1)
         elif isinstance(self, HalfplaneSPLC):
             TelAp = np.concatenate((TelAp_p[:,::-1], TelAp_p), axis=1)
             Apod = np.concatenate((A_p[:,::-1], A_p), axis=1)
             FPM = np.concatenate((np.concatenate((FPM_p[::-1,::-1], FPM_p[:,::-1]),axis=0),
                                   np.concatenate((FPM_p[::-1,:], FPM_p),axis=0)), axis=1)
             LS = np.concatenate((LS_p[:,::-1], LS_p), axis=1)
+            if get_big_telap:
+                TelAp_big = np.concatenate((TelAp_bp[:,::-1], TelAp_bp), axis=1)
         else:
             TelAp = TelAp_p
             Apod = A_p
             FPM = FPM_p
             LS = LS_p
-        return TelAp, Apod, FPM, LS
+            if get_big_telap:
+                TelAp_big = TelAp_bp
+        if get_big_telap:
+            return TelAp_big, TelAp, Apod, FPM, LS
+        else:
+            return TelAp, Apod, FPM, LS
 
     def get_coords(self, fp2res=8, rho_out=None, Nlam=None): # for SPLC, with separate Lyot plane sampling
         D = 1.
@@ -3058,7 +3100,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
     def write_ampl(self, overwrite=False):
         logging.info("Writing the AMPL program")
 
-    def get_coron_masks(self, use_gray_gap_zero=True):
+    def get_coron_masks(self, use_gray_gap_zero=True, get_big_telap=False):
         TelAp_basename = os.path.basename(self.fileorg['TelAp fname'])
         if use_gray_gap_zero:
             gapstr_beg = TelAp_basename.find('gap')
@@ -3069,6 +3111,15 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             TelAp_p = np.floor(np.loadtxt(self.fileorg['TelAp fname']))
         else:
             TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname']))
+
+        if get_big_telap:
+            s = 4
+            gapstr_beg = TelAp_basename.find('gap')
+            TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
+            TelAp_nopad_fname = os.path.join( os.path.dirname(self.fileorg['TelAp fname']), TelAp_nopad_basename )
+            TelAp_big_nopad_fname = TelAp_nopad_fname.replace('N{:04d}'.format(self.design['Pupil']['N']),
+                                                              'N{:04d}'.format(s*self.design['Pupil']['N']))
+            TelAp_bp = np.loadtxt(TelAp_big_nopad_fname)
 
         A_col = np.loadtxt(self.fileorg['sol fname'])[:,-1]
         FPM_p = np.loadtxt(self.fileorg['FPM fname'])
@@ -3083,18 +3134,28 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                                   np.concatenate((FPM_p[::-1,:], FPM_p),axis=0)), axis=1)
             LS = np.concatenate((np.concatenate((LS_p[::-1,::-1], LS_p[:,::-1]),axis=0),
                                  np.concatenate((LS_p[::-1,:], LS_p),axis=0)), axis=1)
+            if get_big_telap:
+                TelAp_big = np.concatenate((np.concatenate((TelAp_bp[::-1,::-1], TelAp_bp[:,::-1]),axis=0),
+                                            np.concatenate((TelAp_bp[::-1,:], TelAp_bp),axis=0)), axis=1)
         elif isinstance(self, HalfplaneAPLC):
             TelAp = np.concatenate((TelAp_p[:,::-1], TelAp_p), axis=1)
             Apod = np.concatenate((A_p[:,::-1], A_p), axis=1)
             FPM = np.concatenate((np.concatenate((FPM_p[::-1,::-1], FPM_p[:,::-1]),axis=0),
                                   np.concatenate((FPM_p[::-1,:], FPM_p),axis=0)), axis=1)
             LS = np.concatenate((LS_p[:,::-1], LS_p), axis=1)
+            if get_big_telap:
+                TelAp_big = np.concatenate((TelAp_bp[:,::-1], TelAp_bp), axis=1)
         else:
             TelAp = TelAp_p
             Apod = A_p
             FPM = FPM_p
             LS = LS_p
-        return TelAp, Apod, FPM, LS
+            if get_big_telap:
+                TelAp_big = TelAp_bp
+        if get_big_telap:
+            return TelAp_big, TelAp, Apod, FPM, LS
+        else:
+            return TelAp, Apod, FPM, LS
 
     def get_coords(self, fp2res=8, rho_out=None, Nlam=None): # for APLC
         D = 1.
@@ -3340,9 +3401,10 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
             print("Band-averaged FWHM PSF area / (lambda0/D)^2: {:.2f}".format(self.eval_metrics['fwhm area']))
         return telap_flag
 
-    def get_yield_input_products(self, pixscale_lamoD=0.25, star_diam_vec=None, Npts_star_diam=7, Nlam=None, norm='aperture'):
+    def get_yield_input_products(self, pixscale_lamoD=0.25, star_diam_vec=None, Npts_star_diam=7, Nlam=None,
+                                 norm='aperture'):
         # Assumes quarter-plane symmetry in the final focal plane
-        TelAp, Apod, FPM, LS = self.get_coron_masks(use_gray_gap_zero=True)
+        TelAp, Apod, FPM, LS = self.get_coron_masks(use_gray_gap_zero=True, get_big_telap=False)
 
         if star_diam_vec is None:
             star_diam_vec = np.concatenate([np.linspace(0,0.09,10), np.linspace(0.1, 1, 10), np.array([2., 3., 4.])])
@@ -3351,7 +3413,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         bw = self.design['Image']['bw']
         wrs = np.linspace(1.-bw/2, 1.+bw/2, Nlam)
         seps = np.arange(self.design['FPM']['rad']+self.design['Image']['ida'],
-                         self.design['Image']['oda']+2*pixscale_lamoD, pixscale_lamoD)
+                         self.design['Image']['oda']+1*pixscale_lamoD, pixscale_lamoD)
         
         N = self.design['Pupil']['N']
         M_fp1 = self.design['FPM']['M']
