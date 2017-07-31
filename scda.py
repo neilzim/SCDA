@@ -1425,8 +1425,8 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
             FoV_mask = rad_mask
 
         for si, sep in enumerate(seps):
-            r_in = np.max([seps[0], sep-0.25])
-            r_out = np.min([seps[-1], sep+0.25])
+            r_in = np.max([seps[0], sep-rho_inc/2])
+            r_out = np.min([seps[-1], sep+rho_inc/2])
             meas_mask = (FoV_mask & (RRs >= r_in) & (RRs <= r_out))
             meas_ann_ind = np.nonzero(np.ravel(meas_mask))[0]
             if len(meas_ann_ind) > 0:
@@ -3214,13 +3214,13 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
                 theta_quad_mask = np.less(theta_quad, self.design['Image']['bowang']/2)
             else: # vertical dark zone
                 theta_quad = np.rad2deg(np.arctan2(YYs[M_fp2:,M_fp2:], XXs[M_fp2:,M_fp2:]))
-                theta_quad_mask = np.greater(theta_quad, self.design['Image']['bowang']/2)
+                theta_quad_mask = np.greater(theta_quad, -self.design['Image']['bowang']/2)
             theta_rhs_mask = np.concatenate((theta_quad_mask[::-1,:], theta_quad_mask), axis=0)
             theta_mask = np.concatenate((theta_rhs_mask[:,::-1], theta_rhs_mask), axis=1)
 
         for si, sep in enumerate(seps):
-            r_in = np.max([seps[0], sep-0.25])
-            r_out = np.min([seps[-1], sep+0.25])
+            r_in = np.max([seps[0], sep-rho_inc/2])
+            r_out = np.min([seps[-1], sep+rho_inc/2])
             if 'bowang' in self.design['Image'] and self.design['Image']['bowang'] != 180: # apply bowtie angle constraints
                 meas_mask = (theta_mask & (RRs >= r_in) & (RRs <= r_out))
                 meas_ann_ind = np.nonzero(np.ravel(meas_mask))[0]
@@ -3357,6 +3357,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         M_fp1 = self.design['FPM']['M']
         fpm_rad = self.design['FPM']['rad']
         rho2 = self.design['Image']['oda'] + 0.5
+        bowang = self.design['Image']['bowang']
         M_fp2 = int(np.ceil(rho2/pixscale_lamoD))
         M_fp2_ext = int(np.ceil((rho2+2.5)/pixscale_lamoD))
         wc = M_fp2_ext - M_fp2
@@ -3391,7 +3392,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         for si, star_diam in enumerate(star_diam_vec):
             intens_2d_vs_star_diam[si,:,:], \
             intens_rad_vs_star_diam[si,:] = get_finite_star_aplc_psf(TelAp, Apod, FPM, LS,
-                                                                     xs, dx, XX, YY, mxs, dmx, xis, dxi,
+                                                                     xs, dx, XX, YY, mxs, dmx, xis, dxi, bowang,
                                                                      star_diam, Npts_star_diam, wrs=wrs,
                                                                      seps=seps, norm=norm,
                                                                      get_radial_curve=True)
@@ -3417,7 +3418,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         return intens_2d_vs_star_diam, intens_rad_vs_star_diam, np.ravel(xis), seps, star_diam_vec, \
                offax_psf_map, np.array(offax_XisEtas).T, sky_trans_map, contrast_convert_fac
 
-def get_finite_star_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis, dxi,
+def get_finite_star_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis, dxi, bowang,
                              star_diam_lamoD=0.1, Npts_star_diam=7,
                              wrs=None, seps=None, get_radial_curve=False, norm='peak'):
     if wrs is None:
@@ -3444,12 +3445,27 @@ def get_finite_star_aplc_psf(TelAp, Apod, FPM, LS, xs, dx, XX, YY, mxs, dmx, xis
         XXs = np.asarray(np.dot(np.matrix(np.ones(xis.shape)).T, xis))
         YYs = np.asarray(np.dot(xis.T, np.matrix(np.ones(xis.shape))))
         RRs = np.sqrt(XXs**2 + YYs**2)
+        M_fp2 = XXs.shape[0] // 2
+
+        if bowang != 180: # Define bowtie angle constraints
+            if bowang >= 0: # horizontal dark zone
+                theta_quad = np.rad2deg(np.arctan2(YYs[M_fp2:,M_fp2:], XXs[M_fp2:,M_fp2:]))
+                theta_quad_mask = np.less(theta_quad, bowang/2)
+            else: # vertical dark zone
+                theta_quad = np.rad2deg(np.arctan2(YYs[M_fp2:,M_fp2:], XXs[M_fp2:,M_fp2:]))
+                theta_quad_mask = np.greater(theta_quad, -bowang/2)
+            theta_rhs_mask = np.concatenate((theta_quad_mask[::-1,:], theta_quad_mask), axis=0)
+            theta_mask = np.concatenate((theta_rhs_mask[:,::-1], theta_rhs_mask), axis=1)
 
         for si, sep in enumerate(seps):
-            r_in = np.max([seps[0], sep-0.25])
-            r_out = np.min([seps[-1], sep+0.25])
-            meas_ann_ind = np.nonzero(np.logical_and(np.greater_equal(RRs, r_in).ravel(),
-                                                     np.less_equal(RRs, r_out).ravel()))[0]
+            r_in = np.max([seps[0], sep-0.25/2])
+            r_out = np.min([seps[-1], sep+0.25/2])
+            if bowang != 180:
+                meas_mask = (theta_mask & (RRs >= r_in) & (RRs <= r_out))
+                meas_ann_ind = np.nonzero(np.ravel(meas_mask))[0]
+            else:
+                meas_ann_ind = np.nonzero(np.logical_and(np.greater_equal(RRs, r_in).ravel(),
+                                                         np.less_equal(RRs, r_out).ravel()))[0]
             intens_radial_src[si] = np.mean(np.ravel(intens_2d_src)[meas_ann_ind])
             
         return intens_2d_src, intens_radial_src
