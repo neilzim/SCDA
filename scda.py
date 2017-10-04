@@ -303,9 +303,11 @@ class DesignParamSurvey(object):
         # Handle missing values
         if 'planeofconstr' not in self.solver or self.solver['planeofconstr'] is None: self.solver['planeofconstr'] = 'FP2'
         if 'constr' not in self.solver or self.solver['constr'] is None: self.solver['constr'] = 'lin'
+        if 'solver' not in self.solver or self.solver['solver'] is None: self.solver['solver'] = 'gurobi'
         if 'method' not in self.solver or self.solver['method'] is None: self.solver['method'] = 'bar'
+        if 'convtol' not in self.solver: self.solver['convtol'] = None
+        if 'threads' not in self.solver: self.solver['threads'] = None
         if 'presolve' not in self.solver or self.solver['presolve'] is None: self.solver['presolve'] = True
-        if 'threads' not in self.solver or self.solver['threads'] is None: self.solver['threads'] = None
         if 'crossover' not in self.solver: self.solver['crossover'] = None
          
         setattr(self, 'coron_list', [])
@@ -710,11 +712,12 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                                  'sol dir', 'log dir', 'eval dir', 'eval subdir', 'slurm dir',
                                  'ampl src fname', 'slurm fname', 'log fname', 'job name', 'design ID', 
                                  'TelAp fname', 'FPM fname', 'LS fname', 'LDZ fname', 'sol fname'],
-                     'solver': ['planeofconstr', 'constr', 'method', 'presolve', 'threads', 'solver', 'crossover'] }
+                     'solver': ['planeofconstr', 'constr', 'method', 'presolve', 'threads', 'solver', 'crossover', 'convtol'] }
 
     _solver_menu = { 'planeofconstr': ['FP1', 'Lyot', 'FP2'], 
                      'constr': ['lin', 'quad'], 'solver': ['LOQO', 'gurobi', 'gurobix'], 
                      'method': ['bar', 'barhom', 'dualsimp'],
+                     'convtol': [None]+range(5,20),
                      'presolve': [True, False], 'threads': [None]+range(1,33), 'crossover': [None]+[True, False] }
 
     _aperture_menu = { 'prim': ['hex1', 'hex2', 'hex3', 'hex4', 'key24', 'pie12', 'pie08', 'circ', 
@@ -2077,15 +2080,15 @@ class QuarterplaneSPLC(SPLC): # Zimmerman SPLC subclass for the quarter-plane sy
         """
 
         gurobi_opt_str = "outlev=1"
-        if self.solver['presolve'] is False:
+        if self.solver['presolve'] == False:
             gurobi_opt_str += " presolve=0"
-        if self.solver['method'] is 'bar' or self.solver['method'] is 'barhom':
+        if self.solver['method'] == 'bar' or self.solver['method'] == 'barhom':
             gurobi_opt_str += " lpmethod=2"
-            if self.solver['convtol'] is not None:
+            if self.solver['convtol'] != None:
                 gurobi_opt_str += " barconvtol={0:.1e}".format(np.power(10,-self.solver['convtol']))
-            if self.solver['method'] is 'barhom':
+            if self.solver['method'] == 'barhom':
                 gurobi_opt_str += " barhomogeneous=1"
-            if self.solver['crossover'] is True:
+            if self.solver['crossover'] == True:
                 gurobi_opt_str += " crossoverbasis=1"
             else:
                 gurobi_opt_str += " crossover=0"
@@ -2722,15 +2725,15 @@ class HalfplaneSPLC(SPLC): # Zimmerman SPLC subclass for the half-plane symmetry
         """
 
         gurobi_opt_str = "outlev=1"
-        if self.solver['presolve'] is False:
+        if self.solver['presolve'] == False:
             gurobi_opt_str += " presolve=0"
-        if self.solver['method'] is 'bar' or self.solver['method'] is 'barhom':
+        if self.solver['method'] == 'bar' or self.solver['method'] == 'barhom':
             gurobi_opt_str += " lpmethod=2"
-            if self.solver['convtol'] is not None:
+            if self.solver['convtol'] != None:
                 gurobi_opt_str += " barconvtol={0:.1e}".format(np.power(10,-self.solver['convtol']))
-            if self.solver['method'] is 'barhom':
+            if self.solver['method'] == 'barhom':
                 gurobi_opt_str += " barhomogeneous=1"
-            if self.solver['crossover'] is True:
+            if self.solver['crossover'] == True:
                 gurobi_opt_str += " crossoverbasis=1"
             else:
                 gurobi_opt_str += " crossover=0"
@@ -3948,15 +3951,15 @@ class HalfplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the half-plane symm
         """
 
         gurobi_opt_str = "outlev=1"
-        if self.solver['presolve'] is False:
+        if self.solver['presolve'] == False:
             gurobi_opt_str += " presolve=0"
-        if self.solver['method'] is 'bar' or self.solver['method'] is 'barhom':
+        if self.solver['method'] == 'bar' or self.solver['method'] == 'barhom':
             gurobi_opt_str += " lpmethod=2"
-            if self.solver['convtol'] is not None:
+            if self.solver['convtol'] != None:
                 gurobi_opt_str += " barconvtol={0:.1e}".format(np.power(10,-self.solver['convtol']))
-            if self.solver['method'] is 'barhom':
+            if self.solver['method'] == 'barhom':
                 gurobi_opt_str += " barhomogeneous=1"
-            if self.solver['crossover'] is True:
+            if self.solver['crossover'] == True:
                 gurobi_opt_str += " crossoverbasis=1"
             else:
                 gurobi_opt_str += " crossover=0"
@@ -4507,15 +4510,15 @@ class QuarterplaneAPLC(NdiayeAPLC): # N'Diaye APLC subclass for the quarter-plan
         """
 
         gurobi_opt_str = "outlev=1"
-        if self.solver['presolve'] is False:
+        if self.solver['presolve'] == False:
             gurobi_opt_str += " presolve=0"
-        if self.solver['method'] is 'bar' or self.solver['method'] is 'barhom':
+        if self.solver['method'] == 'bar' or self.solver['method'] == 'barhom':
             gurobi_opt_str += " lpmethod=2"
-            if self.solver['convtol'] is not None:
+            if self.solver['convtol'] != None:
                 gurobi_opt_str += " barconvtol={0:.1e}".format(np.power(10,-self.solver['convtol']))
-            if self.solver['method'] is 'barhom':
+            if self.solver['method'] == 'barhom':
                 gurobi_opt_str += " barhomogeneous=1"
-            if self.solver['crossover'] is True:
+            if self.solver['crossover'] == True:
                 gurobi_opt_str += " crossoverbasis=1"
             else:
                 gurobi_opt_str += " crossover=0"
