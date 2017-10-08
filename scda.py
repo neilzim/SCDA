@@ -884,7 +884,10 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         gs1.update(left=0.01, right=0.99, bottom=0.02, top=0.99, wspace=0.01)
         if get_big_telap:
            ax1 = plt.subplot(gs1[0,0])
-           s = 4
+           if N <= 128:
+               s = 4
+           else:
+               s = 2
            scaled_TelAp = skimage.transform.rescale(TelAp, s, order=0)
            plt.imshow(scaled_TelAp[s*(N+N/2):, s*N:s*(N+N/2)] + \
                       TelAp_big[s*(N+N/2):, s*N:s*(N+N/2)])
