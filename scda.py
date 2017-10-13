@@ -1488,12 +1488,12 @@ class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diap
 
         return xis, intens_polychrom, seps, radial_intens_polychrom, FoV_mask
 
-    def get_metrics(self, fp1res=8, fp2res=16, rho_out=None, Nlam=None, verbose=True): # for SPLC class
+    def get_metrics(self, fp1res=8, fp2res=16, rho_out=None, Nlam=None, use_gray_gap_zero=True, verbose=True): # for SPLC class
         TelAp_basename = os.path.basename(self.fileorg['TelAp fname'])
         gapstr_beg = TelAp_basename.find('gap')
         TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
         TelAp_nopad_fname = os.path.join( os.path.dirname(self.fileorg['TelAp fname']), TelAp_nopad_basename )
-        if os.path.exists(TelAp_nopad_fname):
+        if os.path.exists(TelAp_nopad_fname) and use_gray_gap_zero:
             TelAp_p = np.loadtxt(TelAp_nopad_fname)
             telap_flag = 0
         else:
@@ -3305,7 +3305,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
 
         return xis, intens_polychrom, seps, radial_intens_polychrom
 
-    def get_metrics(self, fp2res=16, rho_out=None, Nlam=None, verbose=True): # for APLC class
+    def get_metrics(self, fp2res=16, rho_out=None, Nlam=None, use_gray_gap_zero=True, verbose=True): # for APLC class
         TelAp_basename = os.path.basename(self.fileorg['TelAp fname'])
         gapstr_beg = TelAp_basename.find('gap')
         TelAp_nopad_basename = TelAp_basename.replace(TelAp_basename[gapstr_beg:gapstr_beg+4], 'gap0')
@@ -3316,7 +3316,7 @@ class NdiayeAPLC(LyotCoronagraph): # Image-constrained APLC following N'Diaye et
         #    TelAp_p = np.round(np.loadtxt(self.fileorg['TelAp fname'])).astype(int)
         #else:
         #    TelAp_p = np.loadtxt(self.fileorg['TelAp fname'])
-        if os.path.exists(TelAp_nopad_fname):
+        if os.path.exists(TelAp_nopad_fname) and use_gray_gap_zero:
             TelAp_p = np.loadtxt(TelAp_nopad_fname)
             telap_flag = 0
         else:
