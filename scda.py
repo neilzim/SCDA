@@ -13,7 +13,7 @@ import datetime
 import textwrap
 import csv
 import numpy as np
-import skimage.transform
+import scipy.ndimage.interpolation
 import pdb
 import getpass
 import socket
@@ -888,7 +888,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
                s = 4
            else:
                s = 2
-           scaled_TelAp = skimage.transform.rescale(TelAp, s, order=0)
+           scaled_TelAp = scipy.ndimage.interpolation.zoom(TelAp, s, order=0)
            plt.imshow(scaled_TelAp[s*(N+N/2):, s*N:s*(N+N/2)] + \
                       TelAp_big[s*(N+N/2):, s*N:s*(N+N/2)])
            _ = plt.axis('off')
