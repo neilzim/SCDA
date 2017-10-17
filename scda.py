@@ -1088,7 +1088,7 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         logging.info("Wrote off-axis PSF offset list to {:s}".format(offax_psf_offset_list_fname))
         logging.info("Wrote sky transmission map to {:s}".format(sky_trans_fname))
 
-class AxisymAPLC(LyotCoronagraph): # APLC following Zimmerman et al. (2016), uses diaphragm FPM 
+class AxisymAPLC(LyotCoronagraph): # 1-D axisymmetric APLC following Zimmerman et al. (2016)
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 500)), ('centobs',(int, 1))]) ),
                                    ( 'FPM', OrderedDict([('R',(float, 4.)),  ('fpmres',(int, 10))]) ),
                                    ( 'LS', OrderedDict([ ('id',(int, 20)), ('od',(int, 80))]) ),
@@ -1154,9 +1154,10 @@ class AxisymAPLC(LyotCoronagraph): # APLC following Zimmerman et al. (2016), use
        
         self.amplname_ls = "LS{0:02d}D{1:02d}".format(self.design['LS']['id'], self.design['LS']['od'])
  
-        self.amplname_image = "ImgC{0:03d}BW{1:02d}Nlam{2:02d}dR{3:1d}res{4:1d}".format(int(round(10*self.design['Image']['c'])), \
+        self.amplname_image = "ImgC{0:03d}BW{1:02d}Nlam{2:02d}dR{3:1d}OWA{4:04d}res{5:1d}".format(int(round(10*self.design['Image']['c'])), \
                                int(round(100*self.design['Image']['bw'])), self.design['Image']['Nlam'], \
-                               int(round(-10*self.design['Image']['dR'])), self.design['Image']['fpres'])
+                               int(round(-10*self.design['Image']['dR'])), int(100*self.design['Image']['owa']),
+                               self.design['Image']['fpres'])
         
         if self.solver['presolve']:
             self.amplname_solver = "{}{}pre1".format(self.solver['constr'], self.solver['method'])
@@ -1248,7 +1249,7 @@ class AxisymAPLC(LyotCoronagraph): # APLC following Zimmerman et al. (2016), use
         #---------------------
         param fp2res = {7:d};
         param Nimg := {8:d};
-        param bw := {9:0.2f};
+        param bw := {9:0.3f};
         param Nlam := {10:d};
             
         #---------------------
@@ -1266,15 +1267,15 @@ class AxisymAPLC(LyotCoronagraph): # APLC following Zimmerman et al. (2016), use
         define_coords = """
         #---------------------
         # steps in each plane
-        param dx := 1/(2*N);      
-        param dmx := 1/fpmres;
-        param dxi := 1/fp2res;
+        param dr := 1/(2*N);      
+        param dmr := 1/fpmres;
+        param drho := 1/fp2res;
   
         #---------------------
         # coordinate vectors in each plane
-        set Xs := setof {i in 0.5..N-0.5 by 1} i*dx;
-        set MXs := setof {i in 0.5..M-0.5 by 1} i*dmx;
-        set Xis := setof {i in 0..Nimg-1 by 1} i*dxi;
+        set Rs := setof {i in 0.5..N-0.5 by 1} i*dr;
+        set MRs := setof {i in 0.5..M-0.5 by 1} i*dmr;
+        set Rhos := setof {i in 0..Nimg-1 by 1} i*drho;
         """
        
         if self.design['Image']['Nlam'] > 1 and self.design['Image']['bw'] > 0:
@@ -1288,31 +1289,31 @@ class AxisymAPLC(LyotCoronagraph): # APLC following Zimmerman et al. (2016), use
 
 	define_pupil_and_telap = """
         #---------------------
-        set Pupil := setof {r in Xs: r > CentObs/2} r;
-        set Lyot := setof {r in Xs: r > LSid/2 && r < LSod/2} r;
+        set Pupil := setof {r in Rs: r > CentObs/2} r;
+        set Lyot := setof {r in Rs: r > LSid/2 && r < LSod/2} r;
         """
         
 	sets_and_arrays = """
         #---------------------             
-        var A {x in Xs} >= 0, <= 1, :=0.5;
-        set FPM := setof {mx in MXs: mx < FPMrad} mx;
-        set FP2dark := setof {rho in Xis: rho > rho0} rho;
+        var A {r in Rs} >= 0, <= 1, :=0.5;
+        set FPM := setof {mr in MRs: mr < FPMrad} mr;
+        set FP2dark := setof {rho in Rhos: rho > rho0} rho;
         """
 
         field_propagation = """
         #---------------------
-        var E_fpm {wr in wrs, mx in FPM} = 2*pi/wr * sum{x in Xs: x in Pupil} x*A[x]*gsl_sf_bessel_J0(2*pi*mx*x/wr)*dx;
-        var E_Lp {wr in wrs, x in Lyot} = A[x] - 2*pi/wr * sum{mx in FPM} mx*E_fpm[wr, mx]*gsl_sf_bessel_J0(2*pi*x*mx/wr)*dmx;
-        var E_fp2 {wr in wrs, rho in FP2dark} = 2*pi/wr * sum{x in Lyot} x*E_Lp[wr, x]*gsl_sf_bessel_J0(2*pi*rho*x/wr)*dx;
+        var E_fpm {wr in wrs, mr in FPM} = 2*pi/wr * sum{r in Rs: r in Pupil} r*A[r]*gsl_sf_bessel_J0(2*pi*mr*r/wr)*dr;
+        var E_L {wr in wrs, r in Lyot} = A[r] - 2*pi/wr * sum{mr in FPM} mr*E_fpm[wr, mr]*gsl_sf_bessel_J0(2*pi*r*mr/wr)*dmr;
+        var E_fp2 {wr in wrs, rho in FP2dark} = 2*pi/wr * sum{r in Lyot} r*E_L[wr, r]*gsl_sf_bessel_J0(2*pi*rho*r/wr)*dr;
 	"""
 
         field_propagation_unocc = """
-        var E_offax_peak {wr in wrs} = 2*pi/wr * sum{x in Xs: x in Pupil union Lyot} x*A[x]*dx;
+        var E_offax_peak {wr in wrs} = 2*pi/wr * sum{r in Rs: r in Pupil union Lyot} r*A[r]*dr;
         """
        
 	constraints = """
         #---------------------
-        maximize thrupt: sum {x in Xs: x in Pupil union Lyot} 2*pi*x*A[x]*dx / (pi/4);
+        maximize thrupt: sum {r in Rs: r in Pupil union Lyot} 2*pi*r*A[r]*dr / (pi/4);
 
         subject to sidelobe_pos {wr in wrs, rho in FP2dark}: E_fp2[wr, rho] <=  10^(-c/2)*E_offax_peak[wr];
         subject to sidelobe_neg {wr in wrs, rho in FP2dark}: E_fp2[wr, rho] >= -10^(-c/2)*E_offax_peak[wr];
@@ -1351,7 +1352,11 @@ class AxisymAPLC(LyotCoronagraph): # APLC following Zimmerman et al. (2016), use
         store_results = """
         #---------------------
 
-        printf {{x in Xs}}: "%.6g %.g \\n", x, A[x] > "{0:s}";
+        param A_fin {{r in Rs}};
+        let {{r in Rs}} A_fin[r] := 0;
+        let {{r in Pupil}} A_fin[r] := A[r];
+
+        printf {{r in Rs}}: "%.6g %.g \\n", r, A_fin[r] > "{0:s}";
         """.format(self.fileorg['sol fname'])
  
         mod_fobj.write( textwrap.dedent(header) )
