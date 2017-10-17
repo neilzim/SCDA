@@ -412,9 +412,10 @@ class DesignParamSurvey(object):
         print("All input files exist? {}".format(self.check_ampl_input_files()))
         print("")
         print("Last coronagraph in survey list:")
-        print("Telescope aperture file {:s}".format(self.coron_list[-1].fileorg['TelAp fname']))
-        print("Focal plane mask file {:s}".format(self.coron_list[-1].fileorg['FPM fname']))
-        print("Lyot stop file {:s}".format(self.coron_list[-1].fileorg['LS fname']))
+        if self.coron_class != AxisymAPLC:
+            print("Telescope aperture file {:s}".format(self.coron_list[-1].fileorg['TelAp fname']))
+            print("Focal plane mask file {:s}".format(self.coron_list[-1].fileorg['FPM fname']))
+            print("Lyot stop file {:s}".format(self.coron_list[-1].fileorg['LS fname']))
         print("Job label {:s}".format(self.coron_list[-1].fileorg['job name']))
         print("Varied parameter combo tuple:")
         pprint.pprint(self.varied_param_combos[-1])
@@ -1086,6 +1087,296 @@ class LyotCoronagraph(object): # Lyot coronagraph base class
         logging.info("Wrote off-axis PSF to {:s}".format(offax_psf_fname))
         logging.info("Wrote off-axis PSF offset list to {:s}".format(offax_psf_offset_list_fname))
         logging.info("Wrote sky transmission map to {:s}".format(sky_trans_fname))
+
+class AxisymAPLC(LyotCoronagraph): # APLC following Zimmerman et al. (2016), uses diaphragm FPM 
+    _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 500)), ('centobs',(int, 1))]) ),
+                                   ( 'FPM', OrderedDict([('R',(float, 4.)),  ('fpmres',(int, 10))]) ),
+                                   ( 'LS', OrderedDict([ ('id',(int, 20)), ('od',(int, 80))]) ),
+                                   ( 'Image', OrderedDict([('c',(float, 10.)), ('bw',(float, 0.10)), ('Nlam',(int, 3)),
+                                                           ('dR',(float, -0.5)), ('owa',(float, 10)), ('fpres',(int, 2))]) ) ])
+    
+    def __init__(self, verbose=False, **kwargs):
+        super(AxisymAPLC, self).__init__(**kwargs)
+
+        setattr(self, 'design', {})
+        for keycat in self._design_fields:
+            self.design[keycat] = {}
+
+        if 'design' in kwargs:
+            design_dict = kwargs.get('design')
+            for keycat, param_dict in design_dict.items():
+                if keycat in self._design_fields:
+                    for param, value in param_dict.items():
+                        if param in self._design_fields[keycat]:
+                            if value is not None:
+                                if isinstance(value, self._design_fields[keycat][param][0]):
+                                    self.design[keycat][param] = value
+                                else:
+                                    warnstr = ("Warning: Invalid {0} for parameter \"{1}\" under category \"{2}\" " + \
+                                               "design initialization argument, expecting a {3}").format(type(value), param, keycat, self._design_fields[keycat][param][0]) 
+                                    logging.warning(warnstr)
+                        else:
+                            logging.warning("Warning: Unrecognized parameter \"{0}\" under category \"{1}\" in design initialization argument".format(param, keycat))
+                else:
+                    logging.warning("Warning: Unrecognized key category \"{0}\" in design initialization argument".format(keycat))
+                    self.design[keycat] = None
+        for keycat in self._design_fields: # Fill in default values where appropriate
+            if keycat not in self.design:
+                self.design[keycat] = {}
+            for param in self._design_fields[keycat]:
+                if param not in self.design[keycat] or (self.design[keycat][param] is None and \
+                                                        self._design_fields[keycat][param][1] is not None):
+                    self.design[keycat][param] = self._design_fields[keycat][param][1]
+        self.design['FPM']['M'] = int(np.ceil(self.design['FPM']['fpmres']*self.design['FPM']['R']))
+        # NOTE: temporarily removing bandpass augmentation in favor of direct image constraints down to R0+dR
+        #if False and self.design['Image']['dR'] < 0: # expand optimization bandpass according to the focal plane stellar diam./pointing tolerance parameter, 'dR'
+        if self.design['Image']['dR'] < 0: # expand optimization bandpass according to the focal plane stellar diam./pointing tolerance parameter, 'dR'
+            self.design['Image']['bw+'] = self.design['Image']['bw']*self.design['FPM']['R']/(self.design['FPM']['R'] + self.design['Image']['dR'])
+        else:
+            self.design['Image']['bw+'] = self.design['Image']['bw']
+        # Unless Nlam is explicitly specified, set the number of wavelength samples according to the bandwidth
+        if self.design['Image']['Nlam'] == 1 and self.design['Image']['bw+'] > 0:
+            self.design['Image']['Nlam'] = int(np.ceil(self.design['Image']['bw+']/(0.12/4)))
+        # Set a private attribute for the number of image plane samples between the center and the outer constraint angle
+        self.design['Image']['Nimg'] = int( np.ceil( self.design['Image']['fpres']*self.design['Image']['owa']/(1. - self.design['Image']['bw+']/2) ) )
+        
+        if verbose: # Print summary of the set parameters
+            logging.info("Design parameters: {}".format(self.design))
+            logging.info("Optimization and solver parameters: {}".format(self.solver))
+            logging.info("File organization parameters: {}".format(self.fileorg))
+     
+        self.amplname_coron = "APLC_axisym"
+        
+        self.telap_descrip = "cobs{0:02d}N{1:04d}".format(self.design['Pupil']['centobs'], self.design['Pupil']['N'])
+        self.amplname_pupil = self.telap_descrip
+
+        self.amplname_fpm = "FPMrad{0:03d}res{1:02d}".format(int(100*self.design['FPM']['R']), self.design['FPM']['fpmres'])
+       
+        self.amplname_ls = "LS{0:02d}D{1:02d}".format(self.design['LS']['id'], self.design['LS']['od'])
+ 
+        self.amplname_image = "ImgC{0:03d}BW{1:02d}Nlam{2:02d}dR{3:1d}res{4:1d}".format(int(round(10*self.design['Image']['c'])), \
+                               int(round(100*self.design['Image']['bw'])), self.design['Image']['Nlam'], \
+                               int(round(-10*self.design['Image']['dR'])), self.design['Image']['fpres'])
+        
+        if self.solver['presolve']:
+            self.amplname_solver = "{}{}pre1".format(self.solver['constr'], self.solver['method'])
+        else:
+            self.amplname_solver = "{}{}pre0".format(self.solver['constr'], self.solver['method'])
+        
+        if self.solver['convtol'] is not None:
+            self.amplname_solver += "convtol{0:2d}".format(int(round(10*self.solver['convtol'])))
+       
+        if self.solver['crossover'] is not None:
+            self.amplname_solver += "cross"
+        
+        if self.solver['threads'] is not None:
+            self.amplname_solver += "thr{:02d}".format(self.solver['threads'])
+
+        if 'ampl src fname' not in self.fileorg or self.fileorg['ampl src fname'] is None:
+            ampl_src_fname_tail = self.amplname_coron + "_" + self.amplname_pupil + "_" + self.amplname_fpm + "_" + \
+                                  self.amplname_ls + "_" + self.amplname_image + "_" + self.amplname_solver + ".mod"
+            self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname_tail)
+
+        if 'job name' not in self.fileorg or self.fileorg['job name'] is None:
+            self.fileorg['job name'] = os.path.basename(self.fileorg['ampl src fname'])[:-4]
+
+        if 'sol fname' not in self.fileorg or self.fileorg['sol fname'] is None:
+            sol_fname_tail = "ApodSol_" + self.fileorg['job name'] + ".dat"
+            self.fileorg['sol fname'] = os.path.join(self.fileorg['sol dir'], sol_fname_tail)
+
+        if 'slurm fname' not in self.fileorg or self.fileorg['slurm fname'] is None:
+            exec_script_fname_tail = self.fileorg['job name'] + ".sh"
+            self.fileorg['slurm fname'] = os.path.join(self.fileorg['slurm dir'], exec_script_fname_tail)
+
+        if 'log fname' not in self.fileorg or self.fileorg['log fname'] is None:
+            log_fname_tail = self.fileorg['job name'] + ".log"
+            self.fileorg['log fname'] = os.path.join(self.fileorg['log dir'], log_fname_tail)
+
+        # self.check_ampl_input_files()
+
+    def write_ampl(self, overwrite=False, override_infile_status=False, ampl_src_fname=None, verbose=True):
+        if self.ampl_infile_status is False and not override_infile_status:
+            if verbose:
+                logging.warning("Error: the most recent input file check for this design configuration failed.")
+                logging.warning("The override_infile_status switch is off, so write_ampl() will now abort.")
+                logging.warning("See previous warnings in the log to see what file was missing during the initialization")
+            return 2
+        if ampl_src_fname is not None:
+            if os.path.dirname(ampl_src_fname) == '' and self.fileorg['ampl src dir'] is not None:
+                self.fileorg['ampl src fname'] = os.path.join(self.fileorg['ampl src dir'], ampl_src_fname)
+            else:
+                self.fileorg['ampl src fname'] = ampl_src_fname
+                self.fileorg['ampl src dir'] = os.path.dirname(self.fileorg['ampl src fname'])
+        if os.path.exists(self.fileorg['ampl src fname']):
+            if overwrite == True:
+                if verbose:
+                    logging.warning("Warning: Overwriting the existing copy of {0}".format(self.fileorg['ampl src fname']))
+            else:
+                if verbose:
+                    logging.warning("Error: {0} already exists and overwrite switch is off, so write_ampl() will now abort".format(self.fileorg['ampl src fname']))
+                return 1
+        elif not os.path.exists(self.fileorg['ampl src dir']):
+            os.mkdir(self.fileorg['ampl src dir'])
+            if verbose:
+                logging.info("Created new AMPL source code directory, {0:s}".format(self.fileorg['ampl src dir']))
+        mod_fobj = open(self.fileorg['ampl src fname'], "w")
+ 
+        header = """\
+        # AMPL program to optimize an axisymmetric APLC
+        # Created by {0:s} with {1:s} on {2:s} at {3:s}
+        load amplgsl.dll;
+        function gsl_sf_bessel_J0;
+        """.format(getpass.getuser(), os.path.basename(__file__), socket.gethostname(), datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+ 
+        params = """
+        #---------------------
+        param pi:= 4*atan(1);
+ 
+        #---------------------
+        param c := {0:.2f};
+ 
+        #---------------------
+        param FPMrad := {1:0.2f};
+        param rho0 := {2:0.2f};
+        param rho1 := {3:0.2f};
+            
+        #---------------------
+        param N := {4:d};				# discretization parameter (apodizer)
+        param M := {5:d};				# discretization parameter (FPM)     
+        param fpmres := {6:d};			# discretization parameter (FPM)
+                                  
+        #---------------------
+        param fp2res = {7:d};
+        param Nimg := {8:d};
+        param bw := {9:0.2f};
+        param Nlam := {10:d};
+            
+        #---------------------
+        param CentObs := {11:0.2f};
+        param LSid := {12:0.2f};
+        param LSod := {13:0.2f};
+        
+        """.format(self.design['Image']['c'], self.design['FPM']['R'],
+                   self.design['FPM']['R']+self.design['Image']['dR'], self.design['Image']['owa'],
+                   self.design['Pupil']['N'], self.design['FPM']['M'], self.design['FPM']['fpmres'],
+                   self.design['Image']['fpres'], self.design['Image']['Nimg'],
+                   self.design['Image']['bw+'], self.design['Image']['Nlam'],
+                   self.design['Pupil']['centobs']/100., self.design['LS']['id']/100., self.design['LS']['od']/100.)
+       
+        define_coords = """
+        #---------------------
+        # steps in each plane
+        param dx := 1/(2*N);      
+        param dmx := 1/fpmres;
+        param dxi := 1/fp2res;
+  
+        #---------------------
+        # coordinate vectors in each plane
+        set Xs := setof {i in 0.5..N-0.5 by 1} i*dx;
+        set MXs := setof {i in 0.5..M-0.5 by 1} i*dmx;
+        set Xis := setof {i in 0..Nimg-1 by 1} i*dxi;
+        """
+       
+        if self.design['Image']['Nlam'] > 1 and self.design['Image']['bw'] > 0:
+            define_wavelengths = """
+            set wrs := setof {j in 1..Nlam} 1 - bw/2 + (j - 1)*bw/(Nlam - 1);
+            """
+        else:
+            define_wavelengths = """
+            set wrs := setof {j in 1..1} 1;
+            """
+
+	define_pupil_and_telap = """
+        #---------------------
+        set Pupil := setof {r in Xs: r > CentObs/2} r;
+        set Lyot := setof {r in Xs: r > LSid/2 && r < LSod/2} r;
+        """
+        
+	sets_and_arrays = """
+        #---------------------             
+        var A {x in Xs} >= 0, <= 1, :=0.5;
+        set FPM := setof {mx in MXs: mx < FPMrad} mx;
+        set FP2dark := setof {rho in Xis: rho > rho0} rho;
+        """
+
+        field_propagation = """
+        #---------------------
+        var E_fpm {wr in wrs, mx in FPM} = 2*pi/wr * sum{x in Xs: x in Pupil} x*A[x]*gsl_sf_bessel_J0(2*pi*mx*x/wr)*dx;
+        var E_Lp {wr in wrs, x in Lyot} = A[x] - 2*pi/wr * sum{mx in FPM} mx*E_fpm[wr, mx]*gsl_sf_bessel_J0(2*pi*x*mx/wr)*dmx;
+        var E_fp2 {wr in wrs, rho in FP2dark} = 2*pi/wr * sum{x in Lyot} x*E_Lp[wr, x]*gsl_sf_bessel_J0(2*pi*rho*x/wr)*dx;
+	"""
+
+        field_propagation_unocc = """
+        var E_offax_peak {wr in wrs} = 2*pi/wr * sum{x in Xs: x in Pupil union Lyot} x*A[x]*dx;
+        """
+       
+	constraints = """
+        #---------------------
+        maximize thrupt: sum {x in Xs: x in Pupil union Lyot} 2*pi*x*A[x]*dx / (pi/4);
+
+        subject to sidelobe_pos {wr in wrs, rho in FP2dark}: E_fp2[wr, rho] <=  10^(-c/2)*E_offax_peak[wr];
+        subject to sidelobe_neg {wr in wrs, rho in FP2dark}: E_fp2[wr, rho] >= -10^(-c/2)*E_offax_peak[wr];
+        """
+ 
+    	solver = """
+        option solver gurobi;
+        """
+
+        gurobi_opt_str = "outlev=1"
+        if self.solver['presolve'] == False:
+            gurobi_opt_str += " presolve=0"
+        if self.solver['method'] == 'bar' or self.solver['method'] == 'barhom':
+            gurobi_opt_str += " lpmethod=2"
+            if self.solver['convtol'] != None:
+                gurobi_opt_str += " barconvtol={0:.1e}".format(np.power(10,-self.solver['convtol']))
+            if self.solver['method'] == 'barhom':
+                gurobi_opt_str += " barhomogeneous=1"
+            if self.solver['crossover'] == True:
+                gurobi_opt_str += " crossoverbasis=1"
+            else:
+                gurobi_opt_str += " crossover=0"
+        else: # assume dual simplex
+            gurobi_opt_str += " lpmethod=1"
+
+        solver_options = """
+        option gurobi_options "{0:s}";
+        """.format(gurobi_opt_str)
+
+        execute = """
+        solve;
+ 
+        display solve_result_num, solve_result;
+        """
+ 
+        store_results = """
+        #---------------------
+
+        printf {{x in Xs}}: "%.6g %.g \\n", x, A[x] > "{0:s}";
+        """.format(self.fileorg['sol fname'])
+ 
+        mod_fobj.write( textwrap.dedent(header) )
+        mod_fobj.write( textwrap.dedent(params) )
+        mod_fobj.write( textwrap.dedent(define_coords) )
+        mod_fobj.write( textwrap.dedent(define_wavelengths) )
+        mod_fobj.write( textwrap.dedent(define_pupil_and_telap) )
+        mod_fobj.write( textwrap.dedent(sets_and_arrays) )
+
+        mod_fobj.write( textwrap.dedent(field_propagation) )
+        mod_fobj.write( textwrap.dedent(field_propagation_unocc) )
+
+        mod_fobj.write( textwrap.dedent(constraints) )
+        mod_fobj.write( textwrap.dedent(solver) )
+        mod_fobj.write( textwrap.dedent(solver_options) )
+        mod_fobj.write( textwrap.dedent(execute) )
+        mod_fobj.write( textwrap.dedent(store_results) )
+ 
+        mod_fobj.close()
+        if verbose:
+            logging.info("Wrote %s"%self.fileorg['ampl src fname'])
+        return 0
+
+    def check_ampl_input_files(self): # dummy function for axisym APLC class
+        return True # Always pass check because there are no input files.
 
 class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diaphragm FPM 
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 125)), ('prim',(str, 'hex3')), ('secobs',(str, 'X')), 
