@@ -14,6 +14,7 @@ import textwrap
 import csv
 import numpy as np
 import scipy.ndimage.interpolation
+import scipy.special
 import pdb
 import getpass
 import socket
@@ -1295,6 +1296,7 @@ class AxisymAPLC(LyotCoronagraph): # 1-D axisymmetric APLC following Zimmerman e
         
 	sets_and_arrays = """
         #---------------------             
+        param TelAp {r in Rs} := (if r in Pupil then 1 else 0);
         var A {r in Rs} >= 0, <= 1, :=0.5;
         set FPM := setof {mr in MRs: mr < FPMrad} mr;
         set FP2dark := setof {rho in Rhos: rho > rho0} rho;
@@ -1303,17 +1305,17 @@ class AxisymAPLC(LyotCoronagraph): # 1-D axisymmetric APLC following Zimmerman e
         field_propagation = """
         #---------------------
         var E_fpm {wr in wrs, mr in FPM} = 2*pi/wr * sum{r in Rs: r in Pupil} r*A[r]*gsl_sf_bessel_J0(2*pi*mr*r/wr)*dr;
-        var E_L {wr in wrs, r in Lyot} = A[r] - 2*pi/wr * sum{mr in FPM} mr*E_fpm[wr, mr]*gsl_sf_bessel_J0(2*pi*r*mr/wr)*dmr;
+        var E_L {wr in wrs, r in Lyot} = TelAp[r]*A[r] - 2*pi/wr * sum{mr in FPM} mr*E_fpm[wr, mr]*gsl_sf_bessel_J0(2*pi*r*mr/wr)*dmr;
         var E_fp2 {wr in wrs, rho in FP2dark} = 2*pi/wr * sum{r in Lyot} r*E_L[wr, r]*gsl_sf_bessel_J0(2*pi*rho*r/wr)*dr;
 	"""
 
         field_propagation_unocc = """
-        var E_offax_peak {wr in wrs} = 2*pi/wr * sum{r in Rs: r in Pupil union Lyot} r*A[r]*dr;
+        var E_offax_peak {wr in wrs} = 2*pi/wr * sum{r in Rs: r in Pupil inter Lyot} r*A[r]*dr;
         """
        
 	constraints = """
         #---------------------
-        maximize thrupt: sum {r in Rs: r in Pupil union Lyot} 2*pi*r*A[r]*dr / (pi/4);
+        maximize thrupt: sum {r in Rs: r in Pupil inter Lyot} 2*pi*r*A[r]*dr / (pi/4);
 
         subject to sidelobe_pos {wr in wrs, rho in FP2dark}: E_fp2[wr, rho] <=  10^(-c/2)*E_offax_peak[wr];
         subject to sidelobe_neg {wr in wrs, rho in FP2dark}: E_fp2[wr, rho] >= -10^(-c/2)*E_offax_peak[wr];
@@ -1381,7 +1383,60 @@ class AxisymAPLC(LyotCoronagraph): # 1-D axisymmetric APLC following Zimmerman e
         return 0
 
     def check_ampl_input_files(self): # dummy function for axisym APLC class
-        return True # Always pass check because there are no input files.
+        return True # Always pass the check because there are no input files for this design class.
+
+    def get_coron_masks(self): # arrays for field propagation
+        rs = np.loadtxt(self.fileorg['sol fname'])[:,0]
+        M = self.design['FPM']['M']
+        FPMrad = self.design['FPM']['R']
+        mrs = (np.arange(M) + 0.5) / M * FPMrad
+
+        TelAp = 0*rs
+        TelAp[(rs > self.design['Pupil']['centobs']*0.5/100)] = 1
+        Apod = np.loadtxt(self.fileorg['sol fname'])[:,-1]
+        LS = 0*rs
+        LS[((rs > self.design['LS']['id']*0.5/100) & \
+            (rs < self.design['LS']['od']*0.5/100))] = 1
+        return rs, mrs, TelAp, Apod, LS
+
+    def get_onax_psf(self, fp2res=8, rho_out=None, Nlam=None):
+        rs, mrs, TelAp, Apod, LS = self.get_coron_masks()
+
+        rs = np.matrix(rs).T 
+        mrs = np.matrix(mrs).T 
+        TelAp = np.matrix(TelAp).T 
+        Apod = np.matrix(Apod).T 
+        LS = np.matrix(LS).T
+
+        D = 1.
+        N = self.design['Pupil']['N']
+        dr = (D/2) / N
+        FPMrad = self.design['FPM']['R']
+        fpmres = self.design['FPM']['fpmres']
+        dmr = 1. / fpmres
+        bw = self.design['Image']['bw']
+
+        if rho_out is None:
+            rho_out = self.design['Image']['owa'] + 2
+        if Nlam is None:
+            Nlam = self.design['Image']['Nlam']
+        Nrho = np.int(np.ceil(rho_out * fp2res))
+        rhos = np.matrix(np.arange(Nrho) * 1./fp2res).T
+
+        # wavelength ratios
+        wrs = np.linspace(1.-bw/2, 1.+bw/2, Nlam)
+
+        radial_intens_polychrom = np.zeros((Nlam, Nrho))
+
+        for wi, wr in enumerate(wrs):
+            Psi_B = 2*np.pi*dr/wr * scipy.special.jn(0, 2*np.pi*mrs*rs.T/wr) * np.multiply(rs, Apod)
+            Psi_C = Apod - 2*np.pi*dmr/wr * scipy.special.jn(0, 2*np.pi*rs*mrs.T/wr) * np.multiply(mrs, Psi_B)
+            Psi_C_stop = np.multiply(Psi_C, LS)
+            Psi_D = 2*np.pi*dr * scipy.special.jn(0, 2*np.pi*rhos*rs.T/wr) * np.multiply(rs, Psi_C_stop)
+            Psi_D_0_peak = 2*np.pi*dr/wr*rs.T*np.multiply(Apod, LS)
+            radial_intens_polychrom[wi,:] = np.power(np.absolute(Psi_D)/np.absolute(Psi_D_0_peak), 2).T
+
+        return rhos, radial_intens_polychrom
 
 class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diaphragm FPM 
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 125)), ('prim',(str, 'hex3')), ('secobs',(str, 'X')), 
