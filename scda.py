@@ -1438,6 +1438,85 @@ class AxisymAPLC(LyotCoronagraph): # 1-D axisymmetric APLC following Zimmerman e
 
         return rhos, radial_intens_polychrom
 
+    def get_metrics(self, fp2res=16, verbose=True): # for Axisym APLC class
+        rs, mrs, TelAp, Apod, LS = self.get_coron_masks()
+
+        rs = np.matrix(rs).T 
+        TelAp = np.matrix(TelAp).T 
+        Apod = np.matrix(Apod).T 
+        LS = np.matrix(LS).T
+
+        D = 1.
+        N = self.design['Pupil']['N']
+        dr = (D/2) / N
+        bw = self.design['Image']['bw']
+        Nlam = self.design['Image']['Nlam']
+        wrs = np.linspace(1.-bw/2, 1.+bw/2, Nlam)
+
+        rho_out = np.min([4., self.design['Image']['owa']])
+        Nrho = np.int(np.ceil(rho_out * fp2res))
+        rhos = np.matrix(np.arange(Nrho) * 1./fp2res).T
+        p7ap_ind = np.less_equal(rhos, 0.7)
+
+        radial_intens_unocc = np.zeros((Nlam, Nrho))
+        radial_intens_telap = np.zeros((Nlam, Nrho))
+        peak_intens_unocc = np.zeros((Nlam, 1))
+        peak_intens_telap = np.zeros((Nlam, 1))
+
+        for wi, wr in enumerate(wrs):
+            Psi_unocc = 2*np.pi*dr/wr * scipy.special.jn(0, 2*np.pi*rhos*rs.T/wr) * \
+                        np.multiply(rs, np.multiply(Apod, LS))
+            Psi_telap = 2*np.pi*dr/wr * scipy.special.jn(0, 2*np.pi*rhos*rs.T/wr) * \
+                          np.multiply(rs, TelAp)
+
+            Psi_unocc_peak = 2*np.pi*dr/wr*rs.T*np.multiply(Apod, LS)
+            Psi_telap_peak = 2*np.pi*dr/wr*rs.T*TelAp
+
+            radial_intens_unocc[wi] = np.power(np.absolute(Psi_unocc), 2).T
+            radial_intens_telap[wi] = np.power(np.absolute(Psi_telap), 2).T
+            peak_intens_unocc[wi] = np.power(np.absolute(Psi_unocc_peak), 2)[0]
+            peak_intens_telap[wi] = np.power(np.absolute(Psi_telap_peak), 2)[0]
+
+        bandavg_intens_unocc = np.mean(radial_intens_unocc, axis=0)
+        bandavg_intens_telap = np.mean(radial_intens_telap, axis=0)
+        bandavg_peak_unocc = np.mean(peak_intens_unocc, axis=0)
+        bandavg_peak_telap = np.mean(peak_intens_telap, axis=0)
+
+        fwhm_ind_APLC = np.greater_equal(bandavg_intens_unocc, bandavg_peak_unocc/2)
+        fwhm_ind_TelAp = np.greater_equal(bandavg_intens_telap, bandavg_peak_telap/2)
+
+        fwhm_sum_APLC = 2*np.pi*dr*(rhos[fwhm_ind_APLC])*bandavg_intens_unocc[fwhm_ind_APLC]
+        fwhm_sum_TelAp = 2*np.pi*dr*(rhos[fwhm_ind_TelAp])*bandavg_intens_telap[fwhm_ind_TelAp]
+        p7ap_sum_APLC = 2*np.pi*dr*(rhos[p7ap_ind])*bandavg_intens_unocc[p7ap_ind]
+        p7ap_sum_TelAp = 2*np.pi*dr*(rhos[p7ap_ind])*bandavg_intens_telap[p7ap_ind]
+
+        inc_energy_telap = np.sum(2*np.pi*np.multiply(rs, np.power(TelAp,2))*dr)
+
+        self.eval_metrics['inc energy'] = inc_energy_telap
+        self.eval_metrics['tot thrupt'] = np.sum(2*np.pi*np.multiply(rhos, bandavg_intens_unocc)*drho) / inc_energy_telap
+        self.eval_metrics['fwhm thrupt'] = fwhm_sum_APLC / inc_energy_telap
+        self.eval_metrics['fwhm circ thrupt'] = fwhm_sum_APLC / (np.pi/4)
+        self.eval_metrics['p7ap thrupt'] = p7ap_sum_APLC / inc_energy_telap
+        self.eval_metrics['p7ap circ thrupt'] = p7ap_sum_APLC / (np.pi/4)
+        self.eval_metrics['rel fwhm thrupt'] = fwhm_sum_APLC / fwhm_sum_TelAp
+        self.eval_metrics['rel p7ap thrupt'] = p7ap_sum_APLC / p7ap_sum_TelAp
+        self.eval_metrics['fwhm area'] = np.sum(2*np.pi*rhos[fwhm_ind_APLC]*drho)
+
+        if verbose:
+            print("////////////////////////////////////////////////////////")
+            print("{:s}".format(self.fileorg['job name']))
+            print("Incident energy on aperture (dimensionless): {:.3f}".format(self.eval_metrics['inc energy']))
+            print("Non-binary residuals, as a percentage of clear telescope aperture area: {:.2f}%".format(100*self.eval_metrics['apod nb res ratio']))
+            print("Band-averaged total throughput: {:.2f}%".format(100*self.eval_metrics['tot thrupt']))
+            print("Band-averaged half-max throughput: {:.2f}%".format(100*self.eval_metrics['fwhm thrupt']))
+            print("Band-averaged half-max throughput, circ. ref.: {:.2f}%".format(100*self.eval_metrics['fwhm circ thrupt']))
+            print("Band-averaged r=.7 lam/D throughput: {:.2f}%".format(100*self.eval_metrics['p7ap thrupt']))
+            print("Band-averaged r=.7 lam/D throughput, circ. ref.: {:.2f}%".format(100*self.eval_metrics['p7ap circ thrupt']))
+            print("Band-averaged relative half-max throughput: {:.2f}%".format(100*self.eval_metrics['rel fwhm thrupt']))
+            print("Band-averaged relative r=0.7 lam/D throughput: {:.2f}%".format(100*self.eval_metrics['rel p7ap thrupt']))
+            print("Band-averaged FWHM PSF area / (lambda0/D)^2: {:.2f}".format(self.eval_metrics['fwhm area']))
+
+
 class SPLC(LyotCoronagraph): # SPLC following Zimmerman et al. (2016), uses diaphragm FPM 
     _design_fields = OrderedDict([ ( 'Pupil', OrderedDict([('N',(int, 125)), ('prim',(str, 'hex3')), ('secobs',(str, 'X')), 
                                                            ('thick',(str, '025')), ('centobs',(int, 1)),
